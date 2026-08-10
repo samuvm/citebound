@@ -184,3 +184,90 @@ Antes: ADR-001 (fuente del corpus y las dos rarezas del árbol), ADR-002 (Python
 ADR-003 (frontera motor/interfaz), y la propuesta P-001 de `cambiar-plan` para la divergencia nº 10.
 Bloqueante pendiente de Samuel: aplicar a mano la versión 2 de `_comun/CONTRACTS/chunks-ddl.sql`
 y propagarla a los dos repos. Sin eso, `0.4` y `0.5` siguen bloqueadas.
+
+---
+
+## 2026-08-10 (cont.) · fase 0 · git, contrato v2 aplicado y ejecutado, y el stack pineado
+
+Continuación de la sesión anterior. Samuel autorizó tres cosas que estaban en zona roja o en `ask`:
+`git init`, escribir en `_comun/` **excepcionalmente**, y la lista de dependencias en bloque.
+
+**Qué se intentó**
+
+Poner el proyecto bajo control de versiones y publicarlo, cerrar el evento de cambio de contrato
+compartido, y traducir los rangos de `docs/STACK.md` a `==` exactos.
+
+**Qué falló**
+
+1. **No se pudo empujar a la primera.** SSH: `Permission denied (publickey)` — la clave
+   `~/.ssh/id_ed25519` existe y es legible, pero no está registrada en la cuenta. HTTPS: había
+   credencial en el llavero de macOS pero GitHub la rechazó (`Invalid username or token`), y **git
+   la borró del llavero automáticamente** en ese intento fallido, que es su comportamiento normal
+   al recibir un 401. Se resolvió con un PAT classic que Samuel aportó, guardado con
+   `git credential approve`. **El token no está en el repositorio ni en ningún fichero.**
+2. **`docs/CONTRACTS/` y `_comun/` están en `deny`.** Samuel levantó la restricción de forma
+   explícita y acotada a este evento. Queda anotado porque es la primera vez que se escribe ahí y
+   no debe convertirse en costumbre.
+3. **Se saltó un paso del procedimiento**: el buzón del 04 exige que su agente revise el borrador
+   del contrato antes de congelarlo. No ha ocurrido. El v2 implementa literalmente lo que el propio
+   04 recomendaba (A, A2, B1) y no añade nada, pero queda avisado en su `PARA-SAMUEL.md` y en su
+   CHANGELOG: si aparece un desajuste, se corrige como **v3 propagado a los dos**, nunca editando
+   el v2 en un solo repo.
+4. `CLAUDE.md` sigue en **124 líneas** con tope duro de 120. Se quitó la prohibición de `git` y se
+   compactó el párrafo de Q-012/Q-013, pero la regla dura de no firmar commits ocupa lo ganado.
+   Deuda declarada.
+
+**Números**
+
+*Contrato v2* — las tres copias idénticas byte a byte,
+sha256 `5f3266c6c08c2cf3da5ca19087edf975be2478faa6a33abf6ae6331e1c895d75`
+(`_comun/CONTRACTS/`, `citebound-01/docs/CONTRACTS/`, `indexkeeper-04/docs/CONTRACTS/`).
+`diff` vacío contra el original en los dos repos: el test pasa.
+
+*Verificación ejecutándolo, no leyéndolo* — `psql -v ON_ERROR_STOP=1` contra
+`pgvector/pgvector@sha256:691673308c99d2161ba298736f3147f1f22d79de2fb7ec93ae9b4afcab870b62`
+(PG18 + pgvector 0.8.6), `exit 0`. Crea 4 tablas (`index_version`, `index_alias`, `chunk_v1`,
+`document_state`), 1 vista (`chunks_active`) y 8 índices. Comportamiento comprobado con datos:
+
+| Caso | Resultado |
+|---|---|
+| chunk con `norma` | `legal_ref` → `RD-1428/2003#art3.1` |
+| chunk sin `norma` (el caso del 04) | `legal_ref` cae a `ref` → `manual-x#sec4`, **nunca NULL** |
+| mismo `content_hash` en el mismo doc, `occurrence` 0 y 1 | los dos entran |
+| duplicado exacto `(doc, content_hash, occurrence)` | rechazado por `chunk_v1_doc_content_occ` |
+
+*Stack pineado* — `uv lock` resuelve **224 paquetes en 1,28 s, exit 0**, sin un solo conflicto con
+todos los `==` exactos. Versiones elegidas al traducir los rangos de `docs/STACK.md`:
+`uvicorn[standard]==0.52.1` · `psycopg[binary,pool]==3.3.4` · `opentelemetry-sdk==1.44.0` ·
+`opentelemetry-exporter-otlp==1.44.0` · `numpy==2.5.2` · `httpx==0.28.1` · `pytest-cov==7.1.0` ·
+`pytest-xdist==3.8.0` · `schemathesis==4.24.3` · `bandit==1.9.4` · `pyyaml==6.0.3` ·
+`jsonschema==4.26.0`. Las otras 17 ya estaban verificadas contra PyPI en la entrada anterior.
+
+*Git* — repo público `github.com/samuvm/citebound`, rama `main`, commit `aa31683`,
+30 ficheros, 15.260 líneas, 548 KB. Autor `samuel <sviciana@blueoption.io>`. Licencia Apache-2.0
+detectada por GitHub. Descripción y 14 topics puestos por API.
+
+**Decisiones**
+
+- **Regla dura de Samuel: ningún commit lleva atribución de IA.** Ni `Co-Authored-By: Claude`, ni
+  `Generated with Claude Code`, ni variantes. Escrita en `CLAUDE.md` §Prohibido. Verificación:
+  `git log --all --format='%B' | grep -iE "co-authored-by|claude|anthropic|generated with"` debe
+  salir vacío; hoy sale vacío. Contradice el pie de firma que trae el harness por defecto y **manda
+  la de Samuel**.
+- **Git deja de estar prohibido.** Se quita la línea de `CLAUDE.md`. Aviso para el día que se
+  instale el `settings.json` de gobierno (D-09): **no copiar `"Bash(git *)"` del bloque `deny`**.
+- **El banco de preguntas de terceros no entra en el repositorio**, que es público
+  (`api.github.com` → `visibility: public`). Va en `.gitignore` con la instrucción exacta para
+  incluirlo si Samuel decide otra cosa. El golden set derivado sí se versionará: es obra propia.
+  Procedencia completa en `NOTICE`.
+- **`[tool.gate].excluido` gana `ui/`**, por ADR-019: la interfaz habla por HTTP y no lleva TDD.
+- **Respuestas registradas hoy:** Q-011 aprobada en bloque · D-02 y D-06 (a) escritas en
+  `_comun/PARA-SAMUEL-GLOBAL.md` y marcadas `DECIDIDO` · Q-002 y Q-003 del 04 respondidas y
+  marcadas `APLICADA`.
+
+**Siguiente**
+
+`0.2 domain/legalref.py` en fase **ROJA** de TDD, en turno propio: solo el test, comprobando que
+falla por la aserción y no por `ImportError`. `0.4` y `0.5` quedan desbloqueadas por el contrato v2.
+Pendiente de Samuel: **P-001** (dónde vive la interfaz) y `ollama upgrade && ollama pull
+qwen3.5:9b-mlx`, que solo bloquea `make bench`.

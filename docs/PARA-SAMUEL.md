@@ -374,11 +374,16 @@ Dependencias previstas y ya justificadas por `docs/STACK.md`: `fastapi`, `uvicor
 rangos de `docs/STACK.md` son la investigación, no el pin: el agente traduce cada rango a un `==`
 concreto en `pyproject.toml` y anota la versión elegida en `docs/JOURNAL.md` (constitución §7.2).
 
-`[ ] apruebo la lista de arriba en bloque   [ ] las quiero una a una`
+`[x] apruebo la lista de arriba en bloque   [ ] las quiero una a una`
 
 **Tiempo tuyo:** 2 minutos ahora; después, 30 segundos por petición.
-**Estado: PENDIENTE**
-`>> `
+**Estado: RESPONDIDA · 2026-08-10**
+`>> ` **Aprobada en bloque.** Cualquier paquete **fuera** de esa lista sigue exigiendo permiso
+explícito en el mismo turno.
+
+Los rangos de `docs/STACK.md` se han traducido a `==` exactos en `pyproject.toml` y cada versión
+elegida queda anotada en `docs/JOURNAL.md` (constitución §7.2). Desbloquea `0.2 domain/legalref.py`,
+la primera unidad de código del proyecto.
 
 ---
 

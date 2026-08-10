@@ -16,6 +16,42 @@ Regla que aplica también aquí: cambiar un fichero de `docs/CONTRACTS/` es un e
 
 ## [No publicado]
 
+### Contrato · `chunks-ddl.sql` v1 → v2 · 2026-08-10
+
+**Evento consciente de cambio de contrato compartido.** Propagado a mano a `_comun/CONTRACTS/` y a
+`docs/CONTRACTS/` de **`citebound-01` e `indexkeeper-04`**, byte a byte idénticos
+(sha256 `5f3266c6c08c2cf3da5ca19087edf975be2478faa6a33abf6ae6331e1c895d75`). Anotado también en el
+CHANGELOG del 04. Decidido por Samuel en los dos buzones a la vez: Q-012 = **A** y Q-013 = **A2+B1**
+aquí, espejo de Q-002 y Q-003 allí. Razonamiento y coste en
+`docs/adr/018-chunks-ddl-v2-y-conmutacion.md`.
+
+- **`chunk_id` deja de incluir la posición.** De `sha256(doc_id:ordinal:content_hash)[:24]` a
+  `blake2b(doc_id ‖ content_hash ‖ occurrence, digest_size=16)`. Con el ordinal dentro del hash,
+  insertar un párrafo cambiaba todos los `chunk_id` del documento y hacía `G-INCR-2` del 04
+  inalcanzable **por construcción**. Aquí no afecta a ninguna métrica: todo se ancla en `legal_ref`
+  (R1), nunca en `chunk_id`.
+- **Nueva columna `occurrence`**, que desempata contenido idéntico dentro de un mismo documento —en
+  texto legal hay apartados cortos repetidos literalmente—. `ingest/chunking.py` gana un invariante
+  y una propiedad Hypothesis. **`ordinal` sigue siendo columna**, así que la propiedad «la
+  concatenación ordenada de los chunks de un artículo reproduce su texto exacto» queda intacta.
+- **Campos legales opcionales** en el contrato compartido: entra `ref TEXT NOT NULL` genérico y
+  `norma`/`articulo`/`apartado` pasan a nullables. `legal_ref` sigue siendo columna generada y
+  **nunca nula**: cae a `ref` cuando el corpus no es normativo. Condición de este proyecto: su DDL
+  propio añade `CHECK (norma IS NOT NULL)` con test de contrato, o `G-HALLUC` mediría contra un
+  conjunto roto.
+- **Conmutación de índice por vista.** Desaparecen `index_version.is_active` y su índice único
+  parcial; entran la tabla `index_alias` y la vista `chunks_active`. Permite migrar de dimensión de
+  embedding sin parar y deshacer con `DROP TABLE` en vez de `DELETE` de millones de filas. Condición
+  de este proyecto, escrita en el propio contrato: **el informe de eval registra el destino físico
+  resuelto** (`index_alias.index_version` + `physical_table`), nunca el alias, o `G-EVAL-DET`
+  dejaría de significar nada.
+- **Verificado ejecutándolo**, no solo leyéndolo: el DDL corre entero contra
+  `pgvector/pgvector@sha256:69167330…` (PG18 + pgvector 0.8.6) con `ON_ERROR_STOP=1`, crea las 4
+  tablas, la vista y los 8 índices; `legal_ref` compone `RD-1428/2003#art3.1` con norma y cae a
+  `manual-x#sec4` sin ella; y `UNIQUE (index_version, doc_id, content_hash, occurrence)` rechaza el
+  duplicado exacto.
+- **Desbloquea** las tareas `0.4` (`ingest/chunking.py`) y `0.5` (`db/ddl.sql`).
+
 ### Añadido
 - Capa de gobierno inicial: `CLAUDE.md`, `docs/GOALS.yaml`, `docs/PLAN.md`, `docs/RULES.md`,
   `docs/PARA-SAMUEL.md`, `docs/JOURNAL.md`, `docs/adr/000-plantilla.md`, `.claude/state/STATE.md`.

@@ -7,15 +7,45 @@
 
 ---
 
-> ### ⚠️ Estado: fase 0, sin código todavía
+> ### ⚠️ Fase 0 de 5. **Ningún número de esta página está medido todavía**
 >
-> Este repositorio está en su primer commit. Hoy contiene el **gobierno del proyecto**, el
-> **corpus congelado** y las **decisiones de arquitectura** tomadas antes de escribir la primera
-> línea. No hay `src/`, no hay `Makefile` y **ningún número de los que aparecen abajo está medido
-> aún**: son los umbrales que la puerta de calidad exigirá, no resultados.
->
-> Cuando haya resultados se publicarán con su `n`, su intervalo de confianza y el artefacto del
-> que salen — salgan como salgan. Esa es la política declarada del proyecto.
+> Los umbrales de más abajo son lo que la puerta de calidad **exigirá**, no resultados. Cuando
+> haya resultados se publicarán con su `n`, su intervalo de confianza y el artefacto del que
+> salen — salgan como salgan. Es la política declarada del proyecto, escrita antes de que doliera.
+
+## Dónde está
+
+Una fase **solo** se marca hecha cuando `make done MILESTONE=N` devuelve 0. No hay «casi hecho»:
+el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
+[`docs/PLAN.md`](docs/PLAN.md).
+
+- [ ] **0 · Esqueleto vertical que camina** — *en curso* · una norma, un artículo por trozo, sin reordenador y sin agente: feo pero de punta a punta
+- [ ] **1 · Scoring congelado y golden set** — el corrector se cierra **antes** de anotar el primer caso
+- [ ] **2 · Retrieval híbrido** — cada cambio se acepta o se tira con el número de recall, no con la sensación
+- [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
+- [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
+- [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
+- [ ] **5 · Endurecimiento y publicación** — suite adversarial, observabilidad, arranque en frío
+- [ ] 6 · Personalización — **ampliación**. No hacerla no es un fallo, y se dice así
+
+<details>
+<summary><b>Fase 0, tarea a tarea</b></summary>
+
+- [x] `0.1` corpus congelado desde el BOE, con su `sha256` en `corpus/MANIFEST.yaml`
+- [ ] `0.2` `domain/legalref.py` — **tests en rojo escritos**, implementación pendiente
+- [ ] `0.3` `ingest/boe_xml.py` — el parser estructural
+- [ ] `0.4` `ingest/chunking.py` — troceado con invariante de no pérdida
+- [ ] `0.5` `db/ddl.sql` — el esquema, sobre el contrato compartido v2
+- [ ] `0.6` `providers/embeddings.py`
+- [ ] `0.7` `retrieval/vector.py` + `api/ask.py` + `Makefile` con la puerta rápida
+- [ ] salida: `make up && make warm && make smoke-f0` → exit 0
+
+Hecho además: contrato `chunks-ddl.sql` subido a v2 y **verificado ejecutándolo** contra PG18 +
+pgvector; `pyproject.toml` con versiones exactas; y cuatro ADR.
+El detalle vivo está en [`docs/JOURNAL.md`](docs/JOURNAL.md); los números medidos irán, fase a
+fase, en [`CHANGELOG.md`](CHANGELOG.md), que hoy está vacío de números porque no hay ninguno.
+
+</details>
 
 ---
 

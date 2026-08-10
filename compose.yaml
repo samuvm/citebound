@@ -1,0 +1,50 @@
+# =============================================================================
+# Entorno local de citebound-01
+# =============================================================================
+# AQUI NO HAY OLLAMA, Y ES DELIBERADO (RULES R9, docs/STACK.md §0).
+#
+# Docker en macOS no pasa la GPU. Meter Ollama en un contenedor lo hace entre 5 y
+# 20 veces mas lento, tira por tierra el presupuesto de p95 de G-TTFT, y nadie
+# entiende por que. Ollama corre en el HOST y se accede por host.docker.internal.
+# `tests/contract/test_compose.py` falla si alguien anade un servicio ollama/*.
+#
+# La imagen va por DIGEST, nunca por tag (constitucion §7.2): un tag es mutable y
+# un digest no. Este es el mismo con el que se verifico el DDL el 2026-08-10.
+#
+# El puerto es una VARIABLE, no una edicion. D-03 dice que esta maquina comparte
+# cinco proyectos, y el 2026-08-10 el 5433 ya estaba cogido por `eade-postgres` de
+# otro trabajo de Samuel. Chocar de puerto cuesta una tarde y no ensena nada, asi
+# que se elige por entorno y el 5434 es solo el valor por defecto:
+#     CITEBOUND_PG_PORT=5440 make up
+# =============================================================================
+
+services:
+  postgres:
+    image: pgvector/pgvector@sha256:691673308c99d2161ba298736f3147f1f22d79de2fb7ec93ae9b4afcab870b62
+    container_name: citebound-postgres
+    environment:
+      POSTGRES_USER: citebound
+      POSTGRES_PASSWORD: citebound
+      POSTGRES_DB: citebound
+    ports:
+      - "${CITEBOUND_PG_PORT:-5434}:5432"
+    volumes:
+      # /var/lib/postgresql y NO .../data. PostgreSQL 18 cambio el layout de la
+      # imagen oficial a directorios por version mayor, para que `pg_upgrade --link`
+      # no cruce una frontera de montaje. Montar en .../data, que es lo que dice
+      # cualquier tutorial escrito antes de 2026, hace que el contenedor arranque y
+      # se cierre con exit 1 diciendo "unused mount/volume".
+      # docker-library/postgres#1259 · verificado el 2026-08-10.
+      - citebound-pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U citebound -d citebound"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    extra_hosts:
+      # Para que el dia que algo del contenedor necesite hablar con Ollama, la
+      # ruta ya este puesta y nadie tenga la tentacion de meterlo aqui dentro.
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  citebound-pgdata:

@@ -157,6 +157,10 @@ files = ["src/citebound/domain", "src/citebound/ingest"]
 [tool.pytest.ini_options]
 minversion = "9.0"
 testpaths = ["tests"]
+# La raíz, para que los tests de contrato puedan importar `scripts/`: los
+# comprobadores del gate son código con lógica de verdad y merecen su propio test,
+# no solo ejecutarse a ciegas desde el Makefile.
+pythonpath = ["."]
 # --cov-context=test es OBLIGATORIO: sin él check_function_coverage.py no puede
 # saber qué test ejerció cada línea, y "un test por función" deja de ser medible.
 addopts = "--strict-markers --strict-config --cov=citebound --cov-context=test"

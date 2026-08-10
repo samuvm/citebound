@@ -613,3 +613,74 @@ También: `testcontainers.postgres` está deprecado en 4.15.0 a favor de
 
 `0.6 providers/embeddings.py`. También TDD prohibido (`RULES` §3): se graba primero contra el
 `bge-m3` real que ya está en Ollama y se testea contra la grabación.
+
+---
+
+## 2026-08-10 (cont. 7) · fase 0 · `0.6` y `0.7`: la rebanada camina de punta a punta
+
+**Qué se intentó**
+
+Cerrar `providers/embeddings.py` y `0.7` entera: búsqueda vectorial, API, CLI,
+`compose.yaml`, `Makefile` y el humo de salida.
+
+**Qué falló**
+
+Cuatro cosas, y tres las descubrió ejecutar en vez de leer:
+
+1. **Mi propio docstring metía `chunk_id` en el OpenAPI.** El texto decía «esto NO se
+   identifica por `chunk_id`», que es lo contrario de una infracción — pero un `grep` a
+   ciegas no distingue. Peor: el culpable final era **el nombre del comprobador citado en
+   el docstring**, `check_no_chunk_ids.py`. Confirma la decisión de que
+   `scripts/check_no_chunk_ids.py` revise **nombres de propiedad y de esquema**, no el
+   texto entero: un comprobador que grita sin motivo lo desactiva alguien en dos semanas.
+2. **El puerto 5433 estaba cogido** por `eade-postgres`, otro trabajo de Samuel corriendo
+   en la misma máquina. No se toca lo ajeno: el puerto pasa a ser **variable**
+   (`CITEBOUND_PG_PORT`, por defecto 5434) en vez de una edición. Es exactamente el
+   escenario de D-03, y ya van dos puertos ocupados de dos.
+3. **PostgreSQL 18 cambió el punto de montaje.** `- volumen:/var/lib/postgresql/data`,
+   que es lo que dice cualquier tutorial escrito antes de 2026, hace que el contenedor
+   arranque y salga con `exit 1` diciendo *«unused mount/volume»*. PG18 usa
+   subdirectorios por versión mayor para que `pg_upgrade --link` no cruce una frontera de
+   montaje. Se monta en `/var/lib/postgresql` a secas, con la referencia escrita
+   (docker-library/postgres#1259) y un test de contrato que lo fija.
+4. `scripts/` no era importable desde los tests. Se añade `pythonpath = ["."]`: los
+   comprobadores del gate son código con lógica de verdad y merecen su propio test, no
+   solo ejecutarse a ciegas desde el `Makefile`.
+
+**Números**
+
+| | |
+|---|---|
+| Suite | **266 pasan** (255 rápidos + 11 de integración) |
+| `make gate-fast` | **VERDE** en 0,97 s |
+| `make smoke-f0` | **VERDE** · 235 chunks, 3/3 preguntas con ≥1 ref del índice, **10,0 s** |
+| Cobertura de `[tool.gate].testable` | **100 %** de línea y rama en los tres módulos |
+| `ruff` · `format` · `mypy --strict` · `bandit` | limpios, 0 hallazgos |
+
+Recuperación real, sin reranker y sin agente: *«¿con qué diligencia hay que conducir?»* →
+`RD-1428/2003#art3`, que es literalmente «Se deberá conducir con la diligencia y precaución
+necesarias». *«¿cómo se computan los carriles?»* → `art31`. *«adelantar en cambio de
+rasante»* → `art87`. Es la línea base contra la que la fase 2 tendrá que mejorar **con un
+número**, y por eso se anota aquí antes de tocar nada.
+
+**Decisiones**
+
+- **`make check-ollama` compara `>=` y no `==`**, con el motivo escrito en el propio
+  `Makefile`: un binario del host que se autoactualiza no se puede clavar exacto sin
+  pelearse con quien lo actualiza. El pin exacto vive donde sí se sostiene:
+  `pyproject.toml` y el digest de `compose.yaml`. Hoy la máquina tiene 0.32.7 y
+  `docs/STACK.md` dice 0.32.6.
+- **La fase 0 no tiene generador, y se dice en tres sitios**: en el campo
+  `generado_por: "retrieval-only"` de la respuesta, en el `--help` del CLI y en el README.
+  `G-HALLUC` es cero hoy porque no hay nada que pueda alucinar, no porque el sistema sea
+  listo. Publicar el número sin decirlo sería justo lo que D-06 prohíbe.
+- **`EF_SEARCH = 100` declarado en el código**, no dejado al valor por defecto (error nº 12
+  de `RULES`), y la consulta va por `chunks_active` y nunca por `chunk_v1`.
+
+**Siguiente**
+
+Las siete tareas de la fase 0 están hechas y su criterio de salida está verde. **`make done
+MILESTONE=0` no existe todavía y no es lo mismo**: necesita `thresholds.lock` —que solo
+genera Samuel al aprobar `docs/GOALS.yaml`—, `tests/holdout/` escrito por el subagente
+`qa-adversario`, y `mutmut`. Se presentan los números y se para; la fase 1 no se abre sin
+su visto bueno (CLAUDE.md regla 5).

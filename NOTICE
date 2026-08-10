@@ -1,0 +1,60 @@
+Citebound · tutor de normativa de circulación
+Copyright 2026 Samuel Viciana Moreno
+
+Este producto incluye software desarrollado por Samuel Viciana Moreno,
+distribuido bajo la licencia Apache 2.0 (ver LICENSE).
+
+================================================================================
+DATOS · lo que la licencia del código NO cubre
+================================================================================
+
+La licencia Apache 2.0 de este repositorio se aplica al CÓDIGO. Los datos que
+acompañan al proyecto tienen su propia procedencia y sus propias condiciones,
+y se declaran aquí en cumplimiento de la política de honestidad del proyecto
+(_comun/PARA-SAMUEL-GLOBAL.md, D-06, opción a).
+
+--------------------------------------------------------------------------------
+1. Corpus normativo · corpus/raw/
+--------------------------------------------------------------------------------
+
+Real Decreto 1428/2003, de 21 de noviembre, por el que se aprueba el Reglamento
+General de Circulación.
+
+  Identificador : BOE-A-2003-23514
+  Fuente        : Agencia Estatal Boletín Oficial del Estado · datos abiertos
+                  https://www.boe.es/datosabiertos/
+  Consolidación : 2026-07-31T08:26:21Z
+  Descargado    : 2026-08-10
+  sha256        : 1105a26b121e2048816438ddf8a36910e04d5a92ee49e87982608d027ab40072
+
+Información del sector público, reutilizable conforme a la normativa española de
+reutilización de la información del sector público. El texto se reproduce sin
+modificar; su carácter oficial corresponde únicamente a la publicación del BOE.
+Este proyecto no es una fuente jurídica y sus respuestas no son asesoramiento
+legal.
+
+--------------------------------------------------------------------------------
+2. Banco de preguntas tipo test · NO INCLUIDO en este repositorio
+--------------------------------------------------------------------------------
+
+El golden set se construye a partir de un banco de preguntas tipo test de
+circulación de terceros, de acceso público en internet. Ese banco NO se
+redistribuye aquí: está excluido en .gitignore y no forma parte de este
+repositorio en ninguna de sus versiones.
+
+Lo que sí se publica es el golden set derivado (evals/golden/v*.jsonl): la
+pregunta, la referencia legal propuesta por el sistema y la revisión humana que
+la valida. El campo `provenance` de cada caso declara su origen, y ningún caso
+entra sin revisión humana (docs/CONTRACTS/retrieval-metrics.md §3).
+
+Las imágenes asociadas al banco original no se descargan, no se procesan y no se
+publican. Las 193 preguntas que necesitan verlas para responderse quedan fuera
+del golden set, y así se declara.
+
+--------------------------------------------------------------------------------
+3. Modelos
+--------------------------------------------------------------------------------
+
+Se ejecutan en local y no se redistribuyen. Todos Apache-2.0:
+Qwen3.5 (generador) · Gemma 4 (juez) · BGE-M3 (embeddings) ·
+Qwen3-Reranker-0.6B (reordenador).

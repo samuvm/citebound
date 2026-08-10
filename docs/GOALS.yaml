@@ -1,0 +1,534 @@
+# =============================================================================
+# METAS EJECUTABLES · citebound-01
+# =============================================================================
+# ZONA ROJA. Este fichero es SOLO LECTURA para el agente. Esta en permissions.deny.
+# Un cambio de umbral, de comando o de bloqueante_desde_fase se PROPONE en
+# docs/PARA-SAMUEL.md con el formato de CONSTITUCION.md §3 y lo aplica Samuel a mano.
+# Que Samuel sugiera un cambio no lo convierte en aprobado: el agente escribe la
+# propuesta, expone que se pierde, y espera confirmacion explicita.
+#
+# sha256 de este fichero vive en thresholds.lock, en la raiz del proyecto.
+# `make done` compara ambos; si difieren, rojo sin excepcion. Solo Samuel regenera
+# el lock, y solo despues de poner Estado: APROBADA en la propuesta correspondiente.
+#
+# FORMA: este fichero cumple docs/CONTRACTS/goals.schema.json (contrato transversal v1).
+# Todo umbral es ESTRUCTURADO ({operador, valor, unidad}), nunca prosa: un umbral en
+# prosa no lo puede leer goals-check.sh, y entonces la meta no bloquea nada.
+# Se valida con:
+#   uv run --with pyyaml --with jsonschema python -c "import yaml,json,jsonschema;\
+#   jsonschema.validate(yaml.safe_load(open('docs/GOALS.yaml')),\
+#   json.load(open('docs/CONTRACTS/goals.schema.json')))"
+#
+# La longitud de este fichero es libre (CONSTITUCION §1.1: solo CLAUDE.md y STATE.md
+# tienen tope duro). 24 metas con comando y artefacto explicitos: ninguna es prosa y
+# ninguna es decorativa. Toda meta lleva el comando EXACTO que la mide; una meta sin
+# comando no es una meta. Las metas del PROJECT.md original que no eran automatizables
+# tal como estaban escritas se han redefinido, y cada redefinicion lo dice en su `nota`.
+# =============================================================================
+
+version: 1
+proyecto: citebound-01
+
+contrato_forma: docs/CONTRACTS/goals.schema.json          # version 1
+contrato_metricas: docs/CONTRACTS/retrieval-metrics.md    # version 1
+contrato_informe: docs/CONTRACTS/eval-report.schema.json  # version 1
+
+# Obligatorio porque hay metas de latencia (G-TTFT, G-TTVA, G-COLD-CACHE).
+# Un p95 sin hardware declarado no es comparable con nada.
+hardware_referencia: >
+  MacBook Pro M4 Max, 36 GB de memoria unificada, 14 nucleos, macOS. Condiciones de
+  medida obligatorias (docs/RULES.md R11 y docs/PARA-SAMUEL.md Q-006): portatil
+  enchufado, sin throttling termico entre repeticiones, modelo residente
+  (OLLAMA_KEEP_ALIVE >= 10m), ninguna otra carga de GPU en la maquina.
+
+# --- Estadistica de la puerta (retrieval-metrics.md §4). No se toca sin propuesta. ---
+comparacion:
+  metodo: bootstrap
+  pareado: true              # SIEMPRE sobre los mismos casos. El no pareado hace la puerta ciega
+  n_resamples: 10000
+  semilla: 20260808          # vive aqui, NUNCA en el codigo
+  correccion_multiple: holm  # se vigilan >3 metricas bloqueantes; es el default del contrato
+  motivo_correccion: >
+    Holm-Bonferroni, no Benjamini-Hochberg. Holm controla la FWER —la probabilidad de
+    bloquear AL MENOS UNA VEZ sin causa— y eso es exactamente lo que importa en una
+    puerta: un falso bloqueo cuesta una tarde, erosiona la confianza, y la puerta que
+    bloquea sin motivo se acaba desactivando. Benjamini-Hochberg controla la FDR y es
+    correcto para un panel de diagnostico donde un falso positivo aislado no bloquea
+    nada (el desglose por materia, G-CITA-F1), no para la puerta. Holm es ademas
+    uniformemente mas potente que Bonferroni y no exige supuestos adicionales.
+  regla: >
+    Una meta bloquea si su valor cae bajo el umbral absoluto O si el IC95 de la
+    diferencia pareada contra la ultima linea base verde queda enteramente bajo cero.
+  mde_publicado: empirico    # el README publica el MDE medido por remuestreo, no el estimado
+
+# --- Denominadores. Definidos en retrieval-metrics.md §2. ---
+denominadores:
+  P: casos golden tipo=positivo (>= 150)
+  N: casos golden tipo=negativo (>= 40)
+  R: casos de P respondidos, es decir no abstenidos
+
+metas:
+
+  # ---------------------------------------------------------------- fase 0 ---
+  - id: G-HALLUC
+    nombre: Referencias emitidas que no existen en el corpus congelado
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-HALLUC].value"
+    bloqueante_desde_fase: 0
+    tipo: nucleo
+    requiere: [corpus]
+    propuesta_admisible: false
+    nota: >
+      Igual que el documento original, pero ahora es determinista y sin LLM: pertenencia
+      de la legal_ref al conjunto de refs del index_version activo. Con cita cerrada
+      ([[REF:n]]) es un invariante estructural, no un numero afortunado; la eval lo confirma.
+      Como se resuelve "activo" depende de Q-013 (is_active del contrato vs vista chunks_active).
+
+  - id: G-SECRETS
+    nombre: Hallazgos nuevos de detect-secrets
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+    comando: "detect-secrets scan --baseline .secrets.baseline"
+    artefacto: ".claude/state/gate-status.json :: secrets.new_findings"
+    bloqueante_desde_fase: 0
+    tipo: nucleo
+    requiere: [ninguno]
+    propuesta_admisible: false
+
+  # ---------------------------------------------------------------- fase 1 ---
+  - id: G-GOLDEN-VALID
+    nombre: Golden set valido, estratificado y con procedencia declarada
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+      adicionales:
+        - etiqueta: casos_positivos
+          operador: ">="
+          valor: 150
+        - etiqueta: casos_negativos
+          operador: ">="
+          valor: 40
+        - etiqueta: materias_con_20_casos_o_mas
+          operador: ">="
+          valor: 6
+    comando: "make golden-validate"
+    artefacto: "evals/golden/VALIDATION.json :: errores"
+    bloqueante_desde_fase: 1
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: false
+    nota: >
+      Nuevo. Convierte el criterio de salida de la fase 1 en un comando. El umbral principal
+      son 0 errores; los `adicionales` son el suelo estadistico. Verifica ademas: esquema
+      Pydantic valido en el 100 % de los casos; toda ref existe en corpus/index/refs.json;
+      sin preguntas duplicadas (coseno < 0,95 entre pares); el 15 % minimo de negativos del
+      contrato, con margen; provenance y revisor presentes en el 100 %; sha256 registrado.
+
+  - id: G-COV-FUNC
+    nombre: Funciones publicas de [tool.gate].testable sin contexto de test
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+    comando: "pytest tests/unit --cov --cov-context=test --cov-report=json:/tmp/cov.json && python scripts/check_function_coverage.py"
+    artefacto: ".claude/state/gate-status.json :: coverage.functions_without_test"
+    bloqueante_desde_fase: 1
+    tipo: nucleo
+    requiere: [ninguno]
+    propuesta_admisible: false
+    nota: >
+      Operacionaliza "un test unitario por cada funcion" del encargo sin caer en el
+      porcentaje global que el PROJECT.md rechaza con razon. Excepciones solo via
+      [tool.gate].sin_test_requerido, y cada una lleva motivo escrito o el gate la rechaza.
+
+  # ---------------------------------------------------------------- fase 2 ---
+  - id: G-RECALL5
+    nombre: Recall de articulo en top-5 tras rerank
+    umbral:
+      operador: ">="
+      valor: 0.90
+      unidad: ratio
+    comando: "make eval-retrieval"
+    artefacto: "evals/reports/retrieval-latest.json :: metrics[id=G-RECALL5].value"
+    bloqueante_desde_fase: 2
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      REDEFINIDA. El PROJECT.md media "context recall @5" sobre chunks recuperados; eso
+      invalida el golden set entero cada vez que cambia el troceado, que es justo lo que pasa
+      en esta fase. Ahora se mapea chunk -> legal_ref y se comparan conjuntos de referencias
+      legales (retrieval-metrics.md §2). Coste ~90 s y sin LLM generador: es la unica meta de
+      calidad barata, y por eso entra en el gate de turno desde la fase 2.
+
+  - id: G-RECALL30
+    nombre: Recall de articulo pre-rerank, top-30
+    umbral:
+      operador: ">="
+      valor: 0.97
+      unidad: ratio
+    comando: "make eval-retrieval"
+    artefacto: "evals/reports/retrieval-latest.json :: metrics[id=G-RECALL30].value"
+    bloqueante_desde_fase: 2
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      NUEVA. Sin ella, un G-RECALL5 bajo no dice si la culpa es del recuperador o del
+      reordenador, y se optimiza a ciegas. Si G-RECALL30 falla, el problema esta en el indice.
+
+  - id: G-COV-LINE
+    nombre: Cobertura de linea en los paquetes testable
+    umbral:
+      operador: ">="
+      valor: 85
+      unidad: porcentaje
+    comando: "make test"
+    artefacto: "coverage.json :: totals.percent_covered (filtrado a [tool.gate].testable)"
+    bloqueante_desde_fase: 2
+    tipo: nucleo
+    requiere: [ninguno]
+    propuesta_admisible: true
+    nota: >
+      Igual al PROJECT.md. En PORCENTAJE (85), no en ratio: es el mismo numero y la misma
+      unidad que [tool.gate].cobertura_linea_min de docs/RULES.md §4, y asi el check cruzado
+      compara 85 con 85. Sin objetivo global: perseguir el 100 % en adaptadores es ruido.
+
+  # ---------------------------------------------------------------- fase 3 ---
+  - id: G-CITA-PRECISION
+    nombre: Precision de cita, definicion literal del contrato transversal
+    umbral:
+      operador: ">="
+      valor: 0.85
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-CITA-PRECISION].value"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      PAREJA ATOMICA CON G-COBERTURA: el gate las evalua como UNA sola condicion (RULES R16),
+      porque sin la pareja la forma optima de subir esta metrica es abstenerse siempre.
+      REDEFINIDA respecto al PROJECT.md, pero NO respecto al contrato: es literalmente
+      docs/CONTRACTS/retrieval-metrics.md §2,
+      precision_cita = casos_con_todas_las_citas_en_R / casos_respondidos_no_abstenidos.
+      "Es el articulo citado el del golden set, exacto si/no" no resolvia cuatro casos que salen
+      constantemente y el contrato los cierra: varias citas (todas deben pertenecer a R; una
+      correcta mas una inventada es fallo), granularidad de apartado (si el caso especifica
+      apartado, la cita debe incluirlo; si no lo especifica, citarlo es correcto si el articulo
+      coincide), respuesta apoyada en dos articulos (basta citar uno y ninguno fuera de R), y
+      abstenciones (fuera del denominador). ESTA es la meta que bloquea. El "nivel exigido" NO es
+      un campo nuevo del golden set: se deriva de si la ref del caso lleva apartado o no.
+
+  - id: G-CITA-F1
+    nombre: F1 macro de citas sobre R (diagnostico, no bloquea)
+    umbral:
+      operador: ">="
+      valor: 0.85
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-CITA-F1].value"
+    bloqueante_desde_fase: null
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      NUEVA y deliberadamente NO bloqueante. precision = |pred ∩ gold| / |pred|,
+      recall = |pred ∩ gold| / |gold|, macro-F1 sobre R. G-CITA-PRECISION es todo-o-nada por caso
+      y por eso no distingue "cito 2 de 3 refs correctas" de "cito una inventada": cuando cae, no
+      dice por que. Este F1 si. Se mide y se publica siempre junto a G-CITA-PRECISION, pero no
+      bloquea porque su definicion NO esta en el contrato transversal y el agente no improvisa un
+      contrato compartido: eso rompe la comparabilidad con 02 y 04. Al no bloquear, su vigilancia
+      admite Benjamini-Hochberg en el panel de diagnostico, no Holm. Si conviene que pase a
+      bloqueante, es un cambio del contrato v1 -> v2 propagado a mano a los tres repos (ver Q-007).
+
+  - id: G-COBERTURA
+    nombre: Fraccion de P respondidos, es decir no abstenidos
+    umbral:
+      operador: ">="
+      valor: 0.90
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-COBERTURA].value"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      NUEVA y critica. PAREJA ATOMICA CON G-CITA-PRECISION: ambas o ninguna (RULES R16). Sin
+      ella la forma optima de subir la precision de cita es abstenerse siempre.
+
+  - id: G-QUOTE-LIT
+    nombre: Citas emitidas cuyo quote aparece literalmente en el texto de su ref
+    umbral:
+      operador: "=="
+      valor: 1.00
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-QUOTE-LIT].value"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: false
+    nota: >
+      NUEVA. Sustituye la mitad determinista de "faithfulness" y no cuesta un LLM. Es un
+      invariante del nodo verify, no una metrica de calidad: si baja de 1,00 es que el
+      verificador dejo pasar algo. Normalizacion declarada: NFKC, colapso de espacios,
+      comillas tipograficas -> rectas, guiones Unicode -> "-".
+
+  - id: G-ABST-FP
+    nombre: Abstenciones sobre P (abstencion incorrecta)
+    umbral:
+      operador: "<="
+      valor: 0.05
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-ABST-FP].value"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      PAREJA ATOMICA CON G-ABST-FN (RULES R16). Mismo umbral que el PROJECT.md, pero ahora
+      CALCULABLE: exige casos tipo=negativo en el golden set, que el original no contemplaba.
+
+  - id: G-ABST-FN
+    nombre: Casos de N en los que NO se abstuvo (respuesta indebida)
+    umbral:
+      operador: "<="
+      valor: 0.10
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-ABST-FN].value"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      NUEVA. PAREJA ATOMICA CON G-ABST-FP: bloquean juntas (RULES R16). Sin el dual, no
+      abstenerse nunca es la estrategia optima.
+
+  - id: G-TTFT
+    nombre: p95 hasta el primer event token
+    umbral:
+      operador: "<="
+      valor: 1500
+      unidad: ms
+      adicionales:
+        - etiqueta: suma_de_presupuestos_por_etapa
+          operador: "<="
+          valor: 1290
+    comando: "make bench"
+    artefacto: "evals/reports/bench-latest.json :: metrics[id=G-TTFT].value"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      REDEFINIDA. En el PROJECT.md la celda "como se mide" estaba literalmente en blanco.
+      Protocolo en bench/protocol.md: 60 peticiones, se descartan las 5 primeras, 3
+      repeticiones, se publica el MAXIMO de los tres p95, loopback, streaming activo, modelo
+      residente, distribucion de longitud de prompt declarada y hardware declarado arriba.
+      El `adicional` es el reparto por etapa de docs/RULES.md §2.1: una etapa fuera de
+      presupuesto marca ambar aunque el total pase, y el margen de 210 ms es de donde vienen
+      las regresiones de dentro de tres semanas. TTFT se mide hasta el primer `event: token`,
+      NUNCA hasta `event: sources`: eso seria hacer trampa y se dice en el README.
+
+  - id: G-MUT
+    nombre: Mutantes muertos en los paquetes tdd_obligatorio
+    umbral:
+      operador: ">="
+      valor: 70
+      unidad: porcentaje
+    comando: "make mutation"
+    artefacto: "evals/reports/mutation-latest.json :: killed_pct"
+    bloqueante_desde_fase: 3
+    tipo: nucleo
+    requiere: [ninguno]
+    propuesta_admisible: true
+    nota: >
+      NUEVA. En PORCENTAJE (70), misma unidad que [tool.gate].mutantes_muertos_min de
+      docs/RULES.md §4. Es lo unico que distingue cobertura de verificacion. Solo corre
+      en make done.
+
+  # ---------------------------------------------------------------- fase 4 ---
+  - id: G-EVAL-DET
+    nombre: make eval desde cache produce informe byte-identico dos veces
+    umbral:
+      operador: "=="
+      valor: true
+      unidad: bool
+    comando: "make eval-determinism"
+    artefacto: ".claude/state/gate-status.json :: eval_determinista"
+    bloqueante_desde_fase: 4
+    tipo: nucleo
+    requiere: [corpus]
+    propuesta_admisible: false
+    nota: >
+      NUEVA. Convierte en test el criterio de aceptacion nº 2 del proyecto ("un desconocido
+      ejecuta make eval y obtiene los mismos numeros") y resuelve la contradiccion del
+      PROJECT.md entre "corre sin claves de API" y "faithfulness con juez LLM": los juicios
+      se cachean por hash (entrada, salida, prompt_id, prompt_version, modelo_juez, digest) y
+      la cache se versiona en el repo. Se comparan los informes normalizados, sin timestamps.
+
+  - id: G-JUEZ-KAPPA
+    nombre: Cohen kappa juez-vs-Samuel sobre 80 casos etiquetados
+    umbral:
+      operador: ">="
+      valor: 0.60
+      unidad: kappa
+    comando: "make eval-calibrate"
+    artefacto: "evals/reports/judge-calibration.json :: kappa (con ci95)"
+    bloqueante_desde_fase: null
+    tipo: nucleo
+    requiere: [horas-humanas]
+    propuesta_admisible: false
+    nota: >
+      NUEVA y deliberadamente NO bloqueante: su valor decide si G-FAITH-JUEZ bloquea o no.
+      Un juez sin kappa es una opinion con decimales. Se publica el kappa real con su IC
+      bootstrap, sea cual sea, y eso es parte de la politica de honestidad
+      (_comun/PARA-SAMUEL-GLOBAL.md D-06). Requiere las 3-5 h de etiquetado de Q-008.
+
+  - id: G-FAITH-JUEZ
+    nombre: Faithfulness (DeepEval, juez gemma4:12b-mlx) sobre R
+    umbral:
+      operador: ">="
+      valor: 0.90
+      unidad: ratio
+    comando: "make eval"
+    artefacto: "evals/reports/eval-latest.json :: metrics[id=G-FAITH-JUEZ].value"
+    bloqueante_desde_fase: 4
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      CONDICIONADA A G-JUEZ-KAPPA >= 0,60: si el kappa no llega, esta meta pasa a informativa
+      y no bloquea. CAMBIADA DE HERRAMIENTA: el PROJECT.md pone "Faithfulness (Ragas) >= 0,90"
+      en la primera linea del README y como criterio de bloqueo. Ragas esta congelado: ultima
+      release 0.4.3 de enero de 2026, main sin avanzar desde febrero, organizacion migrada. No
+      puede ser un gate. Se sustituye por DeepEval 4.1.5 con juez gemma4:12b-mlx, de familia
+      distinta al generador: un modelo juzgando su propia salida infla faithfulness.
+
+  - id: G-TTVA
+    nombre: p95 hasta event citations verificadas
+    umbral:
+      operador: "<="
+      valor: 6000
+      unidad: ms
+    comando: "make bench"
+    artefacto: "evals/reports/bench-latest.json :: metrics[id=G-TTVA].value"
+    bloqueante_desde_fase: 4
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      NUEVA. Es el numero honesto de "respuesta verificada". Publicarlo junto al TTFT evita que
+      el TTFT parezca lo que no es: verificar antes de emitir y prometer 1,5 s son incompatibles,
+      y el contrato SSE (RULES.md §2) resuelve el conflicto emitiendo `sources` primero.
+
+  # ---------------------------------------------------------------- fase 5 ---
+  - id: G-HALLUC-AMPLIO
+    nombre: Referencias inexistentes sobre 2.000 preguntas sinteticas sin etiquetar
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+      adicionales:
+        - etiqueta: n_preguntas_evaluadas
+          operador: ">="
+          valor: 2000
+    comando: "make eval-broad"
+    artefacto: "evals/reports/broad-latest.json :: metrics[id=G-HALLUC-AMPLIO].value"
+    bloqueante_desde_fase: 5
+    tipo: nucleo
+    requiere: [corpus]
+    propuesta_admisible: false
+    nota: >
+      NUEVA. No necesita etiquetas, asi que se puede medir con n grande, y es lo unico que hace
+      publicable la frase "tolerancia cero": con 0/190 la cota superior al 95 % es 1,6 %; con
+      0/2000 baja a 0,15 %. Por eso el n es un umbral `adicional` y no una nota. Corre en
+      nocturno, nunca en un gate de turno.
+
+  - id: G-INJECT
+    nombre: Obediencia a instrucciones incrustadas en el corpus
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+    comando: "make eval-adversarial"
+    artefacto: "evals/reports/adversarial-latest.json :: metrics[id=G-INJECT].value"
+    bloqueante_desde_fase: 5
+    tipo: nucleo
+    requiere: [corpus]
+    propuesta_admisible: false
+    nota: >
+      NUEVA. El PROJECT.md describe la suite adversarial pero no le pone numero. Corpus de test
+      con chunk envenenado permanente, preguntas fuera de dominio, prompt leaking y homoglifos
+      Unicode. El chunk envenenado NO se borra nunca: es el test, no un residuo.
+
+  - id: G-COLD-CACHE
+    nombre: clone -> primera respuesta con cita, con los modelos ya descargados
+    umbral:
+      operador: "<="
+      valor: 600
+      unidad: s
+    comando: "make cold-start"
+    artefacto: "evals/reports/coldstart-latest.json :: t_con_modelos_s"
+    bloqueante_desde_fase: 5
+    tipo: nucleo
+    requiere: [corpus, horas-humanas]
+    propuesta_admisible: true
+    nota: >
+      Igual al PROJECT.md, pero se publican DOS numeros: con modelos en cache (el comprometido,
+      el de este umbral) y total incluyendo `ollama pull` de 8,9 GB (informativo, sin umbral,
+      con el ancho de banda medido declarado en Q-006). Prometer 10 minutos incluyendo la
+      descarga depende de la linea de Samuel y por eso no se compromete.
+
+  - id: G-REVERSION
+    nombre: Evidencia de un cambio revertido por caida de metrica
+    umbral:
+      operador: ">="
+      valor: 1
+      unidad: count
+    comando: "python scripts/check_reversion_evidence.py"
+    artefacto: "docs/JOURNAL.md (marca <!-- reversion -->) + .snapshots/"
+    bloqueante_desde_fase: 5
+    tipo: nucleo
+    requiere: [ninguno]
+    propuesta_admisible: true
+    nota: >
+      NUEVA. Sustituto sin git del criterio de aceptacion nº 4 del PROJECT.md ("ver un PR donde
+      una eval fallo y el cambio se revirtio"), que vale mas que los otros tres juntos. Exige
+      entrada de JOURNAL con tabla antes/despues y snapshot correspondiente existente. NO se
+      fabrica: se recoge de lo que pase de verdad en las fases 2-4, por eso hay que anotarlo
+      desde la fase 2. Cuando entre git, se convierte en lo que decia el documento.
+
+  # ---------------------------------------------------------- fase 6 (ampliacion) ---
+  - id: G-BKT-PROP
+    nombre: Propiedades del BKT y del selector de bloque
+    umbral:
+      operador: "=="
+      valor: 0
+      unidad: count
+    comando: "pytest tests/property/test_knowledge.py tests/property/test_selector.py"
+    artefacto: ".claude/state/gate-status.json :: property.knowledge"
+    bloqueante_desde_fase: null
+    tipo: ampliacion
+    requiere: [ninguno]
+    propuesta_admisible: true
+    nota: >
+      UNICA meta de ampliacion, y por eso bloqueante_desde_fase es null: la fase 6 es
+      AMPLIACION en docs/PLAN.md y sus metas NUNCA bloquean el nucleo (CONSTITUCION §7.8).
+      No empezarla no es un fallo y el proyecto se publica completo y honesto sin ella.
+      Umbral: 0 fallos de propiedad. Propiedades: monotonia de la probabilidad de dominio
+      tras acierto, cotas [0,1], el selector nunca repite una pregunta dominada, respeta el
+      tamano solicitado. Si la fase se hace, son de los mejores tests del repo y cuestan un
+      dia; si no se hace, se documenta como fuera de alcance con su ADR.

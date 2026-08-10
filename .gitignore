@@ -1,0 +1,45 @@
+# ── Estado local de trabajo · constitución §7.8 ──────────────────────────────
+# No pertenece al entregable: es cómo se construyó, no qué se construyó.
+.claude/state/
+.snapshots/
+
+# ── Material de terceros que NO se redistribuye ──────────────────────────────
+# Este repositorio es PÚBLICO. El banco de preguntas tipo test es material de
+# terceros: se usa para construir el golden set, no se publica.
+# Ver `evals/golden/source/README.md` y `docs/PARA-SAMUEL.md` Q-003 + D-07.
+#
+# El golden set DERIVADO (`evals/golden/v*.jsonl`) sí se versiona: pregunta +
+# referencia legal propuesta + revisión humana es obra propia y transformativa.
+#
+# Para incluirlo de todas formas: borra la línea de abajo y `git add -f`.
+evals/golden/source/*.csv
+
+# ── Python ───────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.coverage
+coverage.json
+htmlcov/
+dist/
+build/
+
+# ── Secretos · G-SECRETS tiene umbral 0 y no admite propuesta ────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Cachés locales que se regeneran ──────────────────────────────────────────
+corpus/index/
+.cache/
+
+# ── macOS ────────────────────────────────────────────────────────────────────
+.DS_Store

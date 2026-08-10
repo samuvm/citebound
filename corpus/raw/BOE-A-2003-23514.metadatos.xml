@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<response>
+  <status>
+    <code>200</code>
+    <text>ok</text>
+  </status>
+  <data>
+    <metadatos>
+      <fecha_actualizacion>20260731T082621Z</fecha_actualizacion>
+      <identificador>BOE-A-2003-23514</identificador>
+      <ambito codigo="1">Estatal</ambito>
+      <departamento codigo="7710">Ministerio de la Presidencia</departamento>
+      <rango codigo="1340">Real Decreto</rango>
+      <fecha_disposicion>20031121</fecha_disposicion>
+      <numero_oficial>1428/2003</numero_oficial>
+      <titulo>Real Decreto 1428/2003, de 21 de noviembre, por el que se aprueba el Reglamento General de Circulación para la aplicación y desarrollo del texto articulado de la Ley sobre tráfico, circulación de vehículos a motor y seguridad vial, aprobado por el Real Decreto Legislativo 339/1990, de 2 de marzo.</titulo>
+      <diario>Boletín Oficial del Estado</diario>
+      <fecha_publicacion>20031223</fecha_publicacion>
+      <diario_numero>306</diario_numero>
+      <fecha_vigencia>20040123</fecha_vigencia>
+      <estatus_derogacion>N</estatus_derogacion>
+      <estatus_anulacion>N</estatus_anulacion>
+      <vigencia_agotada>N</vigencia_agotada>
+      <estado_consolidacion codigo="3">Finalizado</estado_consolidacion>
+      <url_eli>https://www.boe.es/eli/es/rd/2003/11/21/1428</url_eli>
+      <url_html_consolidada>https://www.boe.es/buscar/act.php?id=BOE-A-2003-23514</url_html_consolidada>
+    </metadatos>
+  </data>
+</response>

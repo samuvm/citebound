@@ -29,10 +29,17 @@ from __future__ import annotations
 
 import re
 import unicodedata
-import xml.etree.ElementTree as ET  # nosec B405 B314 — prólogo filtrado, ver _PELIGROSO
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
+
+# Solo los TIPOS: `Element` para anotar y `ParseError` para capturar. El parseo va por
+# `defusedxml`, que es lo que bandit pide y lo que B405 no sabe distinguir de un import
+# que sí parsea. Por eso el `nosec` va aquí y con el motivo escrito, no como costumbre.
+from xml.etree.ElementTree import Element, ParseError  # nosec B405
+
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 
 from citebound.domain.legalref import LegalRef, LegalRefError
 
@@ -61,18 +68,16 @@ _NO_ES_CUERPO = frozenset(
     {"articulo", "anexo", "titulo_num", "titulo_tit", "capitulo_num", "capitulo_tit", "firma"}
 )
 
-# Entity expansion — the "billion laughs" — is the one XML attack `ElementTree` does not
-# defend against, and both markers can only appear in the PROLOG, before the root
-# element. So the whole prolog is scanned rather than a fixed prefix: a cheap guard that
-# can be evaded is worse than none, because it buys false confidence.
+# Parsing goes through `defusedxml`, which refuses entity expansion — the "billion
+# laughs" — outright. `xml.etree` does not defend against it and offers no switch to
+# turn it on, so a hand-rolled guard was the only option until Samuel approved the
+# dependency on 2026-08-10 (outside the Q-011 list, hence the asking).
 #
-# The corpus is frozen and sha256-verified before it reaches here (RULES R4), so this is
-# belt and braces today. It is not decorative tomorrow: ingest is the layer that first
-# touches bytes off the network, and this parser is the obvious thing to reuse.
-#
-# `defusedxml` would be the textbook answer and is deliberately NOT used: it is outside
-# the dependency list Samuel approved in Q-011, and widening that list is his call, not
-# the agent's. Declared as debt in `docs/JOURNAL.md` with the question attached.
+# The prolog scan stays as a belt on top of the braces, and the reason it stays is that
+# it fails with a message that says what is wrong, in Spanish, at the layer that first
+# touches bytes off the network. `defusedxml` raises `EntitiesForbidden`, which is
+# correct and unhelpful to whoever has to fix the download. The two are cheap and they
+# fail differently, which is the point.
 _PELIGROSO = ("<!doctype", "<!entity")
 
 
@@ -205,15 +210,17 @@ def parse_norma(xml: str, norma: str) -> tuple[Precepto, ...]:
 # --------------------------------------------------------------------------------------
 
 
-def _raiz_texto(xml: str) -> ET.Element:
+def _raiz_texto(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -260,13 +267,13 @@ def _designador(rotulo: str) -> tuple[str, PreceptoTipo] | None:
     return None
 
 
-def _ultima_version(bloque: ET.Element) -> ET.Element | None:
+def _ultima_version(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("version")
     return versiones[-1] if versiones else None
 
 
-def _parrafos(version: ET.Element) -> Iterator[tuple[str, str]]:
+def _parrafos(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -278,7 +285,7 @@ def _parrafos(version: ET.Element) -> Iterator[tuple[str, str]]:
 
 
 def _precepto(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,

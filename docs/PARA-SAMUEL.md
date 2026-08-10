@@ -376,6 +376,18 @@ concreto en `pyproject.toml` y anota la versión elegida en `docs/JOURNAL.md` (c
 
 `[x] apruebo la lista de arriba en bloque   [ ] las quiero una a una`
 
+**Ampliación aprobada el 2026-08-10, fuera de la lista original:**
+
+| Paquete | Para qué | Por qué se preguntó |
+|---|---|---|
+| `defusedxml==0.7.1` | Parseo defensivo del XML del BOE | `xml.etree` no defiende contra la expansión de entidades y **no tiene interruptor** para desactivarla. Había una guarda propia que escaneaba el prólogo entero, con su test de *billion laughs*, pero una librería probada es mejor que una guarda escrita a mano |
+| `types-defusedxml` (dev) | Stubs de tipos | `mypy --strict` no puede comprobar un paquete sin `py.typed`, y bajar la exigencia de tipos para acomodar una dependencia es empezar por el lado equivocado |
+
+La guarda propia **se conserva** encima: falla con un mensaje en español que dice qué pasa,
+en la capa que primero toca bytes de la red. `defusedxml` levanta `EntitiesForbidden`, que
+es correcto e inútil para quien tiene que arreglar la descarga. Las dos son baratas y
+fallan distinto, que es el motivo de tener las dos.
+
 **Tiempo tuyo:** 2 minutos ahora; después, 30 segundos por petición.
 **Estado: RESPONDIDA · 2026-08-10**
 `>> ` **Aprobada en bloque.** Cualquier paquete **fuera** de esa lista sigue exigiendo permiso

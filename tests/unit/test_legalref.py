@@ -65,9 +65,7 @@ def test_parse_returns_the_expected_components(raw: str, expected: LegalRef) -> 
 
 
 @pytest.mark.parametrize(("raw", "expected"), PARSE_CASES)
-def test_parse_then_format_is_the_identity_on_canonical_input(
-    raw: str, expected: LegalRef
-) -> None:
+def test_parse_then_format_is_the_identity_on_canonical_input(raw: str, expected: LegalRef) -> None:
     """Canonical input survives a round trip untouched. This is the contract that lets
     `legal_ref` be a Postgres generated column and a Python value at the same time."""
     assert format_ref(parse(raw)) == raw
@@ -93,11 +91,14 @@ NORMALIZE_CASES: list[tuple[str, str]] = [
     ("RD 1428/2003#art34", "RD-1428/2003#art34"),
     # "bis" written apart, and in caps
     ("RD-1428/2003#art14 BIS", "RD-1428/2003#art14bis"),
-    # NFKC: a full-width digit and a non-breaking space must fold to the plain forms
-    ("RD-1428/2003#art3 4", "RD-1428/2003#art34"),
-    ("RD-1428/2003#art３４", "RD-1428/2003#art34"),
+    # NFKC: a full-width digit and a non-breaking space must fold to the plain forms.
+    # El `noqa` es deliberado y por linea, nunca por regla: RUF001 marca Unicode ambiguo,
+    # que es justo lo que se quiere en todo el repo — `G-INJECT` prueba ataques con
+    # homoglifos —, pero aqui el caracter ambiguo ES el dato de prueba.
+    ("RD-1428/2003#art3 4", "RD-1428/2003#art34"),  # noqa: RUF001
+    ("RD-1428/2003#art３４", "RD-1428/2003#art34"),  # noqa: RUF001
     # Unicode hyphens in the norma fold to the plain "-"
-    ("RD‑1428/2003", "RD-1428/2003"),
+    ("RD‑1428/2003", "RD-1428/2003"),  # noqa: RUF001
 ]
 
 

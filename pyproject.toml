@@ -143,15 +143,16 @@ ignore = ["ANN401"]
 python_version = "3.12"
 strict = true
 warn_unreachable = true
-# --strict solo sobre los paquetes [tool.gate].testable (docs/STACK.md §1)
-files = [
-  "src/citebound/domain",
-  "src/citebound/ingest",
-  "src/citebound/retrieval/fusion.py",
-  "src/citebound/retrieval/query_builder.py",
-  "src/citebound/agent/stream_guard.py",
-  "src/citebound/evals",
-]
+mypy_path = "src"
+# --strict SOLO sobre los paquetes de [tool.gate].testable (docs/STACK.md §1).
+#
+# Esta lista NO se mantiene a mano: `make typecheck` la deriva de [tool.gate].testable
+# y se la pasa a mypy, para que no haya dos listas que puedan divergir en silencio —
+# que es el fallo exacto que la constitución §2.6 quiere evitar. Lo de aquí abajo es
+# solo el arranque en seco, mientras no existe el Makefile: mypy falla si le nombras
+# una ruta que todavía no está creada, así que aquí solo van las que existen y crece
+# módulo a módulo hasta que `make typecheck` la sustituya en 0.7.
+files = ["src/citebound/domain"]
 
 [tool.pytest.ini_options]
 minversion = "9.0"

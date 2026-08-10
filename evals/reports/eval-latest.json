@@ -1,0 +1,27 @@
+{
+ "contract_version": 1,
+ "created_at": "2026-08-10T14:38:14+00:00",
+ "dataset": {
+  "n_cases": 3,
+  "name": "smoke-f0 (3 preguntas fijas)",
+  "sha256": "c111bb6de5d7ae50ca29bda1f0b3496172104d19d0d6b36012ced2af176295d0",
+  "version": 0
+ },
+ "environment": {
+  "deterministic": false,
+  "hardware": "MacBook Pro M4 Max, 36 GB, macOS 26.5",
+  "python": "3.12.4"
+ },
+ "metrics": [
+  {
+   "id": "G-HALLUC",
+   "n": 15,
+   "unit": "count",
+   "value": 0
+  }
+ ],
+ "notes": "Fase 0: NO hay generador. Las 15 referencias salen del propio indice, asi que G-HALLUC=0 hoy es cero por construccion trivial y no por la cita cerrada, que llega en la fase 3. Con n=15 la cota superior al 95 % de la tasa real es ~20.0% (regla de tres). index_version=v1-bge-m3-1024 physical_table=chunk_v1 ef_search=100 k=5. Ningun otro G- se mide aqui: necesitan el golden set (fase 1) o el agente (fase 3), y fabricarlos hoy es lo que D-06 prohibe.",
+ "project": "citebound",
+ "run_id": "8a050ed47d03108a",
+ "suite": "fase-0"
+}

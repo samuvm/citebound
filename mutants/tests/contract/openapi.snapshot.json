@@ -1,0 +1,230 @@
+{
+ "components": {
+  "schemas": {
+   "Cita": {
+    "description": "A citation, identified by its stable legal reference and by nothing else (R1).\n\nThe identifier a chunker mints is deliberately absent from this model and from the\nwhole OpenAPI. It is not a style preference: anchoring evaluation on it would\ninvalidate the golden set the moment the chunking strategy changes, which is exactly\nwhat phase 2 does on purpose. RULES R1 enforces it, and its checker runs in the gate.",
+    "properties": {
+     "distancia": {
+      "title": "Distancia",
+      "type": "number"
+     },
+     "id_norma_version": {
+      "default": "",
+      "description": "Norma que dio su redacción vigente a este precepto",
+      "title": "Id Norma Version",
+      "type": "string"
+     },
+     "legal_ref": {
+      "examples": [
+       "RD-1428/2003#art34.1"
+      ],
+      "title": "Legal Ref",
+      "type": "string"
+     },
+     "texto": {
+      "title": "Texto",
+      "type": "string"
+     },
+     "titulo": {
+      "anyOf": [
+       {
+        "type": "string"
+       },
+       {
+        "type": "null"
+       }
+      ],
+      "title": "Titulo"
+     }
+    },
+    "required": [
+     "legal_ref",
+     "texto",
+     "distancia"
+    ],
+    "title": "Cita",
+    "type": "object"
+   },
+   "HTTPValidationError": {
+    "properties": {
+     "detail": {
+      "items": {
+       "$ref": "#/components/schemas/ValidationError"
+      },
+      "title": "Detail",
+      "type": "array"
+     }
+    },
+    "title": "HTTPValidationError",
+    "type": "object"
+   },
+   "Respuesta": {
+    "description": "Phase 0 answers with the retrieved text itself, and says so.",
+    "properties": {
+     "citas": {
+      "items": {
+       "$ref": "#/components/schemas/Cita"
+      },
+      "title": "Citas",
+      "type": "array"
+     },
+     "generado_por": {
+      "default": "retrieval-only",
+      "description": "Fase 0: no hay generador. El texto es el del artículo recuperado",
+      "title": "Generado Por",
+      "type": "string"
+     },
+     "index_version": {
+      "description": "Destino físico resuelto, nunca el alias",
+      "title": "Index Version",
+      "type": "string"
+     },
+     "physical_table": {
+      "title": "Physical Table",
+      "type": "string"
+     },
+     "pregunta": {
+      "title": "Pregunta",
+      "type": "string"
+     },
+     "respuesta": {
+      "title": "Respuesta",
+      "type": "string"
+     }
+    },
+    "required": [
+     "pregunta",
+     "respuesta",
+     "citas",
+     "index_version",
+     "physical_table"
+    ],
+    "title": "Respuesta",
+    "type": "object"
+   },
+   "ValidationError": {
+    "properties": {
+     "ctx": {
+      "title": "Context",
+      "type": "object"
+     },
+     "input": {
+      "title": "Input"
+     },
+     "loc": {
+      "items": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "integer"
+        }
+       ]
+      },
+      "title": "Location",
+      "type": "array"
+     },
+     "msg": {
+      "title": "Message",
+      "type": "string"
+     },
+     "type": {
+      "title": "Error Type",
+      "type": "string"
+     }
+    },
+    "required": [
+     "loc",
+     "msg",
+     "type"
+    ],
+    "title": "ValidationError",
+    "type": "object"
+   }
+  }
+ },
+ "info": {
+  "summary": "Tutor de normativa de circulación con cita cerrada",
+  "title": "Citebound",
+  "version": "0.1.0"
+ },
+ "openapi": "3.1.0",
+ "paths": {
+  "/ask": {
+   "post": {
+    "operationId": "ask_ask_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "pregunta",
+      "required": true,
+      "schema": {
+       "maxLength": 500,
+       "minLength": 3,
+       "title": "Pregunta",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "k",
+      "required": false,
+      "schema": {
+       "default": 5,
+       "maximum": 20,
+       "minimum": 1,
+       "title": "K",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/Respuesta"
+        }
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ask"
+   }
+  },
+  "/health": {
+   "get": {
+    "operationId": "health_health_get",
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "additionalProperties": {
+          "type": "string"
+         },
+         "title": "Response Health Health Get",
+         "type": "object"
+        }
+       }
+      },
+      "description": "Successful Response"
+     }
+    },
+    "summary": "Health"
+   }
+  }
+ }
+}

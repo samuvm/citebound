@@ -14,7 +14,8 @@ OLLAMA_URL ?= http://localhost:11434
 OLLAMA_MIN := 0.32.6
 
 .PHONY: help up down warm lint typecheck test-fast test test-int smoke-f0 \
-        gate-fast clean check-ollama check-r1 openapi ingest
+        gate-fast gate-full done eval mutation cov-func secrets clean \
+        check-ollama check-r1 openapi ingest
 
 help:  ## esta ayuda
 	@grep -hE '^[a-z0-9_-]+:.*##' $(MAKEFILE_LIST) | sort | \
@@ -80,9 +81,30 @@ openapi:  ## regenera el snapshot de OpenAPI
 	 > tests/contract/openapi.snapshot.json
 	@echo "  snapshot regenerado; revisa el diff antes de comprometerlo"
 
+# ----------------------------------------------------------------- medidas ---
+eval:  ## fase 0: mide G-HALLUC y escribe el informe conforme al contrato
+	$(UV) python scripts/eval_f0.py
+
+mutation:  ## mutmut sobre [tool.gate].tdd_obligatorio. Solo en `done`
+	$(UV) mutmut run
+
+cov-func:  ## un test por funcion publica de [tool.gate].testable
+	$(UV) python scripts/check_function_coverage.py
+
+secrets:  ## detect-secrets contra la baseline
+	$(UV) detect-secrets scan --baseline .secrets.baseline \
+	  --exclude-files 'uv\.lock|tests/recordings/|corpus/raw/|\.snapshot\.json'
+
 # -------------------------------------------------------------------- gate ---
 gate-fast: lint typecheck check-r1 test-fast  ## lint + tipos + R1 + suite rapida
 	@echo "gate-fast VERDE"
+
+gate-full: gate-fast test test-int check-r1 secrets  ## + integracion y secretos
+	@echo "gate-full VERDE"
+
+done:  ## LA UNICA DEFINICION DE HECHO. Uso: make done MILESTONE=0
+	@test -n "$(MILESTONE)" || { echo "falta MILESTONE. Uso: make done MILESTONE=0"; exit 2; }
+	$(UV) python scripts/done.py --milestone $(MILESTONE)
 
 clean:  ## borra cachés y el indice derivado
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .hypothesis htmlcov coverage.json .coverage

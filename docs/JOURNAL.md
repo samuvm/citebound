@@ -684,3 +684,84 @@ MILESTONE=0` no existe todavía y no es lo mismo**: necesita `thresholds.lock` �
 genera Samuel al aprobar `docs/GOALS.yaml`—, `tests/holdout/` escrito por el subagente
 `qa-adversario`, y `mutmut`. Se presentan los números y se para; la fase 1 no se abre sin
 su visto bueno (CLAUDE.md regla 5).
+
+---
+
+## 2026-08-10 (cont. 8) · fase 0 · `make done MILESTONE=0`, y el gate se estrena contra su autor
+
+**Qué se intentó**
+
+Construir `make done` entero: las doce condiciones de la constitución §5, en orden, parando
+en la primera roja y escribiendo `.claude/state/gate-status.json`.
+
+**Qué falló**
+
+**El gate cazó cinco rojas en su primera ejecución, y cuatro eran defectos míos, no del
+proyecto.** Es exactamente para lo que sirve, y merece quedar escrito una a una porque un
+gate que da falsos rojos se desactiva en dos semanas:
+
+1. **Condición 1, la primera vez que corrió: `ruff` en rojo sobre `scripts/done.py`.** El
+   gate se estrenó suspendiendo a su propio autor. Tercera vez que me pasa; es el
+   argumento de D-09 escrito con mis manos.
+2. **Cobertura 78 %** — falso. `[tool.coverage.run].source` mide `src/citebound` entero, y
+   ahí dentro están `api/`, `db/` y `providers/`, que están en `[tool.gate].excluido` **a
+   propósito**: perseguir el 100 % en adaptadores es el ruido que `PROJECT.md` §2 rechaza
+   con razón. Filtrado a las rutas testable: **100 %**.
+3. **Mutación 0/1** — falso. `mutmut results` sin `--all` lista **solo los supervivientes**,
+   así que contaba cero muertos. Con `--all true`: **587/588, el 100 %**.
+4. **«1 test con skip»** — falso. Era un `skipif(not COMUN.is_file(), reason=…)`, que es
+   comportamiento correcto en un repo clonado sin `_comun/`, no una forma de esquivar la
+   suite. La regla prohíbe `skip`/`xfail` a secas; el patrón se afina para no confundirlos.
+5. **«ADR-003 y ADR-006 citados y no existen»** — falso. Los cita `000-plantilla.md`, que
+   es literalmente **la lista de ADR pendientes de escribir**, y `CONSTITUCION.md` con
+   números de ejemplo. Contar eso como referencia rota sería ruido permanente.
+
+**Números**
+
+`make done MILESTONE=0` en modo diagnóstico, las doce:
+
+| # | Condición | |
+|:-:|---|---|
+| 1 | estáticos | ok · ruff, format, mypy --strict, bandit |
+| 2 | suite completa | ok · **266 tests**, integración incluida |
+| 3 | **reserva** | **ROJO** · no existe `tests/holdout/` |
+| 4 | cobertura por función | ok · toda función pública de `testable` tiene su test |
+| 5 | cobertura de línea | ok · **100 %** (mínimo 85) |
+| 6 | mutación | ok · **587/588 muertos, 100 %** (mínimo 70) |
+| 7 | metas activas | ok · `G-HALLUC=0`, `G-SECRETS=0` |
+| 8 | **umbrales intactos** | **ROJO** · falta `thresholds.lock` |
+| 9 | inventario de tests | ok · línea base 158 tests, 244 aserciones |
+| 10 | deuda bajo tope | ok · 0 marcas, 0 skip/xfail |
+| 11 | documentación | ok · CHANGELOG y todos los ADR citados existen |
+| 12 | sin secretos | ok |
+
+El único mutante que sobrevive es `"utf-8"` → `"UTF-8"` en `doc_id_de`: **el mismo códec**,
+Python no distingue mayúsculas en el nombre. Es un mutante equivalente, una limitación
+conocida de la técnica, y no un hueco de la suite. Se anota para que nadie lo persiga.
+
+**Decisiones**
+
+- **Una condición que no se puede comprobar es ROJA, nunca verde.** «No hay reserva» no
+  significa «la reserva pasa». Un gate que da por bueno lo que no ha mirado es peor que no
+  tener gate, porque además da confianza.
+- **Cada fallo imprime el comando que lo arregla.** Uno que dice «rojo» y calla se
+  desactiva; uno que dice «rojo, ejecuta esto» se usa.
+- **`--diagnostico` evalúa las doce sin parar** para saber si la primera roja es la única.
+  No relaja nada: `make done` sigue parando en la primera.
+- **Yo no escribo `tests/holdout/`.** Serían tests escritos por quien escribió los tests
+  que deben vigilar, que es exactamente lo que la reserva existe para impedir
+  (constitución §2.5 nº 4). Es decisión de Samuel: lanzar `qa-adversario` o declararla
+  fuera de alcance con su ADR.
+- **`make eval` de fase 0** mide solo `G-HALLUC` y escribe un informe que **valida contra
+  `eval-report.schema.json` v1** desde el primer día. El contrato me corrigió dos veces al
+  escribirlo: `project` debía ser `citebound` y no `citebound-01`, y `dataset.version` es
+  entero. Un artefacto que empieza sin procedencia no la gana después.
+- El informe **dice en `notes` que `G-HALLUC = 0` hoy es cero por construcción trivial**
+  —no hay generador— y no por la cita cerrada, que llega en la fase 3. Con n=15 la cota
+  superior al 95 % es ~20 %. Publicar el cero sin eso sería lo que D-06 prohíbe.
+
+**Siguiente**
+
+Se presentan los números y se para. La fase 1 no se abre sin el visto bueno de Samuel
+(CLAUDE.md regla 5), y `make done MILESTONE=0` no puede ponerse verde sin dos cosas que
+son suyas: la reserva y el lock.

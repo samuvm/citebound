@@ -1,0 +1,105 @@
+# =============================================================================
+# CORPUS CONGELADO · citebound-01
+# =============================================================================
+# El corpus es INMUTABLE y DERIVADO (docs/RULES.md R4). Nadie lo edita a mano.
+# `corpus/index/refs.json` se regenera SOLO desde `corpus/raw/*.xml`, y
+# `make corpus-verify` comprueba estos sha256 y rehace el indice para diferenciarlo.
+#
+# Alcance decidido en docs/PARA-SAMUEL.md Q-001, opcion A (2026-08-10):
+# solo el Reglamento General de Circulacion. RDLeg 6/2015 (LSV) y RD 818/2009
+# (Conductores) quedan como ampliacion futura, no como alcance actual.
+# =============================================================================
+
+version: 1
+congelado_en: "2026-08-10"
+fuente: "Agencia Estatal Boletin Oficial del Estado · API de datos abiertos"
+endpoint: "https://www.boe.es/datosabiertos/api/legislacion-consolidada/id/{id}/texto"
+
+normas:
+  - id: BOE-A-2003-23514
+    norma: "RD-1428/2003"
+    titulo: >
+      Real Decreto 1428/2003, de 21 de noviembre, por el que se aprueba el Reglamento
+      General de Circulacion para la aplicacion y desarrollo del texto articulado de la
+      Ley sobre trafico, circulacion de vehiculos a motor y seguridad vial, aprobado por
+      el Real Decreto Legislativo 339/1990, de 2 de marzo.
+    rango: "Real Decreto"
+    fecha_disposicion: "2003-11-21"
+    fecha_vigencia: "2004-01-23"
+    fecha_actualizacion: "2026-07-31T08:26:21Z"   # ultima consolidacion publicada por el BOE
+    estado_consolidacion: "Finalizado"
+    vigencia_agotada: false
+    ficheros:
+      - ruta: "corpus/raw/BOE-A-2003-23514.xml"
+        bytes: 1158926
+        sha256: "1105a26b121e2048816438ddf8a36910e04d5a92ee49e87982608d027ab40072"
+      - ruta: "corpus/raw/BOE-A-2003-23514.metadatos.xml"
+        bytes: 1478
+        sha256: "1122cd914e22f4e2123433ebb2df6942de6fe2fd64c561cf6a607c48fde3884e"
+    estructura_observada:            # medido el 2026-08-10, ver docs/JOURNAL.md
+      bloques_precepto: 232
+      bloques_articulo_n: 217          # solo los titulados "Artículo N" con digito
+      preceptos_citables: 236          # medido por ingest/boe_xml.py el 2026-08-10
+      preceptos_articulo: 218          # los 217 + "Artículo unico" del Real Decreto
+      preceptos_disposicion: 14
+      preceptos_anexo: 4
+      bloques_con_varias_versiones: 78 # de 335. Vigente = la ULTIMA (ADR-020)
+      referencias_duplicadas: 0        # tras aplicar el contenedor del ADR-020
+      bloques_encabezado: 103
+      p_parrafo: 2273
+      p_parrafo_2: 510
+      p_imagen: 623                  # senales de trafico: sin texto util
+      p_nota_pie: 133
+      p_cuerpo_tabla: 514
+      articulos_bis: ["Artículo 14 bis"]
+
+# --- Avisos que gobiernan el parser (docs/adr/001-corpus-fuente-boe.md) ---
+avisos:
+  - id: apartado-no-estructural
+    texto: >
+      El apartado NO es un elemento del arbol XML: va como prefijo textual dentro de
+      <p class="parrafo"> ("1. Se debera conducir..."). Como LegalRef es
+      norma#artNN.apartado y retrieval-metrics.md §2 considera fallo citar art21 cuando
+      lo correcto es art21.1, la granularidad de apartado se DERIVA del texto.
+  - id: tres-espacios-de-numeracion
+    texto: >
+      CORREGIDO el 2026-08-10 (ADR-020): no son dos espacios, son TRES, y ademas hay una
+      colision dentro del cuerpo. (1) Los 7 preceptos propios del Real Decreto, antes de
+      la frontera "REGLAMENTO GENERAL DE CIRCULACION" en el byte 15706. (2) El Reglamento,
+      que es el contenedor por defecto y no lleva prefijo. (3) El articulado interno de
+      cada ANEXO, que reinicia en 1. Y ademas TITULO VI, anadido por RD 465/2025, reinicia
+      en 151 y choca con los 151-158 del TITULO V. Con designador plano colisionan 47 de
+      236 referencias, medido. El contenedor entra en la LegalRef: rd-unico, anexoii-1,
+      tv-151, tvi-151.
+  - id: titulo-vi-va-detras-de-los-anexos
+    texto: >
+      TITULO VI aparece FISICAMENTE despues de los cuatro anexos en el fichero. Un
+      encabezado TITULO devuelve el parser al cuerpo, y entrar en un ANEXO limpia la
+      jerarquia heredada; sin lo primero, el articulo 151 de zonas urbanas sale como
+      anexoii-151.
+  - id: varias-versiones-por-bloque
+    texto: >
+      78 de los 335 bloques traen mas de una <version> (65 con dos, 12 con tres, 1 con
+      cuatro). La vigente es la ULTIMA. Leer la primera serviria redaccion superada en un
+      cuarto del corpus, y seria invisible: la cita es real, G-QUOTE-LIT se queda en 1,00
+      y G-HALLUC en 0.
+  - id: imagenes-sin-texto
+    texto: >
+      623 bloques <p class="imagen"> son senales de trafico. Producen chunks sin texto
+      util y quedan fuera del indice; se declara en el README y afecta a la materia
+      "senalizacion".
+
+# --- Ampliacion futura, NO descargada (Q-001 opciones B y C) ---
+ampliacion_futura:
+  - id: BOE-A-2015-11722
+    norma: "RDLeg-6/2015"
+    titulo: "Texto refundido de la Ley sobre Trafico, Circulacion de Vehiculos a Motor y Seguridad Vial"
+    bytes_observados: 633113
+    fecha_actualizacion: "2026-07-31T08:26:22Z"
+    coste_estimado: "+40 casos de golden set"
+  - id: BOE-A-2009-9481
+    norma: "RD-818/2009"
+    titulo: "Reglamento General de Conductores"
+    bytes_observados: 2053997
+    fecha_actualizacion: "2025-12-19T12:03:50Z"
+    coste_estimado: "+80 casos de golden set"

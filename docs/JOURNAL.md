@@ -547,3 +547,69 @@ huella `57b55d9b5c466d81…`.
 
 `0.5 db/ddl.sql`. Cambia el régimen: `RULES` §3 pone **TDD prohibido** en `db/`, así que va por
 snapshot de contrato e integración con testcontainers, no por rojo/verde.
+
+---
+
+## 2026-08-10 (cont. 6) · fase 0 · `0.5 db/ddl.sql`, y un test que estaba midiendo el tamaño del corpus
+
+**Qué se intentó**
+
+El esquema. Cambia el régimen: `RULES` §3 prohíbe TDD en `db/`, así que va por snapshot de
+contrato e integración con testcontainers contra Postgres 18 + pgvector 0.8.6 real.
+
+**Qué falló**
+
+**Un test mío afirmaba lo que no debía.** `test_a_query_through_the_view_still_uses_the_hnsw_index`
+comprobaba que el plan de ejecución a través de la vista `chunks_active` usara el índice HNSW, y
+falló: `Seq Scan`. Parecía exactamente lo que el ADR-018 temía al aceptar B1.
+
+No lo era. Diagnóstico con las cuatro combinaciones:
+
+| Objeto | `enable_seqscan` | Plan |
+|---|---|---|
+| `chunk_v1` | on | Seq Scan |
+| `chunk_v1` | **off** | **índice HNSW** |
+| `chunks_active` | on | Seq Scan |
+| `chunks_active` | **off** | **índice HNSW** |
+
+**La vista no tiene nada que ver.** Con 235 filas el planificador prefiere barrido secuencial
+*también sobre la tabla física*, y hace bien. Mi test estaba midiendo el tamaño del corpus y
+llamándolo forma de la vista.
+
+Replanteado a lo que la condición del ADR-018 necesita de verdad: **la vista no se interpone entre
+la consulta y el índice**. Se quita el barrido secuencial de la mesa y se comparan los dos planes;
+si la vista fuera el problema, solo uno llegaría al índice. Y se añade un segundo test que deja
+escrito, para quien lo lea dentro de tres meses, que el planificador **puede** ignorar el índice en
+un corpus tan pequeño y que eso no es un fallo — con la nota de que si `G-RECALL5` decepciona en la
+fase 2, esto es lo primero que hay que volver a medir en vez de suponer.
+
+También: `testcontainers.postgres` está deprecado en 4.15.0 a favor de
+`testcontainers.community.postgres`. Corregido.
+
+**Números**
+
+| | |
+|---|---|
+| Suite completa | **234 pasan** (224 rápidos + **10 de integración**) |
+| Gate rápido | 224 en 0,79 s, con los 10 de integración deseleccionados |
+| `ruff` · `format` · `mypy --strict` · `bandit` | limpios, 0 hallazgos |
+| Integración | PG18 + pgvector 0.8.6 **por digest**, 4 tablas + 1 vista + 8 índices |
+| Ingesta doble | 235 filas la primera vez, **235 la segunda** |
+| `legal_ref` en base de datos | 235 no nulas, 235 distintas |
+
+**Decisiones**
+
+- **El contrato no se copia al paquete: se concatena.** `esquema_sql()` lee
+  `docs/CONTRACTS/chunks-ddl.sql` y le añade `db/ddl.sql`. Una tercera copia sería una tercera
+  forma de divergir; así la divergencia es **imposible por construcción** en vez de detectable
+  tarde.
+- **El DDL propio solo puede `ALTER … ADD CONSTRAINT`**, y hay un test de contrato que lo impone.
+  En el momento en que pudiera `CREATE`, los dos proyectos dejarían de compartir esquema.
+- Tres `CHECK` propios: `norma NOT NULL` (la condición de Q-013 a), `legal_ref` no vacía y
+  `content` no vacío.
+- **La imagen va por digest en el test**, el mismo que irá en `compose.yaml`.
+
+**Siguiente**
+
+`0.6 providers/embeddings.py`. También TDD prohibido (`RULES` §3): se graba primero contra el
+`bge-m3` real que ya está en Ollama y se testea contra la grabación.

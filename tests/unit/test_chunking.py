@@ -1,0 +1,271 @@
+"""Unit tests for `citebound.ingest.chunking`.
+
+Turns `Precepto` values into the rows of the `chunk_v1` table. The identifier contract
+is **not this project's to invent**: it is `docs/CONTRACTS/chunks-ddl.sql` v2, shared
+with `indexkeeper-04`, and every assertion about `chunk_id`, `doc_id`, `content_hash` or
+`occurrence` below is that file read literally.
+
+    doc_id       = sha256(source_uri)[:16]
+    content_hash = sha256(normalize(content))     NFC + colapso de espacios + strip
+    occurrence   = índice 0-based de esta aparición de content_hash dentro del documento
+    chunk_id     = blake2b(doc_id ‖ content_hash ‖ str(occurrence), digest_size=16).hex()
+
+Why v2 took the position out of the hash, and why `occurrence` had to appear in its
+place, is ADR-018. The short version: with the ordinal inside, inserting one paragraph
+renamed every chunk below it and made `indexkeeper-04`'s flagship metric unreachable by
+construction. Taking it out means identical text inside one document needs something
+else to tell the copies apart — and in legal text that is not hypothetical.
+
+Phase 0 chunks one article per chunk, deliberately (`docs/PLAN.md`: *"una norma, 1
+artículo = 1 chunk, solo vectorial"*). The strategy is named and recorded because
+`index_version.chunker_id` is a column of the shared contract, and because phase 2 exists
+to compare strategies against the golden set — a comparison that is only possible if the
+one used is written down next to the numbers.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import re
+
+import pytest
+
+from citebound.domain.legalref import LegalRef
+from citebound.ingest.boe_xml import Apartado, Precepto, PreceptoTipo
+from citebound.ingest.chunking import (
+    CHUNKER_ID,
+    Chunk,
+    ChunkingError,
+    chunk_id_de,
+    chunk_preceptos,
+    content_hash_de,
+    doc_id_de,
+    normalizar_contenido,
+)
+
+NORMA = "RD-1428/2003"
+URI = "https://www.boe.es/datosabiertos/api/legislacion-consolidada/id/BOE-A-2003-23514"
+
+
+def _precepto(
+    designador: str,
+    *apartados: tuple[str | None, str],
+    rubrica: str = "Rúbrica.",
+    tipo: PreceptoTipo = PreceptoTipo.ARTICULO,
+    titulo: str | None = "TÍTULO PRELIMINAR",
+) -> Precepto:
+    return Precepto(
+        ref=LegalRef(NORMA, designador),
+        tipo=tipo,
+        rubrica=rubrica,
+        apartados=tuple(Apartado(n, t) for n, t in apartados),
+        titulo=titulo,
+        capitulo=None,
+        seccion=None,
+        vigente=True,
+        id_norma_version="BOE-A-2003-23514",
+        fecha_vigencia="20040123",
+    )
+
+
+ART3 = _precepto("3", ("1", "Se deberá conducir con diligencia."), ("2", "Las conductas graves."))
+ART34 = _precepto("34", (None, "Para el cómputo de carriles."))
+
+
+# --------------------------------------------------------------------------------------
+# the identifier contract, read literally from chunks-ddl.sql v2
+# --------------------------------------------------------------------------------------
+
+
+def test_doc_id_is_the_first_sixteen_hex_of_the_sha256_of_the_uri() -> None:
+    assert doc_id_de(URI) == hashlib.sha256(URI.encode()).hexdigest()[:16]
+    assert len(doc_id_de(URI)) == 16
+
+
+def test_content_hash_is_the_sha256_of_the_normalised_text() -> None:
+    esperado = hashlib.sha256(b"Un texto.").hexdigest()
+    assert content_hash_de("  Un    texto.  ") == esperado
+
+
+def test_chunk_id_is_blake2b_of_doc_content_and_occurrence() -> None:
+    doc, contenido = doc_id_de(URI), content_hash_de("Un texto.")
+    esperado = hashlib.blake2b(f"{doc}{contenido}0".encode(), digest_size=16).hexdigest()
+    assert chunk_id_de(doc, contenido, 0) == esperado
+    assert len(chunk_id_de(doc, contenido, 0)) == 32
+
+
+def test_the_chunk_id_does_not_depend_on_the_position() -> None:
+    """The whole point of contract v2. With the ordinal inside the hash, inserting one
+    paragraph at the top of a document renamed every chunk below it and forced a full
+    re-embed — which made `G-INCR-2` of `indexkeeper-04` unreachable by construction, not
+    by implementation."""
+    doc, contenido = doc_id_de(URI), content_hash_de("Un texto.")
+    assert chunk_id_de(doc, contenido, 0) == chunk_id_de(doc, contenido, 0)
+    # el mismo contenido en dos posiciones distintas del documento conserva su id
+    a = chunk_preceptos((ART3, ART34), source_uri=URI)
+    b = chunk_preceptos((_precepto("9", (None, "Relleno.")), ART3, ART34), source_uri=URI)
+    por_ref = {str(c.ref): c.chunk_id for c in a}
+    for chunk in b:
+        if str(chunk.ref) in por_ref:
+            assert chunk.chunk_id == por_ref[str(chunk.ref)]
+
+
+def test_the_occurrence_tells_identical_text_apart_inside_one_document() -> None:
+    """Short apartados repeat verbatim in legal text, so `occurrence` is what keeps two
+    genuinely different chunks from colliding on one primary key."""
+    repetido = "Se estará a lo dispuesto en el artículo anterior."
+    chunks = chunk_preceptos(
+        (_precepto("7", (None, repetido)), _precepto("8", (None, repetido))), source_uri=URI
+    )
+    assert [c.occurrence for c in chunks] == [0, 1]
+    assert chunks[0].content_hash == chunks[1].content_hash
+    assert chunks[0].chunk_id != chunks[1].chunk_id
+
+
+def test_normalisation_is_nfc_plus_collapsed_whitespace_plus_strip() -> None:
+    """Exactly what the contract writes, no more: NFC, not NFKC. Folding compatibility
+    characters here would silently change the text whose hash the other project relies on."""
+    assert normalizar_contenido("  hola   mundo \n ") == "hola mundo"
+    assert normalizar_contenido("mañana") == "mañana"  # NFC compone la ñ
+    assert normalizar_contenido("Ａ") == "Ａ"  # NFKC lo volvería "A"; NFC no
+
+
+# --------------------------------------------------------------------------------------
+# determinism · the invariant the whole incremental story rests on
+# --------------------------------------------------------------------------------------
+
+
+def test_two_runs_over_the_same_input_produce_the_same_identifiers() -> None:
+    """`chunks-ddl.sql` invariant A: the sha256 of the ordered set of
+    `(chunk_id, content_hash, …)` must be identical across runs. No timestamps, no
+    random UUIDs, no process counters."""
+    primera = chunk_preceptos((ART3, ART34), source_uri=URI)
+    segunda = chunk_preceptos((ART3, ART34), source_uri=URI)
+    assert [c.chunk_id for c in primera] == [c.chunk_id for c in segunda]
+    assert [c.ordinal for c in primera] == [c.ordinal for c in segunda]
+
+
+def test_the_ordinal_is_the_position_in_the_document() -> None:
+    chunks = chunk_preceptos((ART3, ART34, _precepto("35", (None, "Otro."))), source_uri=URI)
+    assert [c.ordinal for c in chunks] == [0, 1, 2]
+
+
+def test_the_chunker_is_named_because_the_contract_has_a_column_for_it() -> None:
+    """`index_version.chunker_id`. Phase 2 compares chunking strategies against the
+    golden set, and a comparison whose strategy is not recorded next to the numbers is
+    an anecdote."""
+    assert CHUNKER_ID == "articulo-v1"
+    assert all(c.chunker_id == CHUNKER_ID for c in chunk_preceptos((ART3,), source_uri=URI))
+
+
+# --------------------------------------------------------------------------------------
+# what a chunk carries
+# --------------------------------------------------------------------------------------
+
+
+def test_phase_zero_makes_one_chunk_per_article() -> None:
+    """`docs/PLAN.md` phase 0: *una norma, 1 artículo = 1 chunk*. Deliberately naive —
+    the point of the skeleton is that it walks end to end, and phase 2 is where chunking
+    is measured instead of assumed."""
+    chunks = chunk_preceptos((ART3, ART34), source_uri=URI)
+    assert len(chunks) == 2
+    assert [str(c.ref) for c in chunks] == ["RD-1428/2003#art3", "RD-1428/2003#art34"]
+
+
+def test_the_text_of_all_apartados_reaches_the_chunk() -> None:
+    contenido = chunk_preceptos((ART3,), source_uri=URI)[0].content
+    assert "Se deberá conducir con diligencia." in contenido
+    assert "Las conductas graves." in contenido
+
+
+def test_the_rubric_leads_the_chunk_so_that_a_lone_apartado_still_says_what_it_is_about() -> None:
+    """An apartado retrieved on its own reads as an orphan sentence. Leading with the
+    article's rubric is what lets the embedding of the chunk carry its subject, and it is
+    the cheapest thing that moves recall in a corpus this repetitive."""
+    contenido = chunk_preceptos((ART3,), source_uri=URI)[0].content
+    assert contenido.startswith("Artículo 3. Rúbrica.")
+
+
+def test_the_hierarchy_travels_with_the_chunk_for_the_materia_filter() -> None:
+    chunk = chunk_preceptos((ART3,), source_uri=URI)[0]
+    assert chunk.titulo == "TÍTULO PRELIMINAR"
+    assert chunk.capitulo is None
+
+
+def test_provenance_travels_with_the_chunk() -> None:
+    chunk = chunk_preceptos((ART3,), source_uri=URI)[0]
+    assert chunk.id_norma_version == "BOE-A-2003-23514"
+    assert chunk.fecha_vigencia == "20040123"
+
+
+def test_every_chunk_carries_a_non_empty_reference() -> None:
+    """RULES §3.2, required property. A chunk without a ref cannot be cited, cannot be
+    verified and pollutes `recall@k` with a row that can never be a correct answer."""
+    for chunk in chunk_preceptos((ART3, ART34), source_uri=URI):
+        assert isinstance(chunk.ref, LegalRef)
+        assert str(chunk.ref)
+        assert "chunk_id" not in str(chunk.ref)
+
+
+# --------------------------------------------------------------------------------------
+# refusal
+# --------------------------------------------------------------------------------------
+
+
+def test_a_repealed_precepto_is_not_indexed() -> None:
+    """Article 51 is in the corpus and says `(Derogado)`. Indexing it would let the
+    system retrieve and quote a repealed article — literal, verifiable and wrong."""
+    derogado = _precepto("51", (None, "(Derogado)."))
+    derogado = Precepto(
+        **{  # type: ignore[misc]
+            f.name: (False if f.name == "vigente" else getattr(derogado, f.name))
+            for f in __import__("dataclasses").fields(derogado)
+        }
+    )
+    assert chunk_preceptos((derogado, ART3), source_uri=URI) == (
+        chunk_preceptos((ART3,), source_uri=URI)
+    )
+
+
+def test_a_precepto_with_no_text_is_refused_loudly() -> None:
+    """Silently skipping would hide a broken ingest behind a smaller index."""
+    with pytest.raises(ChunkingError):
+        chunk_preceptos((_precepto("9"),), source_uri=URI)
+
+
+def test_an_empty_source_uri_is_refused() -> None:
+    """`doc_id` is derived from it; an empty uri gives every document the same id."""
+    with pytest.raises(ChunkingError):
+        chunk_preceptos((ART3,), source_uri="")
+
+
+def test_chunking_nothing_yields_nothing() -> None:
+    assert chunk_preceptos((), source_uri=URI) == ()
+
+
+# --------------------------------------------------------------------------------------
+# no loss · the property RULES §3.2 demands, stated once here and again as a property
+# --------------------------------------------------------------------------------------
+
+
+def test_the_chunk_text_reproduces_the_apartados_it_came_from() -> None:
+    chunk = chunk_preceptos((ART3,), source_uri=URI)[0]
+    cuerpo = chunk.content.split("\n", 1)[1]  # tras la rúbrica
+    assert cuerpo == "1. Se deberá conducir con diligencia.\n2. Las conductas graves."
+
+
+def test_no_chunk_ever_mixes_two_articles() -> None:
+    """RULES §3.2, required property. A chunk straddling an article boundary would make
+    the `quote` of one article verifiable against the text of another, and
+    `G-QUOTE-LIT` would keep saying 1,00 while the citation pointed at the wrong law."""
+    for chunk in chunk_preceptos((ART3, ART34), source_uri=URI):
+        refs = set(re.findall(r"Artículo \d+", chunk.content))
+        assert len(refs) <= 1
+
+
+def test_a_chunk_is_immutable_and_hashable() -> None:
+    chunk = chunk_preceptos((ART3,), source_uri=URI)[0]
+    assert isinstance(chunk, Chunk)
+    assert len({chunk, chunk}) == 1
+    with pytest.raises((AttributeError, TypeError)):
+        chunk.ordinal = 99  # type: ignore[misc]

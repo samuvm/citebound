@@ -30,6 +30,13 @@ non-numeric designator ``unico``, and disposiciones and anexos are likewise
 non-numeric (``ddunica``, ``dfprimera``, ``anexoi``), so they can never collide with
 an article number.
 
+**One document, three numbering spaces.** `RD-1428/2003` holds the Royal Decree's own
+preceptos, the annexed Reglamento, and an articulado inside each ANEXO — and all three
+restart at 1. The Reglamento is the default and takes no prefix, because it is what the
+contract's own example cites; the other two are prefixed by their container
+(``rd-unico``, ``anexoi-1``). Without that, 47 references of the frozen corpus collide.
+See ADR-020.
+
 **A `LegalRef` is always canonical.** The constructor validates and rejects; it does
 not repair. Use `parse` when the text comes from outside — a prompt, a CSV, a
 database row — and construct directly only with values you already know are clean.
@@ -86,7 +93,12 @@ _WS = re.compile(r"\s+")
 # and needs an ADR, because `legal_ref` is a shared column.
 _NORMA = re.compile(r"^[A-Za-z]+-\d+/\d{4}$")
 
-_DESIGNADOR = re.compile(r"^[a-z0-9]+$")
+# A hyphen JOINS segments and never dangles. One document holds three numbering spaces
+# that all restart at 1 — the Royal Decree's own preceptos, the annexed Reglamento, and
+# the articulado inside each ANEXO — and without a container prefix 47 references of the
+# frozen corpus collide. That is measured, not feared: `recall@k` is a set operation over
+# references, so a collision counts two different articles as one. See ADR-020.
+_DESIGNADOR = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
 _APARTADO = re.compile(r"^[a-z0-9]+(?:\.[a-z0-9]+)*$")
 
 

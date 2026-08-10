@@ -5,7 +5,7 @@ The parser turns the BOE's consolidated XML into `Precepto` values carrying a
 the granularity `G-CITA-PRECISION` and `G-QUOTE-LIT` depend on — **is not a node in the
 tree**. It arrives as a `"1. "` prefix inside `<p class="parrafo">`.
 
-`tests/fixtures/boe-fragmento.xml` is **nine blocks lifted whole** out of
+`tests/fixtures/boe-fragmento.xml` is **ten blocks lifted whole** out of
 `corpus/raw/BOE-A-2003-23514.xml` (sha256 `1105a26b…40072`, 2026-08-10). Not
 paraphrased, not shortened: `test_the_fixture_is_verbatim_from_the_frozen_corpus` fails
 if a single one drifts. Four of them encode traps that a parser written from
@@ -16,7 +16,9 @@ imagination walks straight into:
     wording for a quarter of the corpus — a citation that is literal, verifiable and
     wrong, which is worse than one that is obviously wrong.
   * **`Artículo 14 bis` lives in a block whose id is `a1-3`.** The BOE mints internal
-    ids for inserted articles, so the id is useless as a designator.
+    ids for inserted articles, so the id is useless as a designator. The fixture places
+    that block in the body to exercise the designator alone; in the real document it
+    sits inside ANEXO II, which is why the corpus-level test expects `anexoii-14bis`.
   * **A repealed article keeps an editorial note** in `<blockquote class="soloTexto">`
     after the `(Derogado)` marker. That is commentary, not article text.
   * **`ANEXO I` is `tipo="encabezado"`, not `tipo="precepto"`.** Filtering on `precepto`
@@ -68,7 +70,7 @@ def test_the_fixture_is_verbatim_from_the_frozen_corpus() -> None:
     memory of it, which is how a suite quietly becomes decorative."""
     corpus = CORPUS.read_text(encoding="utf-8")
     bloques = re.findall(r"<bloque .*?</bloque>", FIXTURE, re.S)
-    assert len(bloques) == 9
+    assert len(bloques) == 10
     for bloque in bloques:
         bid = re.search(r'id="([^"]+)"', bloque)
         assert bid is not None
@@ -141,16 +143,23 @@ def test_the_last_version_of_a_block_is_the_one_in_force(
 
 
 def test_superseded_wording_never_reaches_the_text(preceptos: tuple[Precepto, ...]) -> None:
-    """The wording that *was* in force stays in the document, in the earlier
-    `<version>`. Quoting it satisfies `G-QUOTE-LIT` — the fragment really is in the
-    file — while telling the user law that no longer applies."""
-    bloque = re.search(r'<bloque id="a135".*?</bloque>', FIXTURE, re.S)
+    """Article 51 held real text until 2021 — two apartados about overtaking speeds —
+    and its current version is the `(Derogado)` marker. Both wordings sit in the same
+    file. Serving the old one would satisfy `G-QUOTE-LIT` (the fragment really is in the
+    document) while telling the user law that was repealed five years ago.
+
+    Article 135 is the counter-example and the reason this test does not use it: it also
+    carries two versions, but the 2025 reform did not touch the wording, so the same
+    sentence is legitimately present in both. "Text from an earlier version" is not by
+    itself the defect — serving a version that is no longer in force is.
+    """
+    bloque = re.search(r'<bloque id="a51".*?</bloque>', FIXTURE, re.S)
     assert bloque is not None
     anterior = bloque.group(0)[: bloque.group(0).rfind("<version ")]
-    viejas = [t.strip() for t in re.findall(r'<p class="parrafo">([^<]{40,})</p>', anterior)]
-    assert viejas, "el fixture debería traer texto de la versión anterior"
+    viejas = [t.strip() for t in re.findall(r'<p class="parrafo">([^<]{60,})</p>', anterior)]
+    assert len(viejas) == 2, "el artículo 51 tenía dos apartados antes de derogarse"
 
-    vigente = " ".join(a.texto for a in _by_ref(preceptos, "RD-1428/2003#art135").apartados)
+    vigente = " ".join(a.texto for a in _by_ref(preceptos, "RD-1428/2003#art51").apartados)
     for frase in viejas:
         assert frase not in vigente
 
@@ -315,17 +324,126 @@ def test_a_norma_that_is_not_a_legal_reference_is_refused() -> None:
 # --------------------------------------------------------------------------------------
 
 
-def test_the_real_frozen_corpus_parses_to_the_counts_recorded_in_the_manifest() -> None:
+def test_the_real_frozen_corpus_parses_without_a_single_colliding_reference() -> None:
     """Nine hand-picked blocks prove the parser handles the shapes somebody remembered.
-    This proves it handles the document. Counts from `corpus/MANIFEST.yaml ::
-    estructura_observada`, measured on 2026-08-10."""
+    This proves it handles the document. Numbers measured on 2026-08-10 and recorded in
+    `corpus/MANIFEST.yaml :: estructura_observada`.
+
+    218 articles and not the 217 the manifest first wrote down: that count matched
+    `titulo="Artículo N"` with a digit, and `Artículo único` — the Royal Decree's own
+    single article — is the 218th.
+    """
     preceptos = parse_norma(CORPUS.read_text(encoding="utf-8"), norma=NORMA)
-    articulos = [p for p in preceptos if p.tipo is PreceptoTipo.ARTICULO]
-    assert len(articulos) == 217
+    por_tipo = {t: [p for p in preceptos if p.tipo is t] for t in PreceptoTipo}
+    assert len(preceptos) == 236
+    assert len(por_tipo[PreceptoTipo.ARTICULO]) == 218
+    assert len(por_tipo[PreceptoTipo.DISPOSICION]) == 14
+    assert len(por_tipo[PreceptoTipo.ANEXO]) == 4
     assert all(p.apartados for p in preceptos), "ningún precepto puede quedarse sin texto"
-    assert len({str(p.ref) for p in preceptos}) == len(preceptos), "refs duplicadas"
+    refs = [str(p.ref) for p in preceptos]
+    assert len(set(refs)) == len(refs), "dos preceptos comparten referencia"
+
+
+def test_the_three_numbering_spaces_of_the_document_stay_apart() -> None:
+    """The Royal Decree's own seven preceptos, the Reglamento, and the articulado inside
+    each ANEXO all restart at 1. Without a container prefix, 47 references collide."""
+    refs = {str(p.ref) for p in parse_norma(CORPUS.read_text(encoding="utf-8"), norma=NORMA)}
+    assert "RD-1428/2003#artrd-unico" in refs
+    assert "RD-1428/2003#artrd-dfprimera" in refs
+    assert "RD-1428/2003#art1" in refs
+    assert "RD-1428/2003#artanexoii-1" in refs
+    assert len([r for r in refs if "#artrd-" in r]) == 7
+
+
+def test_the_eight_articles_that_collide_inside_the_reglamento_are_disambiguated() -> None:
+    """`TÍTULO VI`, added by RD 465/2025, restarts its articulado at 151 and lands on the
+    existing 151-158 of `TÍTULO V`. Both are in force and both say "Artículo 151"; that
+    is a fact about the norm, not a parser bug. BOTH members of the pair take the TÍTULO
+    prefix, never just the second, so the result does not depend on reading order."""
+    refs = {str(p.ref) for p in parse_norma(CORPUS.read_text(encoding="utf-8"), norma=NORMA)}
+    assert "RD-1428/2003#arttv-151" in refs
+    assert "RD-1428/2003#arttvi-151" in refs
+    assert "RD-1428/2003#art151" not in refs, "la forma ambigua no debe sobrevivir"
+    assert len([r for r in refs if re.search(r"#arttvi?-15\d$", r)]) == 16
 
 
 def test_the_real_corpus_still_contains_the_edge_cases_the_fixture_claims() -> None:
+    """`Artículo 14 bis` comes out as `anexoii-14bis`, and that is not a wart: in the
+    real document the block sits at byte 1 097 975, **inside ANEXO II**, between the
+    ANEXO II and ANEXO III headings. The fixture places the same block in the body to
+    exercise the designator on its own, which is why the two tests expect different
+    references for it — and why the container has to be tracked rather than guessed
+    from the article number."""
     refs = {str(p.ref) for p in parse_norma(CORPUS.read_text(encoding="utf-8"), norma=NORMA)}
-    assert {"RD-1428/2003#art14bis", "RD-1428/2003#art51", "RD-1428/2003#artanexoi"} <= refs
+    assert {"RD-1428/2003#artanexoii-14bis", "RD-1428/2003#art51"} <= refs
+    assert "RD-1428/2003#artanexoi" in refs
+
+
+# --------------------------------------------------------------------------------------
+# the guards, one test each · they are the only thing between a bad file and a bad index
+# --------------------------------------------------------------------------------------
+
+
+def test_a_document_declaring_entities_is_refused_before_it_is_parsed() -> None:
+    """The billion-laughs payload. `ElementTree` expands entities and has no switch to
+    stop it, so the prolog is checked first. The whole prolog, not a fixed prefix: a
+    guard that can be evaded by padding is worse than none, because it buys confidence
+    it has not earned."""
+    bomba = (
+        '<?xml version="1.0"?>\n'
+        + "<!-- "
+        + "x" * 5000
+        + " -->\n"
+        + '<!DOCTYPE lolz [<!ENTITY lol "lol"><!ENTITY lol2 "&lol;&lol;">]>\n'
+        + "<response><data><documento><texto/></documento></data></response>"
+    )
+    with pytest.raises(BoeXmlError, match="entidades"):
+        parse_norma(bomba, norma=NORMA)
+
+
+def test_a_block_whose_title_is_not_a_citable_unit_is_skipped() -> None:
+    """Preámbulo, firma and nota inicial are blocks with text and no designator. They
+    are not law and must not become references."""
+    xml = FIXTURE.replace('titulo="Artículo 3"', 'titulo="Preámbulo"')
+    refs = {str(p.ref) for p in parse_norma(xml, norma=NORMA)}
+    assert "RD-1428/2003#art3" not in refs
+    assert "RD-1428/2003#artpreambulo" not in refs
+
+
+def test_a_precepto_with_no_body_text_is_not_emitted() -> None:
+    """A reference with nothing behind it would embed to noise and could never be
+    legitimately retrieved, while still counting as a member of the index that
+    `G-HALLUC` checks membership against."""
+    vacio = (
+        "<response><data><documento><texto>"
+        '<bloque id="a9" tipo="precepto" titulo="Artículo 9">'
+        '<version id_norma="BOE-A-2003-23514" fecha_vigencia="20040123">'
+        '<p class="articulo">Artículo 9. Sin cuerpo.</p>'
+        '<p class="imagen"><img src="s.png"/></p>'
+        "</version></bloque>"
+        "</texto></documento></data></response>"
+    )
+    assert parse_norma(vacio, norma=NORMA) == ()
+
+
+def test_a_heading_that_does_not_repeat_the_designator_becomes_the_whole_rubric() -> None:
+    """Most headings read `"Artículo 3. Conductores."`, but the parser must not lose the
+    text when the BOE prints one that does not repeat the designator."""
+    xml = FIXTURE.replace(
+        '<p class="articulo">Artículo 3. Conductores.</p>',
+        '<p class="articulo">Conductores</p>',
+    )
+    a3 = next(p for p in parse_norma(xml, norma=NORMA) if str(p.ref) == "RD-1428/2003#art3")
+    assert a3.rubrica == "Conductores"
+
+
+def test_a_block_with_no_version_at_all_is_skipped() -> None:
+    """Every block of the frozen corpus has at least one `<version>`, but the parser
+    must not crash on a document that does not. Ingest is the layer that first touches
+    bytes off the network, and it either refuses cleanly or it corrupts the index."""
+    sin_version = (
+        "<response><data><documento><texto>"
+        '<bloque id="a9" tipo="precepto" titulo="Artículo 9"/>'
+        "</texto></documento></data></response>"
+    )
+    assert parse_norma(sin_version, norma=NORMA) == ()

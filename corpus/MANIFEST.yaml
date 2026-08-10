@@ -38,7 +38,13 @@ normas:
         sha256: "1122cd914e22f4e2123433ebb2df6942de6fe2fd64c561cf6a607c48fde3884e"
     estructura_observada:            # medido el 2026-08-10, ver docs/JOURNAL.md
       bloques_precepto: 232
-      bloques_articulo_n: 217
+      bloques_articulo_n: 217          # solo los titulados "Artículo N" con digito
+      preceptos_citables: 236          # medido por ingest/boe_xml.py el 2026-08-10
+      preceptos_articulo: 218          # los 217 + "Artículo unico" del Real Decreto
+      preceptos_disposicion: 14
+      preceptos_anexo: 4
+      bloques_con_varias_versiones: 78 # de 335. Vigente = la ULTIMA (ADR-020)
+      referencias_duplicadas: 0        # tras aplicar el contenedor del ADR-020
       bloques_encabezado: 103
       p_parrafo: 2273
       p_parrafo_2: 510
@@ -55,11 +61,28 @@ avisos:
       <p class="parrafo"> ("1. Se debera conducir..."). Como LegalRef es
       norma#artNN.apartado y retrieval-metrics.md §2 considera fallo citar art21 cuando
       lo correcto es art21.1, la granularidad de apartado se DERIVA del texto.
-  - id: dos-espacios-de-numeracion
+  - id: tres-espacios-de-numeracion
     texto: >
-      Este documento contiene el Real Decreto (con un unico "Articulo unico") y, colgando
-      de el, el Reglamento General de Circulacion con su propia numeracion 1..N. LegalRef
-      numera los articulos del REGLAMENTO; el articulo unico del RD se indexa aparte.
+      CORREGIDO el 2026-08-10 (ADR-020): no son dos espacios, son TRES, y ademas hay una
+      colision dentro del cuerpo. (1) Los 7 preceptos propios del Real Decreto, antes de
+      la frontera "REGLAMENTO GENERAL DE CIRCULACION" en el byte 15706. (2) El Reglamento,
+      que es el contenedor por defecto y no lleva prefijo. (3) El articulado interno de
+      cada ANEXO, que reinicia en 1. Y ademas TITULO VI, anadido por RD 465/2025, reinicia
+      en 151 y choca con los 151-158 del TITULO V. Con designador plano colisionan 47 de
+      236 referencias, medido. El contenedor entra en la LegalRef: rd-unico, anexoii-1,
+      tv-151, tvi-151.
+  - id: titulo-vi-va-detras-de-los-anexos
+    texto: >
+      TITULO VI aparece FISICAMENTE despues de los cuatro anexos en el fichero. Un
+      encabezado TITULO devuelve el parser al cuerpo, y entrar en un ANEXO limpia la
+      jerarquia heredada; sin lo primero, el articulo 151 de zonas urbanas sale como
+      anexoii-151.
+  - id: varias-versiones-por-bloque
+    texto: >
+      78 de los 335 bloques traen mas de una <version> (65 con dos, 12 con tres, 1 con
+      cuatro). La vigente es la ULTIMA. Leer la primera serviria redaccion superada en un
+      cuarto del corpus, y seria invisible: la cita es real, G-QUOTE-LIT se queda en 1,00
+      y G-HALLUC en 0.
   - id: imagenes-sin-texto
     texto: >
       623 bloques <p class="imagen"> son senales de trafico. Producen chunks sin texto

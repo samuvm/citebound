@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <response><data><documento><texto>
+<bloque id="reglamentogeneraldecirculacion" tipo="encabezado" titulo="REGLAMENTO GENERAL DE CIRCULACIÓN">
+        <version id_norma="BOE-A-2003-23514" fecha_publicacion="20031223" fecha_vigencia="20040123">
+          <p class="libro">REGLAMENTO GENERAL DE CIRCULACIÓN</p>
+        </version>
+      </bloque>
 <bloque id="tpreliminar" tipo="encabezado" titulo="TÍTULO PRELIMINAR">
         <version id_norma="BOE-A-2003-23514" fecha_publicacion="20031223" fecha_vigencia="20040123">
           <p class="titulo_num">TÍTULO PRELIMINAR</p>

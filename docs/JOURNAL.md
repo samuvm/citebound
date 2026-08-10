@@ -403,3 +403,80 @@ El verde de `0.3`. Después `0.4 chunking`, `0.5 ddl`, `0.6 embeddings` y `0.7` 
 Ollama actualizado a **0.32.7**, una por encima del `0.32.6` que fija `docs/STACK.md`: cuando se
 escriba el `Makefile` la comprobación será `>= 0.32.6` con el motivo escrito, porque un binario del
 host que se autoactualiza no se puede clavar sin pelearse con el usuario.
+
+---
+
+## 2026-08-10 (cont. 4) · fase 0 · verde de `0.3`, y el ADR-001 se queda corto
+
+**Qué se intentó**
+
+Implementar `ingest/boe_xml.py` hasta poner en verde los 29 tests del rojo anterior.
+
+**Qué falló**
+
+El código, poco. **Mis suposiciones, cuatro veces más**, y todas las descubrió medir contra el
+corpus en vez de razonar sobre él:
+
+1. **El ADR-001 decía «dos espacios de numeración». Son tres, y encima hay una colisión dentro del
+   cuerpo.** Con designador plano, **47 de 236 referencias colisionan** — recuento, no estimación.
+   El daño habría sido del tipo callado: `recall@k` compara **conjuntos** de `legal_ref`, así que
+   dos artículos distintos con la misma referencia se cuentan como uno, y un caso del golden set
+   que cite `art151` es ambiguo entre señales de tráfico y zonas urbanas. → **ADR-020**.
+2. **`TÍTULO VI` está físicamente detrás de los cuatro anexos** en el fichero. Mi primera regla
+   («una vez dentro de un anexo, ya no se sale») dejaba el artículo 151 de zonas urbanas como
+   `anexoii-151`.
+3. **`Artículo 14 bis` no es un artículo del cuerpo**: vive en el byte 1 097 975, **dentro del
+   ANEXO II**, entre los encabezados de ANEXO II y ANEXO III. Mi test esperaba `art14bis` y el
+   parser decía `anexoii-14bis`. **El equivocado era el test.**
+4. **Tres tests míos estaban mal planteados**, y los tres se corrigen sin debilitar ninguna
+   aserción:
+   - `test_superseded_wording` usaba el artículo 135, cuyas dos versiones tienen **el mismo texto**
+     (la reforma de 2025 no tocó la redacción). Pasa a usar el 51, que sí difiere. Y el 135 se queda
+     en el fichero como contraejemplo escrito: *texto de una versión anterior* no es el defecto;
+     *servir una versión que ya no está en vigor* sí lo es.
+   - La propiedad «los números de apartado nunca se repiten» es **falsa para entrada arbitraria**.
+     Si un documento imprime dos apartados numerados 1, el parser debe reportar dos apartados
+     numerados 1: reportar fielmente es el trabajo. La unicidad es propiedad del corpus y se
+     comprueba sobre el corpus real, que es donde aplica.
+   - La propiedad de idempotencia del troceado es **falsa por construcción**: quitar el marcador
+     destruye la información que causó el corte. Se sustituye por «sin marcadores → exactamente un
+     apartado». Un invariante que no se cumple es peor que ninguno: pasa solo mientras el código
+     está roto.
+
+Y dos de gestión: `ruff --fix` **me borró un comentario `# nosec`** del import y bandit volvió a
+marcar; y llegué a escribir «bandit sin hallazgos» leyendo mal su tabla — el `High: 2` era la
+columna de **confianza**, no de severidad. Los hallazgos eran reales: B405 y B314 por `xml.etree`.
+
+**Números**
+
+| | |
+|---|---|
+| Suite | **180 pasan**, 0 fallan |
+| Cobertura | **100 % de línea y de rama** en `domain` y en `ingest` (umbral 85) |
+| Hypothesis | 16 propiedades verdes en `dev` (25), `gate` (100) y `nightly` (1000, 9,69 s) |
+| `ruff` · `ruff format` · `mypy --strict` · `bandit` | limpios · **0 hallazgos** |
+| Corpus real | **236 preceptos** · 218 artículo · 14 disposición · 4 anexo · **0 refs duplicadas** · 0 sin texto |
+| Contenedores | 7 del Real Decreto · 189 del Reglamento · 40 de anexos · 16 desambiguados por TÍTULO |
+
+**Decisiones**
+
+- **ADR-020**: el contenedor entra en la `LegalRef`. El Reglamento no lleva prefijo —es lo que cita
+  el ejemplo del contrato—; los otros dos sí (`rd-unico`, `anexoii-1`). Ante una colisión se
+  prefijan **los dos** miembros, nunca solo el segundo, para que el resultado no dependa del orden
+  de lectura. `_DESIGNADOR` pasa a `^[a-z0-9]+(?:-[a-z0-9]+)*$`: un guion une, nunca cuelga.
+- **La guarda contra expansión de entidades escanea el prólogo entero**, no un prefijo fijo. Una
+  guarda que se esquiva rellenando es peor que ninguna, porque compra confianza que no se ha ganado.
+  Cubierta con un test de *billion laughs*.
+- **DEUDA DECLARADA:** lo correcto sería `defusedxml`, y **no se usa porque está fuera de la lista
+  que Samuel aprobó en Q-011**. Ampliar esa lista es decisión suya, no del agente. Mientras tanto,
+  `# nosec` con el motivo escrito y la guarda del prólogo. Es una pregunta de una línea cuando
+  toque.
+- El fixture crece a **diez bloques** con la frontera `REGLAMENTO GENERAL DE CIRCULACIÓN`, que era
+  justo lo que le faltaba para ser representativo: sin ella todo caía en el contenedor del Decreto.
+- `corpus/MANIFEST.yaml` corregido: 217 eran los titulados «Artículo N» con dígito; los preceptos
+  de tipo artículo son **218**, con el `Artículo único` del Real Decreto.
+
+**Siguiente**
+
+`0.4 ingest/chunking.py`, con el `occurrence` del contrato v2 y la propiedad de no pérdida que
+`RULES` §3.2 exige. Después `0.5 db/ddl.sql`, `0.6 embeddings` y `0.7` con el `Makefile`.

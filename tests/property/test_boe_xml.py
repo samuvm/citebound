@@ -13,6 +13,8 @@ the question, and the only symptom is recall that nobody can explain.
 
 from __future__ import annotations
 
+import re
+
 from hypothesis import given
 from hypothesis import strategies as st
 
@@ -60,12 +62,18 @@ def test_no_apartado_is_empty(ps: list[str]) -> None:
 
 
 @given(st.lists(parrafos, min_size=1, max_size=12))
-def test_apartado_numbers_never_repeat(ps: list[str]) -> None:
-    """Two apartados numbered `1` inside one article would give two chunks with the same
-    `legal_ref`, and `recall@k` — a set operation over references — would silently count
-    them as one."""
-    numeros = [a.numero for a in split_apartados(ps) if a.numero is not None]
-    assert len(numeros) == len(set(numeros))
+def test_the_numbers_reported_are_exactly_the_markers_that_were_there(ps: list[str]) -> None:
+    """No number is invented and none is dropped.
+
+    An earlier version of this property asserted that apartado numbers never repeat.
+    That is false for arbitrary input and it was **my** error, not the code's: if a
+    document really prints two apartados numbered 1, the parser must report two
+    apartados numbered 1. Reporting faithfully is the job; uniqueness is a property of
+    the corpus, and it is asserted where it belongs — over the real frozen document,
+    in `tests/unit/test_boe_xml.py`.
+    """
+    esperados = [m.group(1) for p in ps if (m := re.match(r"^(\d+)\.\s", p))]
+    assert [a.numero for a in split_apartados(ps) if a.numero is not None] == esperados
 
 
 @given(st.lists(numerados, min_size=2, max_size=10, unique=True))
@@ -77,10 +85,17 @@ def test_numbering_is_read_in_document_order(ps: list[str]) -> None:
     assert [a.numero for a in split_apartados(ps)] == esperado
 
 
-@given(st.lists(parrafos, min_size=1, max_size=12))
-def test_splitting_is_idempotent_once_the_numbering_is_stripped(ps: list[str]) -> None:
-    """Feeding the split back through itself must not carve the text again: the second
-    pass sees paragraphs with no markers and returns them untouched."""
-    once = split_apartados(ps)
-    twice = split_apartados([a.texto for a in once])
-    assert [a.texto for a in twice] == [a.texto for a in once]
+@given(st.lists(continuaciones, min_size=1, max_size=8))
+def test_paragraphs_without_a_marker_become_exactly_one_apartado(ps: list[str]) -> None:
+    """With nothing to split on there is nothing to split: the paragraphs join into a
+    single unnumbered apartado.
+
+    This replaces an idempotence property that was simply false — feeding the split back
+    through itself merges what the numbering had separated, because stripping the marker
+    destroys the very information that caused the split. An invariant that does not hold
+    is worse than no invariant: it passes only while the code is broken.
+    """
+    resultado = split_apartados(ps)
+    assert len(resultado) == 1
+    assert resultado[0].numero is None
+    assert resultado[0].texto == "\n".join(ps)

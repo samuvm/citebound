@@ -152,7 +152,7 @@ mypy_path = "src"
 # solo el arranque en seco, mientras no existe el Makefile: mypy falla si le nombras
 # una ruta que todavía no está creada, así que aquí solo van las que existen y crece
 # módulo a módulo hasta que `make typecheck` la sustituya en 0.7.
-files = ["src/citebound/domain"]
+files = ["src/citebound/domain", "src/citebound/ingest"]
 
 [tool.pytest.ini_options]
 minversion = "9.0"

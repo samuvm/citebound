@@ -312,3 +312,52 @@ def test_parse_rejects_an_empty_article_before_a_present_apartado() -> None:
     nothing, which cannot be resolved against the corpus."""
     with pytest.raises(LegalRefError):
         parse("RD-1428/2003#art..1")
+
+
+# --------------------------------------------------------------------------------------
+# containers · one document, three numbering spaces (ADR-020)
+# --------------------------------------------------------------------------------------
+
+# Built lazily inside the test: constructing a `LegalRef` at module level would raise
+# during collection, and a collection error is not a red — it is noise.
+CONTAINER_CASES: list[tuple[str, tuple[str, str | None]]] = [
+    # the Reglamento is the default container and takes no prefix: it is what the
+    # contract's own example cites, and what most of the golden set will point at
+    ("RD-1428/2003#art34.1", ("34", "1")),
+    # the Royal Decree's own seven preceptos, which live before the Reglamento starts
+    ("RD-1428/2003#artrd-unico", ("rd-unico", None)),
+    ("RD-1428/2003#artrd-dfprimera", ("rd-dfprimera", None)),
+    # an article of the sign catalogue, which numbers from 1 again inside ANEXO I
+    ("RD-1428/2003#artanexoi-1", ("anexoi-1", None)),
+    ("RD-1428/2003#artanexoi-1.2", ("anexoi-1", "2")),
+]
+
+
+@pytest.mark.parametrize(("raw", "partes"), CONTAINER_CASES)
+def test_a_container_prefixed_designator_round_trips(
+    raw: str, partes: tuple[str, str | None]
+) -> None:
+    """`RD-1428/2003` holds three numbering spaces that all restart at 1: the Royal
+    Decree's own preceptos, the annexed Reglamento, and the articulado inside each
+    ANEXO. Without a prefix, 47 references of the frozen corpus collide — measured, not
+    feared — and `recall@k`, a set operation over references, would count two different
+    articles as one."""
+    articulo, apartado = partes
+    assert parse(raw) == LegalRef("RD-1428/2003", articulo, apartado)
+    assert format_ref(parse(raw)) == raw
+
+
+def test_articles_from_different_containers_never_match() -> None:
+    cuerpo = LegalRef("RD-1428/2003", "1")
+    anexo = LegalRef("RD-1428/2003", "anexoi-1")
+    decreto = LegalRef("RD-1428/2003", "rd-unico")
+    assert not matches(cuerpo, anexo, MatchLevel.ARTICULO)
+    assert not matches(cuerpo, decreto, MatchLevel.ARTICULO)
+    assert not matches(anexo, decreto, MatchLevel.ARTICULO)
+
+
+@pytest.mark.parametrize("malo", ["-1", "1-", "a--b", "anexoi-"])
+def test_a_hyphen_may_join_segments_but_never_dangle(malo: str) -> None:
+    """`anexoi-1` is two segments joined; `1-` is a typo that would resolve to nothing."""
+    with pytest.raises(LegalRefError):
+        LegalRef("RD-1428/2003", malo)

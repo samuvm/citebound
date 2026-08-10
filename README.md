@@ -7,11 +7,16 @@
 
 ---
 
-> ### ⚠️ Fase 0 de 5. **Ningún número de esta página está medido todavía**
+> ### Fase 0 cerrada. **Ninguno de los umbrales de calidad está medido todavía**
 >
-> Los umbrales de más abajo son lo que la puerta de calidad **exigirá**, no resultados. Cuando
-> haya resultados se publicarán con su `n`, su intervalo de confianza y el artefacto del que
-> salen — salgan como salgan. Es la política declarada del proyecto, escrita antes de que doliera.
+> `make done MILESTONE=0` devuelve 0 con las doce condiciones en verde, y los números de esa
+> puerta están en el [CHANGELOG](CHANGELOG.md): 295 tests, 100 % de cobertura en los paquetes
+> con TDD obligatorio, 587 de 588 mutantes muertos.
+>
+> **Los umbrales de la tabla de abajo siguen sin medir**, y `G-HALLUC = 0` hoy vale poco: en la
+> fase 0 **no hay generador**, así que no hay nada que pueda alucinar. El cero de verdad —el que
+> viene de la cita cerrada— llega en la fase 3. Cuando haya resultados se publicarán con su `n`,
+> su intervalo de confianza y el artefacto del que salen, salgan como salgan.
 
 ## Dónde está
 
@@ -19,7 +24,7 @@ Una fase **solo** se marca hecha cuando `make done MILESTONE=N` devuelve 0. No h
 el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 [`docs/PLAN.md`](docs/PLAN.md).
 
-- [ ] **0 · Esqueleto vertical que camina** — *en curso* · una norma, un artículo por trozo, sin reordenador y sin agente: feo pero de punta a punta
+- [x] **0 · Esqueleto vertical que camina** — `make done MILESTONE=0` → exit 0 · [números en el CHANGELOG](CHANGELOG.md)
 - [ ] **1 · Scoring congelado y golden set** — el corrector se cierra **antes** de anotar el primer caso
 - [ ] **2 · Retrieval híbrido** — cada cambio se acepta o se tira con el número de recall, no con la sensación
 - [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
@@ -32,18 +37,19 @@ el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 <summary><b>Fase 0, tarea a tarea</b></summary>
 
 - [x] `0.1` corpus congelado desde el BOE, con su `sha256` en `corpus/MANIFEST.yaml`
-- [ ] `0.2` `domain/legalref.py` — **tests en rojo escritos**, implementación pendiente
-- [ ] `0.3` `ingest/boe_xml.py` — el parser estructural
-- [ ] `0.4` `ingest/chunking.py` — troceado con invariante de no pérdida
-- [ ] `0.5` `db/ddl.sql` — el esquema, sobre el contrato compartido v2
-- [ ] `0.6` `providers/embeddings.py`
-- [ ] `0.7` `retrieval/vector.py` + `api/ask.py` + `Makefile` con la puerta rápida
-- [ ] salida: `make up && make warm && make smoke-f0` → exit 0
+- [x] `0.2` `domain/legalref.py` — el tipo del que depende todo lo demás
+- [x] `0.3` `ingest/boe_xml.py` — 236 preceptos, 0 referencias duplicadas
+- [x] `0.4` `ingest/chunking.py` — 235 chunks, identificadores deterministas
+- [x] `0.5` `db/ddl.sql` — verificado contra PG18 real, ingerir dos veces no duplica
+- [x] `0.6` `providers/embeddings.py` — grabado contra el modelo real
+- [x] `0.7` `retrieval` + `api` + `cli` + `compose.yaml` + `Makefile`
+- [x] salida: `make up && make warm && make smoke-f0` → exit 0, en 10,0 s
 
 Hecho además: contrato `chunks-ddl.sql` subido a v2 y **verificado ejecutándolo** contra PG18 +
 pgvector; `pyproject.toml` con versiones exactas; y cuatro ADR.
-El detalle vivo está en [`docs/JOURNAL.md`](docs/JOURNAL.md); los números medidos irán, fase a
-fase, en [`CHANGELOG.md`](CHANGELOG.md), que hoy está vacío de números porque no hay ninguno.
+El detalle vivo está en [`docs/JOURNAL.md`](docs/JOURNAL.md), incluidos los cuatro fallos que
+encontró medir contra el corpus en vez de razonar sobre él. Los números de cada puerta van, fase
+a fase, en [`CHANGELOG.md`](CHANGELOG.md).
 
 </details>
 
@@ -103,8 +109,9 @@ correcta. Se hace determinista todo lo que puede serlo, y el residuo se acota y 
 
 ## Umbrales que la puerta exigirá
 
-Ninguno medido todavía. Cada uno lleva el comando exacto que lo produce en
-[`docs/GOALS.yaml`](docs/GOALS.yaml) — una meta sin comando no es una meta.
+**Ninguno medido todavía**, y el único que ya tiene número —`G-HALLUC = 0`— vale poco: en la
+fase 0 no hay generador. Cada meta lleva el comando exacto que la produce en
+[`docs/GOALS.yaml`](docs/GOALS.yaml); una meta sin comando no es una meta.
 
 | Meta | Qué significa | Umbral |
 |---|---|---:|
@@ -129,7 +136,8 @@ No PDF, no *scraping*: la fuente ya publica la jerarquía exacta y sin pérdida
 | Norma | RD 1428/2003 · Reglamento General de Circulación |
 | Identificador | `BOE-A-2003-23514` |
 | Consolidación | 2026-07-31 |
-| Contenido | 232 preceptos · 217 artículos · 103 encabezados |
+| Contenido | 232 bloques `precepto` · **236 unidades citables** tras el parseo · 103 encabezados |
+| Troceado | **235 chunks** · el artículo 51, derogado, queda fuera · 0 referencias duplicadas |
 
 La unidad de verdad es la **`LegalRef`** (`norma#artNN.apartado`), nunca el `chunk_id`. Eso es lo
 que permite cambiar el troceado, el modelo de embeddings o el reordenador sin invalidar el

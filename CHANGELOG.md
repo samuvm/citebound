@@ -14,12 +14,57 @@ lista de intenciones y el proyecto pierde justo lo que lo distingue.
 Regla que aplica también aquí: cambiar un fichero de `docs/CONTRACTS/` es un evento consciente y
 **deja entrada propia**, con la versión del contrato y qué otros proyectos hay que propagar a mano.
 
-## [No publicado]
+## [fase-0] · 2026-08-10 · Esqueleto vertical que camina
 
-### Contrato · `chunks-ddl.sql` v1 → v2 · 2026-08-10
+`make done MILESTONE=0` → **exit 0**, las doce condiciones de la constitución §5 en verde.
+Punto de retorno: commit etiquetado `fase-0`.
 
-**Evento consciente de cambio de contrato compartido.** Propagado a mano a `_comun/CONTRACTS/` y a
-`docs/CONTRACTS/` de **`citebound-01` e `indexkeeper-04`**, byte a byte idénticos
+### Números medidos
+
+| Condición del gate | Valor | Comando |
+|---|---:|---|
+| Suite completa | **295 tests** (284 propios + 20 de reserva − deselección) | `pytest tests` |
+| Reserva `tests/holdout/` | **20 pasan** | `pytest tests/holdout` |
+| Cobertura de línea en `[tool.gate].testable` | **100 %** (mínimo 85) | `make done` |
+| Cobertura por función | **0 funciones públicas sin test** | `scripts/check_function_coverage.py` |
+| Mutación | **587/588 muertos, 100 %** (mínimo 70) | `mutmut run` |
+| `G-HALLUC` | **0** sobre n=15 refs emitidas | `make eval` |
+| `G-SECRETS` | **0** hallazgos nuevos | `detect-secrets` |
+| Deuda | 0 marcas, 0 `skip`/`xfail` | `make done` |
+| Salida de fase | `make smoke-f0` → **exit 0**, 10,0 s | `make smoke-f0` |
+
+Entorno: MacBook Pro M4 Max 36 GB · Python 3.12.4 · Ollama 0.32.7 en el host ·
+PG18 + pgvector 0.8.6 por digest · `bge-m3` 1024 dim · `index_version` `v1-bge-m3-1024` ·
+corpus `BOE-A-2003-23514` consolidado 2026-07-31, sha256 `1105a26b…40072`.
+
+**El informe de eval dice en `notes` que `G-HALLUC = 0` hoy es cero por construcción
+trivial** —no hay generador en la fase 0— y no por la cita cerrada, que llega en la fase 3.
+Con n=15 la cota superior al 95 % es ~20 %. Publicarlo sin eso sería lo que D-06 prohíbe.
+
+### Añadido
+
+- **Corpus congelado**: RD 1428/2003 desde la API del BOE, con sha256 en `corpus/MANIFEST.yaml`.
+  236 preceptos → **235 chunks** (el artículo 51, derogado, queda fuera), 0 refs duplicadas.
+- `domain/legalref.py`, `ingest/boe_xml.py`, `ingest/chunking.py` con TDD y Hypothesis.
+- `db/` sobre el contrato v2, `providers/embeddings.py` con doble grabado,
+  `retrieval/vector.py`, `api/app.py`, `cli.py`, `compose.yaml` y el `Makefile` con el gate.
+- `scripts/`: `done.py` (las doce condiciones), `check_function_coverage.py`,
+  `check_no_chunk_ids.py` (R1), `eval_f0.py`, `smoke_f0.py`, `record_embeddings.py`.
+- **`tests/holdout/`**, escrito por el subagente `qa-adversario` sin leer `tests/`.
+
+### Corregido
+
+- **`_NORMA`, `_DESIGNADOR` y `_APARTADO` anclaban con `$`**, que en Python casa también
+  antes de un salto de línea final: `LegalRef("RD-1428/2003", "34\n")` se aceptaba mientras
+  el docstring prometía lo contrario. **Lo encontró la reserva, no la suite propia.** Se
+  cambia a `\Z`. No era alcanzable por `parse`, que hace `strip`; sí construyendo directo.
+- El identificador del corpus de Q-001 (`BOE-A-2003-21806`) no existe: el correcto es
+  `BOE-A-2003-23514`.
+
+### Contrato · `chunks-ddl.sql` v1 → v2
+
+**Evento consciente de cambio de contrato compartido.** Propagado a mano a `_comun/CONTRACTS/`
+y a `docs/CONTRACTS/` de **`citebound-01` e `indexkeeper-04`**, byte a byte idénticos
 (sha256 `5f3266c6c08c2cf3da5ca19087edf975be2478faa6a33abf6ae6331e1c895d75`). Anotado también en el
 CHANGELOG del 04. Decidido por Samuel en los dos buzones a la vez: Q-012 = **A** y Q-013 = **A2+B1**
 aquí, espejo de Q-002 y Q-003 allí. Razonamiento y coste en
@@ -52,7 +97,7 @@ aquí, espejo de Q-002 y Q-003 allí. Razonamiento y coste en
   duplicado exacto.
 - **Desbloquea** las tareas `0.4` (`ingest/chunking.py`) y `0.5` (`db/ddl.sql`).
 
-### Añadido
+### Gobierno, escrito antes de la primera línea de código
 - Capa de gobierno inicial: `CLAUDE.md`, `docs/GOALS.yaml`, `docs/PLAN.md`, `docs/RULES.md`,
   `docs/PARA-SAMUEL.md`, `docs/JOURNAL.md`, `docs/adr/000-plantilla.md`, `.claude/state/STATE.md`.
 - Copias de `docs/CONSTITUCION.md` y `docs/STACK.md`, y de los contratos que aplican a este

@@ -361,3 +361,41 @@ def test_a_hyphen_may_join_segments_but_never_dangle(malo: str) -> None:
     """`anexoi-1` is two segments joined; `1-` is a typo that would resolve to nothing."""
     with pytest.raises(LegalRefError):
         LegalRef("RD-1428/2003", malo)
+
+
+# --------------------------------------------------------------------------------------
+# what the holdout found · `$` is not the end of the string in Python
+# --------------------------------------------------------------------------------------
+
+CON_SALTO: list[tuple[str, str | None, str | None]] = [
+    ("RD-1428/2003\n", None, None),
+    ("RD-1428/2003", "34\n", None),
+    ("RD-1428/2003", "34", "1\n"),
+    ("RD-1428/2003", "34\n", "1"),
+]
+
+
+@pytest.mark.parametrize(("norma", "articulo", "apartado"), CON_SALTO)
+def test_a_trailing_newline_is_not_canonical(
+    norma: str, articulo: str | None, apartado: str | None
+) -> None:
+    """Found by the holdout suite, not by this file. Worth writing down twice.
+
+    Python's `$` matches **before a final newline**, so `^[a-z0-9]+$` accepted `"34\\n"`
+    and the constructor let a non-canonical value through — while its own docstring
+    promised the opposite. `\\Z` is the end of the string and nothing else.
+
+    It is not reachable through `parse`, which strips and collapses whitespace, and that
+    is exactly why the suite missed it: every test here went in through the front door.
+    It IS reachable by constructing directly — hydrating a database row, loading a golden
+    set case, anything that skips `parse` — and the damage would be silent: the reference
+    still looks right, and it stops matching the `legal_ref` column byte for byte.
+    """
+    with pytest.raises(LegalRefError):
+        LegalRef(norma, articulo, apartado)
+
+
+@pytest.mark.parametrize("sufijo", ["\n", "\r\n", "\r", "\n\n", " \n"])
+def test_no_flavour_of_trailing_whitespace_slips_through(sufijo: str) -> None:
+    with pytest.raises(LegalRefError):
+        LegalRef("RD-1428/2003", f"34{sufijo}")

@@ -53,7 +53,11 @@ PARSE_CASES: list[tuple[str, LegalRef]] = [
     # disposiciones and anexos: non-numeric designators, so they can never collide
     ("RD-1428/2003#artddunica", LegalRef("RD-1428/2003", "ddunica")),
     ("RD-1428/2003#artdfprimera", LegalRef("RD-1428/2003", "dfprimera")),
-    ("RD-1428/2003#artanexoI", LegalRef("RD-1428/2003", "anexoi")),
+    # The canonical designator is lowercase, roman numerals included: `ART34`, `Art.34`
+    # and `art34` have to be one reference, and a designator that keeps its case would
+    # break that. The uppercase spelling is a NORMALIZE case, not a canonical one, and
+    # lives below.
+    ("RD-1428/2003#artanexoi", LegalRef("RD-1428/2003", "anexoi")),
     # a second norma, for when the corpus grows (Q-001 options B and C)
     ("RDLeg-6/2015#art77.d", LegalRef("RDLeg-6/2015", "77", "d")),
 ]
@@ -91,6 +95,8 @@ NORMALIZE_CASES: list[tuple[str, str]] = [
     ("RD 1428/2003#art34", "RD-1428/2003#art34"),
     # "bis" written apart, and in caps
     ("RD-1428/2003#art14 BIS", "RD-1428/2003#art14bis"),
+    # a roman numeral written the way the BOE prints it, "ANEXO XI"
+    ("RD-1428/2003#art ANEXO XI", "RD-1428/2003#artanexoxi"),
     # NFKC: a full-width digit and a non-breaking space must fold to the plain forms.
     # El `noqa` es deliberado y por linea, nunca por regla: RUF001 marca Unicode ambiguo,
     # que es justo lo que se quiere en todo el repo — `G-INJECT` prueba ataques con
@@ -272,3 +278,37 @@ def test_legalref_is_hashable_so_it_can_live_in_the_sets_recall_is_computed_over
 def test_legalref_is_immutable() -> None:
     with pytest.raises((AttributeError, TypeError)):
         A34_1.articulo = "99"  # type: ignore[misc]
+
+
+# --------------------------------------------------------------------------------------
+# the construction guards · the four branches that stop a malformed reference existing
+# --------------------------------------------------------------------------------------
+
+BAD_CONSTRUCTIONS: list[tuple[str, str | None, str | None]] = [
+    # the norma is validated on the way in: a permissive shape would let a chunk id
+    # become a legal reference, which is the failure R1 exists to prevent
+    ("no-es-una-norma", None, None),
+    ("chunk_id:a1b2c3", None, None),
+    ("RD-1428/2003", "34BIS", None),  # designador sin canonizar: la caja alta importa
+    ("RD-1428/2003", "34 bis", None),  # espacio interior
+    ("RD-1428/2003", "34", "1 a"),  # espacio en el apartado
+    ("RD-1428/2003", "34", "1..2"),  # punto suelto
+]
+
+
+@pytest.mark.parametrize(("norma", "articulo", "apartado"), BAD_CONSTRUCTIONS)
+def test_the_constructor_rejects_anything_not_already_canonical(
+    norma: str, articulo: str | None, apartado: str | None
+) -> None:
+    """`LegalRef` validates and refuses; it never repairs. Text from outside goes
+    through `parse`, which is the only place that knows how to canonicalise."""
+    with pytest.raises(LegalRefError):
+        LegalRef(norma, articulo, apartado)
+
+
+def test_parse_rejects_an_empty_article_before_a_present_apartado() -> None:
+    """`art..1` survives normalisation as a designator starting with a dot. Without this
+    guard it would produce a reference with no article and an apartado hanging off
+    nothing, which cannot be resolved against the corpus."""
+    with pytest.raises(LegalRefError):
+        parse("RD-1428/2003#art..1")

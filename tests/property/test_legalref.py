@@ -8,7 +8,7 @@ on: a hole here is a hole in `G-RECALL5`, `G-CITA-PRECISION` and `G-HALLUC` at o
 
 from __future__ import annotations
 
-from hypothesis import assume, given
+from hypothesis import assume, given, note
 from hypothesis import strategies as st
 
 from citebound.domain.legalref import (
@@ -40,16 +40,50 @@ apartados = st.one_of(
 )
 
 
-@st.composite
-def legal_refs(draw: st.DrawFn) -> LegalRef:
-    """A well-formed reference at any of the three precision levels."""
-    norma = draw(normas)
-    articulo = draw(st.one_of(st.none(), articulos))
-    apartado = draw(st.one_of(st.none(), apartados)) if articulo is not None else None
-    return LegalRef(norma, articulo, apartado)
-
-
 LEVELS = [MatchLevel.NORMA, MatchLevel.ARTICULO, MatchLevel.APARTADO]
+
+# Keep a component with probability 3/4 when deriving the second reference of a pair.
+# A fair coin would leave only 1/8 of pairs agreeing on all three components, and
+# Hypothesis would refuse to run the implications for filtering too much.
+_KEEP = st.integers(min_value=0, max_value=3).map(lambda n: n > 0)
+
+
+@st.composite
+def legal_refs(draw: st.DrawFn, min_level: MatchLevel = MatchLevel.NORMA) -> LegalRef:
+    """A well-formed reference that reaches at least `min_level`."""
+    norma = draw(normas)
+    if min_level is MatchLevel.NORMA:
+        articulo = draw(st.one_of(st.none(), articulos))
+        if articulo is None:
+            return LegalRef(norma)
+        return LegalRef(norma, articulo, draw(st.one_of(st.none(), apartados)))
+    articulo = draw(articulos)
+    if min_level is MatchLevel.ARTICULO:
+        return LegalRef(norma, articulo, draw(st.one_of(st.none(), apartados)))
+    return LegalRef(norma, articulo, draw(apartados))
+
+
+@st.composite
+def ref_pairs(
+    draw: st.DrawFn, min_level: MatchLevel = MatchLevel.NORMA
+) -> tuple[LegalRef, LegalRef]:
+    """Two references likely to agree on a *prefix* of their components.
+
+    Drawing both independently is useless for the implications below: two random
+    references almost never match, so `assume(matches(...))` would filter out every
+    input and Hypothesis would refuse to run. **A property that never executes proves
+    nothing**, and it fails loudly rather than passing vacuously, which is the right
+    behaviour. So the second reference is derived from the first component by
+    component, and `min_level` guarantees both reach the level under test.
+    """
+    a = draw(legal_refs(min_level))
+    other = draw(legal_refs(min_level))
+    norma = a.norma if draw(_KEEP) else other.norma
+    articulo = a.articulo if draw(_KEEP) else other.articulo
+    apartado = a.apartado if draw(_KEEP) else other.apartado
+    if articulo is None:
+        apartado = None  # an apartado with no article is not a representable reference
+    return a, LegalRef(norma, articulo, apartado)
 
 
 def _reaches(ref: LegalRef, level: MatchLevel) -> bool:
@@ -106,15 +140,23 @@ def test_matches_is_symmetric(a: LegalRef, b: LegalRef, level: MatchLevel) -> No
 # --------------------------------------------------------------------------------------
 
 
-@given(legal_refs(), legal_refs())
-def test_matching_at_apartado_implies_matching_at_articulo(a: LegalRef, b: LegalRef) -> None:
+@given(ref_pairs(MatchLevel.APARTADO))
+def test_matching_at_apartado_implies_matching_at_articulo(
+    pair: tuple[LegalRef, LegalRef],
+) -> None:
+    a, b = pair
     assume(matches(a, b, MatchLevel.APARTADO))
+    note(f"{a} vs {b}")
     assert matches(a, b, MatchLevel.ARTICULO)
 
 
-@given(legal_refs(), legal_refs())
-def test_matching_at_articulo_implies_matching_at_norma(a: LegalRef, b: LegalRef) -> None:
+@given(ref_pairs(MatchLevel.ARTICULO))
+def test_matching_at_articulo_implies_matching_at_norma(
+    pair: tuple[LegalRef, LegalRef],
+) -> None:
+    a, b = pair
     assume(matches(a, b, MatchLevel.ARTICULO))
+    note(f"{a} vs {b}")
     assert matches(a, b, MatchLevel.NORMA)
 
 

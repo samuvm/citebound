@@ -271,3 +271,71 @@ detectada por GitHub. Descripción y 14 topics puestos por API.
 falla por la aserción y no por `ImportError`. `0.4` y `0.5` quedan desbloqueadas por el contrato v2.
 Pendiente de Samuel: **P-001** (dónde vive la interfaz) y `ollama upgrade && ollama pull
 qwen3.5:9b-mlx`, que solo bloquea `make bench`.
+
+---
+
+## 2026-08-10 (cont. 2) · fase 0 · `0.2 legalref` en verde, y tres defectos en mis propios tests
+
+**Qué se intentó**
+
+Cerrar el ciclo rojo→verde de `domain/legalref.py`, la primera unidad de código del proyecto.
+
+**Qué falló**
+
+Nada de la implementación: **los tres fallos que quedaron al implementar eran defectos de los
+tests**, y los tres se arreglan sin tocar una sola aserción.
+
+1. **Un caso de `PARSE_CASES` codificaba una contradicción.** `("RD-1428/2003#artanexoI",
+   LegalRef(..., "anexoi"))` afirmaba que `artanexoI` es forma canónica y a la vez esperaba el
+   designador en minúscula. La forma canónica **es** minúscula, porque `ART34`, `Art.34` y `art34`
+   tienen que ser la misma referencia. Se corrige el caso y **la variante en mayúsculas se mueve a
+   `NORMALIZE_CASES`**, donde le correspondía: no se pierde cobertura, se añade
+   (`#art ANEXO XI` → `#artanexoxi`).
+2. **Las dos implicaciones de `matches` no llegaban a ejecutarse.** Sacaban las dos referencias por
+   separado, así que `assume(matches(...))` filtraba prácticamente todo y Hypothesis abortaba con
+   `FailedHealthCheck: filter_too_much`. **La propiedad era correcta; la generación era inútil.**
+   Se añade `ref_pairs(min_level)`, que deriva la segunda referencia de la primera conservando cada
+   componente con probabilidad 3/4 y garantiza que ambas alcanzan el nivel bajo prueba. Que
+   Hypothesis se niegue a correr en vez de pasar en vacío es **el comportamiento correcto**: una
+   propiedad que nunca se ejecuta no prueba nada, y pasar en verde habría sido peor que fallar.
+3. **`ruff` en rojo dos veces**, las dos por `RUF001` (Unicode ambiguo). En los tests el carácter
+   ambiguo **es** el dato de prueba, así que va `noqa` por línea y con motivo. En `src/`, la clase de
+   caracteres de siete guiones se reescribe con escapes `\uXXXX` y un comentario por codepoint:
+   **mejor que un `noqa`**, porque no silencia nada y encima se lee. La regla sigue activa en todo
+   el repo, que es lo que importa cuando `G-INJECT` prueba ataques con homoglifos.
+
+**Números**
+
+| Comprobación | Comando | Resultado |
+|---|---|---|
+| Suite | `pytest tests` | **127 pasan**, 0 fallan |
+| Cobertura de línea y rama | `pytest --cov=citebound.domain` | **100 %** (umbral 85) |
+| Propiedades, perfil `dev` (25) | `HYPOTHESIS_PROFILE=dev` | 11 pasan |
+| Propiedades, perfil `gate` (100) | `HYPOTHESIS_PROFILE=gate` | 11 pasan, 0,70 s |
+| Propiedades, perfil `nightly` (1000) | `HYPOTHESIS_PROFILE=nightly` | 11 pasan, 6,98 s |
+| Lint | `ruff check` | limpio |
+| Formato | `ruff format --check` | limpio |
+| Tipos | `mypy --strict` | limpio |
+| Seguridad | `bandit -r src` | sin hallazgos |
+
+Rojo previo, para el registro: 97 fallos, 95 por aserción, **0** por import o sintaxis.
+
+**Decisiones**
+
+- **La forma canónica del designador de artículo es minúscula; la norma conserva su caja.** La
+  norma es un identificador oficial del BOE, no un token que acuñemos nosotros.
+- **El apartado es todo lo que va tras el primer punto**, para que `art65.5.c` signifique artículo
+  65, apartado `5.c`, que es como el contrato escribe los apartados compuestos.
+- **`LegalRef` valida y rechaza; nunca repara.** El texto de fuera pasa por `parse`, que es el único
+  sitio que sabe canonizar. Se añaden seis casos que ejercitan las cuatro guardas de construcción,
+  y con eso la cobertura sube de 95 % a 100 %.
+- **`_NORMA` es deliberadamente estricta** (`^[A-Za-z]+-\d+/\d{4}$`). Una norma permisiva dejaría
+  que un `chunk_id` se parsease como referencia legal, que es justo el fallo que R1 existe para
+  impedir. Ampliarla para una norma que no encaje es cambio de contrato y lleva ADR.
+- Eliminada la constante muerta `_ORDER`.
+
+**Siguiente**
+
+`0.3 ingest/boe_xml.py`, también con TDD obligatorio y donde está el riesgo nº 1 del proyecto: el
+apartado hay que deducirlo del texto del párrafo, no leerlo del árbol. `qwen3.5:9b-mlx` ya está
+descargado (8,9 GB, `nvfp4`); queda subir Ollama de 0.31.1 a 0.32.6, que no bloquea código.

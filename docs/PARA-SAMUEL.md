@@ -605,8 +605,22 @@ sigue con `bloqueante_desde_fase: null`. Lo único que cambia es dónde vive una
 `make done`, y el README la presenta como demo y no como entregable. Funciona, pero es peor: una
 demo fuera del gate es exactamente el tipo de código que acaba sin test de contrato.
 
-**Estado: PENDIENTE**
-`>> `
+**Estado: APROBADA · 2026-08-10 · APLICADA**
+`>> ` **Sí: la interfaz es obligatoria para `make done` completo.**
+
+Aplicado en `docs/PLAN.md` —zona roja, editada por el agente con autorización explícita de Samuel
+en esta sesión— con la marca `<!-- P-001 -->` en las dos líneas tocadas:
+
+- **Nueva fila `3b · Interfaz de práctica de test`, tipo NÚCLEO.** 8-12 h de agente, 0 horas
+  humanas. Entra en `make done MILESTONE=3`. Se le exige test de contrato contra el snapshot de
+  OpenAPI y humo e2e; **no** lleva TDD ni cobertura por función, porque es presentación
+  (ADR-019, y `ui/` ya está en `[tool.gate].excluido` y `tdd_prohibido` de `pyproject.toml`).
+- **La fase 6 se queda solo con la selección adaptativa** (BKT + selector), ampliación con timebox
+  duro de 3 días. No empezarla sigue sin ser un fallo.
+
+**Ninguna meta nueva, ningún umbral tocado, `thresholds.lock` intacto.** Lo único que cambia es
+dónde vive una tarea. Si no estás de acuerdo con cómo quedó redactada, revertir es borrar la fila
+`3b` y la línea de la fase 6: está marcada para que se encuentre en un `grep`.
 
 ---
 

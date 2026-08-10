@@ -339,3 +339,67 @@ Rojo previo, para el registro: 97 fallos, 95 por aserción, **0** por import o s
 `0.3 ingest/boe_xml.py`, también con TDD obligatorio y donde está el riesgo nº 1 del proyecto: el
 apartado hay que deducirlo del texto del párrafo, no leerlo del árbol. `qwen3.5:9b-mlx` ya está
 descargado (8,9 GB, `nvfp4`); queda subir Ollama de 0.31.1 a 0.32.6, que no bloquea código.
+
+---
+
+## 2026-08-10 (cont. 3) · fase 0 · rojo de `0.3`, y un bloque del BOE tiene varias versiones
+
+**Qué se intentó**
+
+Escribir el rojo de `ingest/boe_xml.py` contra el corpus real, no contra una idea de cómo debería
+ser el XML del BOE.
+
+**Qué falló**
+
+Tres suposiciones mías, las tres desmentidas por el propio fichero:
+
+1. **Un `<bloque>` puede tener varias `<version>`, y la vigente es la ÚLTIMA.** Recuento sobre el
+   corpus congelado: **257 bloques con una, 65 con dos, 12 con tres y 1 con cuatro — 78 de 335, el
+   23 %**. Leer la primera serviría redacción superada en casi un cuarto del texto. Y sería el peor
+   fallo posible del proyecto: la cita es real, el fragmento existe literalmente, `G-QUOTE-LIT` se
+   queda en 1,00 y `G-HALLUC` en 0 — y la respuesta es derecho que ya no está en vigor. Literal y
+   equivocado es peor que evidentemente equivocado.
+2. **El `id` del bloque no sirve como designador.** «Artículo 14 bis» vive en `<bloque id="a1-3">`,
+   y hay `a1-2`, `a1-4`, `a10-2`… El BOE acuña ids internos para los artículos insertados. El atajo
+   obvio —quitar la `a` inicial— daría `1-3`, que no es ningún artículo.
+3. **`ANEXO I` es `tipo="encabezado"`, no `precepto`.** Filtrar por `precepto` tira el catálogo de
+   señales entero, que es una materia completa del golden set.
+
+Y un cuarto, este mío y de gestión: **el fixture que escribí primero decía «copiado literal» y no
+lo era** — había acortado 9 de 18 párrafos. Lo detectó una comprobación que escribí en el momento,
+no una revisión posterior. Ahora el fixture son **nueve bloques enteros del corpus** y hay un test,
+`test_the_fixture_is_verbatim_from_the_frozen_corpus`, que falla si alguno deja de coincidir
+carácter a carácter. Un fixture que se despega de su fuente deja de probar el parser y pasa a
+probar el recuerdo que alguien tiene de él.
+
+**Números**
+
+| | |
+|---|---|
+| Rojo de `0.3` | **29 fallos**: 24 `AssertionError` + 4 `DID NOT RAISE`. **0 por import o sintaxis** |
+| Fixture | 9 bloques, 14 KB, **literales**, verificado por test |
+| Versiones por bloque en el corpus | 1→257 · 2→65 · 3→12 · 4→1 |
+| `<blockquote class="soloTexto">` | 42 |
+| Bloques con `(Derogado)` | 1 (el artículo 51) |
+| Suite completa | 134 pasan (las 127 de `0.2` intactas), 29 en rojo |
+| `ruff` | limpio |
+
+**Decisiones**
+
+- **La versión vigente es la última del bloque**, y `Precepto` registra de qué norma viene y desde
+  cuándo. Sale gratis y permite decir «según la redacción dada por la reforma de 2025».
+- **El designador se saca del atributo `titulo`, nunca del `id`.**
+- **El `<blockquote class="soloTexto">` no es texto del artículo**: es nota editorial sobre la
+  derogación. No entra y no se puede citar.
+- **El fixture sale del test a su propio fichero.** `E501` marcaba el XML embebido en una cadena de
+  Python; reflowarlo habría roto la literalidad. Sacarlo a `tests/fixtures/` arregla el lint y pone
+  el fragmento donde le corresponde.
+- Un artículo con un solo párrafo sin numerar tiene **un apartado con `numero=None`**. Inventar un
+  `1` acuñaría `art34.1`, que no existe: exactamente la alucinación que `G-HALLUC` impide.
+
+**Siguiente**
+
+El verde de `0.3`. Después `0.4 chunking`, `0.5 ddl`, `0.6 embeddings` y `0.7` con el `Makefile`.
+Ollama actualizado a **0.32.7**, una por encima del `0.32.6` que fija `docs/STACK.md`: cuando se
+escriba el `Makefile` la comprobación será `>= 0.32.6` con el motivo escrito, porque un binario del
+host que se autoactualiza no se puede clavar sin pelearse con el usuario.

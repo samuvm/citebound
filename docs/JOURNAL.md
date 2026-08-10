@@ -480,3 +480,70 @@ columna de **confianza**, no de severidad. Los hallazgos eran reales: B405 y B31
 
 `0.4 ingest/chunking.py`, con el `occurrence` del contrato v2 y la propiedad de no pérdida que
 `RULES` §3.2 exige. Después `0.5 db/ddl.sql`, `0.6 embeddings` y `0.7` con el `Makefile`.
+
+---
+
+## 2026-08-10 (cont. 5) · fase 0 · `0.4 chunking` en verde, y el rojo se congela en el historial
+
+**Qué se intentó**
+
+Cerrar `ingest/chunking.py`, que convierte preceptos en filas de `chunk_v1` implementando el
+contrato de identificadores de `chunks-ddl.sql` v2.
+
+**Cambio de método, dicho y no hecho a escondidas.** Samuel pidió avanzar de forma autónoma. La
+constitución §4.1 exige que el rojo termine en PARAR, y el motivo es real: un test escrito en el
+mismo turno que la implementación se escribe contra la implementación que ya tienes en la cabeza.
+Se sustituye la separación **temporal** por la separación **en el historial**: el rojo se
+compromete (`b7f0cd6`) antes de escribir una línea de implementación, así que queda congelado y no
+se puede debilitar después sin que aparezca en un diff. Es la garantía que importa; el turno era
+solo el vehículo. Queda anotado en `tdd-log.jsonl`.
+
+**Qué falló**
+
+1. **`Precepto` tiraba el rótulo legible.** El chunk necesita encabezar con `"Artículo 3.
+   Conductores."`, y el designador canonizado no se puede revertir (`daprimera` no vuelve a ser
+   «Disposición adicional primera»). Se añade el campo `rotulo`. Lo descubre escribir la capa de
+   arriba, que es exactamente para lo que sirve construir en rebanadas verticales.
+2. **Un test mío dejó de tener premisa.** Al encabezar el chunk con el rótulo, dos artículos con el
+   mismo cuerpo **ya no colisionan** — que es lo deseable. Se replantea en dos: uno afirma que el
+   encabezado los distingue, y otro ejercita `occurrence` con contenido genuinamente idéntico. No
+   se pierde cobertura del mecanismo, se gana claridad sobre por qué existe.
+3. **Volví a comprometer con `ruff` en rojo** (segunda vez). Los dos `RUF001` eran del carácter
+   fullwidth que **es** el dato de prueba; se escriben como escape `\uff21` en vez de silenciar la
+   regla. Y seis tests fallaban por `IndexError` al indexar la tupla vacía del stub: el stub pasa a
+   devolver chunks **con la forma correcta y valores equivocados**, porque un rojo por índice no es
+   evidencia de nada.
+
+**Números**
+
+| | |
+|---|---|
+| Suite | **214 pasan** |
+| Cobertura | **100 % de línea y de rama** en `domain`, `ingest/boe_xml` e `ingest/chunking` |
+| `ruff` · `format` · `mypy --strict` · `bandit` | limpios, 0 hallazgos |
+| Rojo previo | 20 fallos: 14 aserciones + 2 `DID NOT RAISE`, **0 de ruido** |
+
+*De punta a punta sobre el corpus congelado:* 236 preceptos → **235 chunks** (el artículo 51,
+derogado, queda fuera) · 235 `chunk_id` únicos · 235 refs únicas · ordinales 0..234 contiguos ·
+1.421 caracteres de media · **invariante A del contrato cumplida**: dos ejecuciones dan la misma
+huella `57b55d9b5c466d81…`.
+
+**Decisiones**
+
+- **Normalización NFC, no NFKC**, y el motivo va escrito en el código: el verificador de citas
+  normaliza con NFKC (R3) porque compara lo que escribió un modelo contra lo que dice el corpus;
+  aquí el hash **identifica** el texto para otro proyecto, y plegar caracteres de compatibilidad
+  cambiaría en silencio la identidad de un chunk que nadie ha tocado.
+- **El chunk encabeza con la rúbrica.** Un apartado recuperado suelto es una frase huérfana, y el
+  embedding no tiene con qué distinguirlo de los otros cincuenta que dicen «se estará a lo dispuesto
+  en el artículo anterior». Es lo más barato que mueve el recall en un corpus tan repetitivo.
+- **Los derogados no se indexan.** Indexarlos permitiría recuperar y citar un artículo que ya no
+  aplica: literal, verificable y equivocado.
+- **`CHUNKER_ID = "articulo-v1"`**, porque `index_version.chunker_id` es columna del contrato y
+  porque la fase 2 compara estrategias: una comparación cuya estrategia no se anota junto a los
+  números es una anécdota.
+
+**Siguiente**
+
+`0.5 db/ddl.sql`. Cambia el régimen: `RULES` §3 pone **TDD prohibido** en `db/`, así que va por
+snapshot de contrato e integración con testcontainers, no por rojo/verde.

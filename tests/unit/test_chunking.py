@@ -53,10 +53,12 @@ def _precepto(
     rubrica: str = "Rúbrica.",
     tipo: PreceptoTipo = PreceptoTipo.ARTICULO,
     titulo: str | None = "TÍTULO PRELIMINAR",
+    rotulo: str | None = None,
 ) -> Precepto:
     return Precepto(
         ref=LegalRef(NORMA, designador),
         tipo=tipo,
+        rotulo=rotulo or f"Artículo {designador}",
         rubrica=rubrica,
         apartados=tuple(Apartado(n, t) for n, t in apartados),
         titulo=titulo,
@@ -110,15 +112,35 @@ def test_the_chunk_id_does_not_depend_on_the_position() -> None:
             assert chunk.chunk_id == por_ref[str(chunk.ref)]
 
 
-def test_the_occurrence_tells_identical_text_apart_inside_one_document() -> None:
-    """Short apartados repeat verbatim in legal text, so `occurrence` is what keeps two
-    genuinely different chunks from colliding on one primary key."""
+def test_the_rubric_lead_makes_two_articles_with_the_same_body_distinct() -> None:
+    """Short apartados repeat verbatim all over legal text. Because the chunk opens with
+    `"Artículo N. Rúbrica."`, two different articles that say the same thing still hash
+    apart — which is the right outcome: they are different law and must be retrievable
+    as such."""
     repetido = "Se estará a lo dispuesto en el artículo anterior."
     chunks = chunk_preceptos(
         (_precepto("7", (None, repetido)), _precepto("8", (None, repetido))), source_uri=URI
     )
-    assert [c.occurrence for c in chunks] == [0, 1]
+    assert chunks[0].content_hash != chunks[1].content_hash
+    assert chunks[0].chunk_id != chunks[1].chunk_id
+    assert [c.occurrence for c in chunks] == [0, 0]
+
+
+def test_the_occurrence_tells_genuinely_identical_content_apart() -> None:
+    """`occurrence` is what contract v2 put in the place the ordinal used to occupy, and
+    it has to work even though the article-level strategy of phase 0 rarely triggers it.
+    Phase 2 splits finer, and then two apartados with the same wording under the same
+    heading stop being contrived: without `occurrence` they would collide on the primary
+    key of `chunk_v1`.
+
+    The case is built here the only way phase 0 allows — two preceptos that the parser
+    disambiguated by TÍTULO (ADR-020) and that carry the same rótulo, rúbrica and text."""
+    mismo = ("Artículo 151", "Rúbrica.", (None, "Texto idéntico palabra por palabra."))
+    a = _precepto("tv-151", mismo[2], rubrica=mismo[1], rotulo=mismo[0])
+    b = _precepto("tvi-151", mismo[2], rubrica=mismo[1], rotulo=mismo[0])
+    chunks = chunk_preceptos((a, b), source_uri=URI)
     assert chunks[0].content_hash == chunks[1].content_hash
+    assert [c.occurrence for c in chunks] == [0, 1]
     assert chunks[0].chunk_id != chunks[1].chunk_id
 
 
@@ -127,7 +149,9 @@ def test_normalisation_is_nfc_plus_collapsed_whitespace_plus_strip() -> None:
     characters here would silently change the text whose hash the other project relies on."""
     assert normalizar_contenido("  hola   mundo \n ") == "hola mundo"
     assert normalizar_contenido("mañana") == "mañana"  # NFC compone la ñ
-    assert normalizar_contenido("Ａ") == "Ａ"  # NFKC lo volvería "A"; NFC no
+    # U+FF21 FULLWIDTH A escrito como escape: el carácter ambiguo ES el dato de prueba,
+    # y así RUF001 sigue activo en todo el repo — G-INJECT prueba homoglifos.
+    assert normalizar_contenido("\uff21") == "\uff21"  # NFKC lo volvería "A"; NFC no
 
 
 # --------------------------------------------------------------------------------------
@@ -250,7 +274,9 @@ def test_chunking_nothing_yields_nothing() -> None:
 
 def test_the_chunk_text_reproduces_the_apartados_it_came_from() -> None:
     chunk = chunk_preceptos((ART3,), source_uri=URI)[0]
-    cuerpo = chunk.content.split("\n", 1)[1]  # tras la rúbrica
+    partes = chunk.content.split("\n", 1)
+    assert len(partes) == 2, "el chunk debe llevar la rúbrica y, tras un salto, el cuerpo"
+    cuerpo = partes[1]
     assert cuerpo == "1. Se deberá conducir con diligencia.\n2. Las conductas graves."
 
 

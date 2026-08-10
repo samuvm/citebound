@@ -107,6 +107,11 @@ class Precepto:
 
     ref: LegalRef
     tipo: PreceptoTipo
+    # Cómo lo llama el BOE: "Artículo 3", "Disposición adicional primera", "ANEXO I".
+    # El designador de la `ref` está canonizado y no se puede revertir a algo legible
+    # (`daprimera` no vuelve a ser "Disposición adicional primera"), y el troceado lo
+    # necesita para encabezar el chunk con algo que un humano — y un embedding — sepa leer.
+    rotulo: str
     rubrica: str
     apartados: tuple[Apartado, ...]
     titulo: str | None
@@ -304,6 +309,7 @@ def _precepto(
     return Precepto(
         ref=LegalRef(norma, _con_contenedor(designador, contenedor, tipo)),
         tipo=tipo,
+        rotulo=rotulo,
         rubrica=rubrica,
         apartados=split_apartados(cuerpo),
         titulo=titulo,

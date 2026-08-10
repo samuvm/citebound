@@ -49,6 +49,7 @@ def preceptos(draw: st.DrawFn, designador: str | None = None) -> Precepto:
     return Precepto(
         ref=LegalRef(NORMA, designador or draw(designadores)),
         tipo=PreceptoTipo.ARTICULO,
+        rotulo="Artículo X",
         rubrica=draw(textos),
         apartados=tuple(
             Apartado(n, t)
@@ -82,7 +83,9 @@ def test_the_chunk_reproduces_the_text_of_the_apartados_it_came_from(p: Precepto
     so "the ordered concatenation of an article's chunks" is that single chunk — and the
     property is written so that it keeps holding when phase 2 splits finer."""
     trozos = chunk_preceptos((p,), source_uri=URI)
-    cuerpo = "\n".join(c.content.split("\n", 1)[1] for c in trozos)
+    partes = [c.content.split("\n", 1) for c in trozos]
+    assert all(len(p) == 2 for p in partes), "cada chunk lleva rúbrica, salto y cuerpo"
+    cuerpo = "\n".join(p[1] for p in partes)
     esperado = "\n".join(
         f"{a.numero}. {a.texto}" if a.numero is not None else a.texto for a in p.apartados
     )
@@ -137,6 +140,7 @@ def test_the_identifier_does_not_depend_on_the_position(ps: tuple[Precepto, ...]
     nuevo = Precepto(
         ref=LegalRef(NORMA, "dtprimera"),
         tipo=PreceptoTipo.ARTICULO,
+        rotulo="Disposición transitoria primera",
         rubrica="Insertado.",
         apartados=(Apartado(None, "Texto que no existía antes."),),
         titulo=None,

@@ -52,8 +52,8 @@ lint:  ## ruff check + format --check
 	$(UV) ruff check src tests scripts
 	$(UV) ruff format --check src tests scripts
 
-typecheck:  ## mypy --strict sobre [tool.gate].testable
-	$(UV) mypy
+typecheck:  ## mypy --strict sobre [tool.gate].testable, DERIVADO de esa lista
+	$(UV) python scripts/typecheck.py
 
 check-r1:  ## R1 · ninguna cita se identifica por el id del troceador
 	$(UV) python scripts/check_no_chunk_ids.py

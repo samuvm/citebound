@@ -146,15 +146,13 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 mypy_path = "src"
-# --strict SOLO sobre los paquetes de [tool.gate].testable (docs/STACK.md §1).
+# NO hay lista de `files` aquí, y es deliberado. La hubo, escrita a mano, y se quedó en
+# `domain` + `ingest` mientras `evals/` entraba en [tool.gate].testable sin que nadie lo
+# notara: dos listas divergiendo en silencio, que es justo el fallo contra el que avisaba
+# el comentario que ocupaba este sitio. Ahora `make typecheck` deriva las rutas de
+# [tool.gate].testable y se las pasa a mypy. Una sola lista, y la que manda.
 #
-# Esta lista NO se mantiene a mano: `make typecheck` la deriva de [tool.gate].testable
-# y se la pasa a mypy, para que no haya dos listas que puedan divergir en silencio —
-# que es el fallo exacto que la constitución §2.6 quiere evitar. Lo de aquí abajo es
-# solo el arranque en seco, mientras no existe el Makefile: mypy falla si le nombras
-# una ruta que todavía no está creada, así que aquí solo van las que existen y crece
-# módulo a módulo hasta que `make typecheck` la sustituya en 0.7.
-files = ["src/citebound/domain", "src/citebound/ingest"]
+# `uv run mypy` a secas ya no comprueba nada por su cuenta: usa `make typecheck`.
 
 [tool.pytest.ini_options]
 minversion = "9.0"

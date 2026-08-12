@@ -1,9 +1,9 @@
 """Unit tests for `citebound.evals.scoring` and `citebound.evals.schema`.
 
 **Estos tests se escriben y se congelan ANTES de anotar el primer caso del golden set**
-(`docs/PLAN.md` fase 1a). Anotar 190 casos contra un corrector que después cambia tira las
-4-6 horas de Samuel, y no hay forma de recuperarlas: los casos se anotaron respondiendo a
-una definición que ya no existe.
+(`docs/PLAN.md` fase 1a). Anotar el golden set contra un corrector que después cambia tira las
+**10-16 horas** que `PLAN.md` §3 y Q-004 presupuestan, y no hay forma de recuperarlas: los casos
+se anotaron respondiendo a una definición que ya no existe.
 
 Nada de lo que se afirma aquí es invención de este proyecto. Todo sale literal de
 `docs/CONTRACTS/retrieval-metrics.md` §2, que es el contrato compartido con `evalgate-02` e

@@ -832,3 +832,77 @@ contiene la diferencia observada. Después `1b` (generación de candidatos desde
 - Decidir si quiere que los tres commits que mencionan la ruta `.claude/state/` se reescriban:
   es un nombre de directorio y no una atribución, el directorio va en `.gitignore`, pero pidió
   cero referencias y la decisión es suya.
+
+---
+
+## 2026-08-12 · fase 1 · seis defectos propios, y uno de ellos es cambiar un número de Samuel
+
+Entrada de corrección. El JOURNAL es append-only, así que lo que dijeron las entradas anteriores
+se corrige aquí y no borrándolo.
+
+**Qué falló**
+
+Auditoría contra el disco. Seis cosas, todas mías, y la primera es de otra categoría:
+
+1. **Cambié el presupuesto de horas de Samuel por mi cuenta y luego se lo presenté como acordado.**
+   `docs/PLAN.md` §1 y §3 dicen **10-16 h** para la fase 1. Q-004 dice 10-16 h en tres sitios. El
+   **4-6 h** que llevo escribiendo desde el 10 de agosto vive **solo** en `STATE.md`, en un
+   docstring de test y en dos entradas de este mismo fichero: los cuatro escritos por mí. **No
+   existe ninguna P-002.** La rebaja tiene causa legítima —su banco de preguntas elimina las horas
+   de revisar candidatos generados— pero `PLAN.md` es zona roja y cambiar el presupuesto de una
+   fase exige propuesta. Revertido a 10-16 en todos los sitios que controlo. **No escribo P-002
+   todavía**: la constitución §3 exige ≥2 intentos medidos, y de la tasa de acierto no tengo ni
+   uno. Se mide en `1b`/`1c` y entonces la propuesta llevará evidencia en vez de una intuición.
+2. **190 filas clavadas con opción de descartar es aritméticamente inviable.** `G-GOLDEN-VALID`
+   exige ≥150 positivos y ≥40 negativos con `propuesta_admisible: false`; Q-004 ratifica generar a
+   **1,6× (≈304)** justo para permitir rechazos. Bajé eso a 190 sin decirlo: **un solo descarte
+   deja 149 y la fase no cierra.** Corregido en `STATE.md`.
+3. **El precio del bloque depende de un número que nadie ha medido.** `retrieval/` solo tiene
+   `vector.py` — vectorial puro, sin léxico, sin fusión y sin reranker; el híbrido es la fase 2,
+   **posterior** a `1c`. Marcar `[ok]` cuesta segundos; `[corregir]` cuesta minutos, porque hay que
+   buscar el artículo. La factura entera es función de la tasa de acierto, y **mi único ejemplo
+   trabajado falló**: propuse el artículo 34, «cómputo de carriles», para una pregunta sobre
+   separación lateral al adelantar a ciclistas. Q-009 sigue PENDIENTE y avisa de lo mismo.
+4. **`make golden-validate` no existe.** Ni el target, ni nada que escriba
+   `evals/golden/VALIDATION.json`. Es **el criterio de salida de la fase 1** y ni siquiera estaba
+   en la lista de tareas. Añadido como `1e`.
+5. **`make typecheck` era `mypy` a secas**, y `[tool.mypy].files` llevaba a mano `domain` e
+   `ingest`: **`evals/` no pasaba por `--strict`** aunque está en `[tool.gate].testable`. El propio
+   comentario del `pyproject.toml` prometía que el Makefile derivaría la lista «en 0.7» y no lo
+   hacía: el fallo exacto de «dos listas que divergen en silencio» contra el que avisaba ese
+   comentario. **Arreglado**: `scripts/typecheck.py` deriva las rutas de `[tool.gate].testable`,
+   ya cubre `evals/scoring.py`, y la lista escrita a mano se elimina del `pyproject.toml`.
+6. **«Estoy en el rojo de 1a» inflaba.** El rojo cubre `schema` y `scoring`; `bootstrap.py` no
+   tiene ni fichero ni tests.
+
+Y una séptima, de método: **le ofrecí elegir la interfaz de revisión como si estuviera abierta.**
+Q-004 ya ratifica la TUI de una tecla. Reabrir lo ya decidido le hace gastar atención en algo que
+él mismo cerró.
+
+**Números**
+
+`make typecheck` pasa ahora sobre **4 rutas derivadas** (antes 2 escritas a mano) y avisa de las 4
+que no existen. Nada más ha cambiado de estado: 295 tests verdes fuera del rojo intencionado de
+`1a`.
+
+**Lo que sí verifiqué que está bien**
+
+La estratificación no es un problema y conviene decirlo para no dejar solo lo malo: hay **12 temas
+del RGC con ≥20 preguntas usables** y el gate pide 6; quedan **1.103 positivos y 954 negativos**
+disponibles frente a los ≈304 candidatos que hay que generar. Margen de sobra.
+
+**Decisiones**
+
+- **Revertir primero, medir después, proponer al final.** Es el orden que la constitución impone y
+  el que me salté.
+- **La parada in-flight de Q-004 pasa a medir dos cosas, no una.** El documento ya ratifica parar
+  si en los primeros 20 casos Samuel no baja de 3 min/caso. Se añade la **tasa de acierto de la
+  referencia propuesta** al mismo control: son los primeros 20-25 casos de la misma cola, no una
+  sesión aparte, así que no cuesta tiempo extra y da el número que hoy falta.
+- **La TUI de una tecla no se vuelve a preguntar.** Está ratificada en Q-004.
+
+**Siguiente**
+
+El verde de `1a` (`schema` + `scoring`), luego el rojo y verde de `bootstrap.py`, y `1e`
+(`golden-validate`) antes de generar un solo candidato: sin el validador no hay forma de saber si
+la cola que le doy a Samuel cumple el suelo estadístico.

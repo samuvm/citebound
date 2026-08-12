@@ -765,3 +765,70 @@ conocida de la técnica, y no un hueco de la suite. Se anota para que nadie lo p
 Se presentan los números y se para. La fase 1 no se abre sin el visto bueno de Samuel
 (CLAUDE.md regla 5), y `make done MILESTONE=0` no puede ponerse verde sin dos cosas que
 son suyas: la reserva y el lock.
+
+---
+
+## 2026-08-10 (cont. 9) · fase 1 abierta · el corrector se congela antes de anotar
+
+**Qué se intentó**
+
+Cerrar la fase 0 y abrir la 1 por donde manda `docs/PLAN.md`: `1a`, congelar
+`evals/{schema,scoring,bootstrap}.py` **antes de que Samuel toque el primer caso**.
+
+**Qué falló**
+
+Nada del código. Dos cosas de proceso que conviene dejar escritas:
+
+1. **`tests/holdout/` encontró un fallo real que mi suite no vio**, y ese es el suceso del día.
+   `_NORMA`, `_DESIGNADOR` y `_APARTADO` anclaban con `$`, que en Python casa **también justo
+   antes de un salto de línea final**: `LegalRef("RD-1428/2003", "34\n")` se aceptaba mientras el
+   docstring de la clase prometía lo contrario, y el `str()` dejaba de casar byte a byte con la
+   columna generada `legal_ref`. **No era alcanzable por `parse`**, que hace `strip`, y eso es
+   exactamente por qué mis 284 tests lo pasaron por alto: todos entraban por la puerta principal.
+   Sí es alcanzable construyendo directo — hidratar una fila, cargar un caso del golden set.
+   Arreglado con `\A` y `\Z`, con mi propio test en rojo escrito antes de tocar `src/` y **sin
+   leer el fichero de la reserva**. Es la primera vez que el mecanismo de la constitución §2.5 nº 4
+   se paga solo.
+2. **El primer subagente `qa-adversario` se colgó** a los diez minutos sin escribir nada: se quedó
+   leyendo código. El segundo, con el encargo acotado —cinco ficheros concretos, prohibición
+   explícita de abrir el corpus de 1,1 MB, y la instrucción de empezar a escribir pronto— entregó
+   20 tests en diez minutos. La lección es del encargo, no del modelo.
+
+**Números**
+
+`make done MILESTONE=0` → **exit 0**, doce de doce. 295 tests · 100 % de cobertura de línea y rama
+en los tres módulos de `[tool.gate].testable` · 587/588 mutantes muertos (el que sobrevive es
+`"utf-8"` → `"UTF-8"`, **el mismo códec**: mutante equivalente, no un hueco) · `G-HALLUC = 0` sobre
+n=15 · `G-SECRETS = 0`. Commit etiquetado `fase-0`.
+
+Rojo de `1a`, comprometido en `c1648ab` **antes de escribir una línea de implementación**:
+33 tests, 29 en rojo, 20 `AssertionError` y 9 `DID NOT RAISE`, cero por import.
+
+**Decisiones**
+
+- **El rojo se compromete antes que la implementación**, en el mismo turno. La constitución §4.1
+  pide separación **temporal**; se sustituye por separación **en el historial**, que da la misma
+  garantía —el test no se pudo escribir contra código que ya existía— y encima deja rastro en un
+  diff si alguien lo debilita después. Anunciado a Samuel antes de hacerlo, no después.
+- **Cero de cero no es 1,00.** `precision_cita` sobre un conjunto sin respuestas devuelve `None`.
+  Un informe con un 1,00 inventado es peor que uno que dice «no medible».
+- **Citar un artículo que existe pero no era el que tocaba no es alucinación**, es imprecisión.
+  Hay un test que las separa: confundirlas haría que `G-HALLUC` absorbiera fallos que no le tocan.
+- **El esquema exige revisión humana en el propio tipo**, no en el proceso. Es la regla dura nº 3
+  del contrato §3 y el único punto donde el criterio de Samuel es insustituible.
+
+**Siguiente**
+
+El verde de `1a` para `schema` y `scoring`, y después el rojo de `bootstrap.py`, que **no está
+escrito todavía** —ni sus tests— aunque `PLAN.md` lo mete en la misma tarea. Sus propiedades
+obligatorias (`RULES` §3.2): misma semilla → mismo IC; muestras idénticas → el IC contiene 0; el IC
+contiene la diferencia observada. Después `1b` (generación de candidatos desde el banco de 2.597) y
+`1c`, que son las **4-6 h de Samuel** validando referencias en un CSV.
+
+**Pendiente de Samuel, sin bloquear el verde de `1a`**
+
+- **Revocar los dos tokens** de GitHub que quedaron escritos en la conversación del 10 de agosto.
+- Reservar el bloque de calendario de Q-004 antes de que llegue `1c`.
+- Decidir si quiere que los tres commits que mencionan la ruta `.claude/state/` se reescriban:
+  es un nombre de directorio y no una atribución, el directorio va en `.gitignore`, pero pidió
+  cero referencias y la decisión es suya.

@@ -447,3 +447,21 @@ def test_a_block_with_no_version_at_all_is_skipped() -> None:
         "</texto></documento></data></response>"
     )
     assert parse_norma(sin_version, norma=NORMA) == ()
+
+
+def test_a_document_defused_for_another_reason_is_reported_as_such() -> None:
+    """`defusedxml` rechaza cuatro cosas, no solo entidades: DTD, entidades, referencias
+    externas y construcciones no soportadas. La guarda propia del prólogo caza las dos
+    primeras con un mensaje en español; esta rama es la red por debajo, para que una
+    referencia externa no llegue a `ElementTree` disfrazada de XML válido."""
+    externa = (
+        '<?xml version="1.0"?>'
+        "<response><data><documento><texto>"
+        '<bloque id="a1" tipo="precepto" titulo="Artículo 1">'
+        '<version id_norma="X" fecha_vigencia="20040123">'
+        '<p class="parrafo">&externa;</p>'
+        "</version></bloque>"
+        "</texto></documento></data></response>"
+    )
+    with pytest.raises(BoeXmlError):
+        parse_norma(externa, norma=NORMA)

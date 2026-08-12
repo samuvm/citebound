@@ -400,3 +400,47 @@ def test_an_abstention_that_also_carries_citations_is_refused() -> None:
     construyó la predicción, y contarlo como cualquiera de los dos falsea las dos métricas."""
     with pytest.raises(ValueError, match="absten"):
         Prediccion(caso_id="a", refs=(LegalRef(NORMA, "34"),), abstenida=True)
+
+
+# --------------------------------------------------------------------------------------
+# los denominadores vacíos y las guardas · cero de cero nunca es un número
+# --------------------------------------------------------------------------------------
+
+
+def test_recall_over_a_set_with_no_positive_cases_is_undefined() -> None:
+    """Un conjunto de solo negativos no tiene recall. Devolver 1,00 aquí sería publicar un
+    recall perfecto sobre cero preguntas medibles."""
+    metrica = recall_at_k([caso("a", tipo=Tipo.NEGATIVO)], {}, k=5)
+    assert metrica.valor is None
+    assert metrica.n == 0
+
+
+@pytest.mark.parametrize("k", [0, -1])
+def test_recall_with_a_nonsensical_k_is_refused(k: int) -> None:
+    with pytest.raises(ValueError, match="k debe ser"):
+        recall_at_k([caso("a", f"{NORMA}#art34")], {"a": []}, k=k)
+
+
+def test_a_positive_case_with_no_retrieval_list_is_refused() -> None:
+    """Tratar la ausencia como «no se recuperó nada» daría un recall más bajo pero
+    plausible, y nadie sabría que en realidad falta el dato."""
+    with pytest.raises(ValueError, match="sin lista de recuperados"):
+        recall_at_k([caso("a", f"{NORMA}#art34")], {}, k=5)
+
+
+def test_coverage_and_false_positive_abstention_over_only_negatives_are_undefined() -> None:
+    """Las dos se miden sobre casos con respuesta en el corpus. Sin ninguno, no hay
+    fracción que calcular — y `0,00` diría que el sistema no responde nada, que es falso."""
+    casos = [caso("a", tipo=Tipo.NEGATIVO)]
+    prediccion = [pred("a", abstenida=True)]
+    assert cobertura(casos, prediccion).valor is None
+    assert abstencion_incorrecta(casos, prediccion).valor is None
+
+
+def test_undue_abstention_over_a_set_with_no_negatives_is_undefined() -> None:
+    """El caso simétrico, y el que más importa: si el golden set se quedara sin negativos,
+    `G-ABST-FN` no diría 0,00 —«nunca responde de más»— sino que no es medible. Es lo que
+    obliga a los 40 negativos de `G-GOLDEN-VALID`."""
+    metrica = abstencion_indebida([caso("a", f"{NORMA}#art34")], [pred("a", f"{NORMA}#art34")])
+    assert metrica.valor is None
+    assert metrica.n == 0

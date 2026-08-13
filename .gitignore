@@ -13,6 +13,13 @@
 #
 # Para incluirlo de todas formas: borra la línea de abajo y `git add -f`.
 evals/golden/source/*.csv
+#
+# La cola de revisión de `1b` tampoco se publica, y por el mismo motivo: lleva el
+# enunciado y las tres opciones **literales** del banco, y todavía NO tiene la parte
+# transformativa —la referencia legal validada por Samuel— que es lo que convierte una
+# pregunta ajena en un caso de golden set propio. Se regenera con `make golden-sample`,
+# que es determinista con la semilla de `GOALS.yaml`, así que no se pierde nada.
+evals/golden/cola/
 
 # ── Python ───────────────────────────────────────────────────────────────────
 __pycache__/

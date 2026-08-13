@@ -11,7 +11,7 @@ recupera:
   · si la muestra no es reproducible, no se puede decir de dónde salió el golden set.
 
 **Los números no se inventan aquí.** El suelo sale de `GOALS.yaml` (`G-GOLDEN-VALID`) y el
-factor de sobremuestreo de Q-004, que ratifica generar a **1,6×** justo para permitir
+factor de sobremuestreo de Q-004, que ratifica generar a **1,6 veces** justo para permitir
 descartes. 190 filas clavadas con opción de descartar es aritméticamente inviable: un solo
 descarte deja 149 positivos y la fase no cierra.
 """
@@ -92,8 +92,8 @@ def test_las_preguntas_mixtas_quedan_fuera_de_la_v1_y_no_en_silencio() -> None:
 
 
 def test_el_objetivo_es_el_suelo_de_goals_por_el_factor_de_q004() -> None:
-    """`G-GOLDEN-VALID` pide ≥150 positivos y ≥40 negativos; Q-004 ratifica generar a 1,6×
-    para permitir rechazos. 150·1,6 = 240 y 40·1,6 = 64."""
+    """`G-GOLDEN-VALID` pide ≥150 positivos y ≥40 negativos; Q-004 ratifica generar a 1,6 veces
+    para permitir rechazos. 150 por 1,6 = 240, y 40 por 1,6 = 64."""
     umbrales = golden_sample.umbrales()
     assert golden_sample.objetivo(umbrales.positivos_min) == 240
     assert golden_sample.objetivo(umbrales.negativos_min) == 64
@@ -126,7 +126,7 @@ def test_el_plan_cubre_el_minimo_de_materias_con_margen() -> None:
 
 def test_un_tema_sin_material_suficiente_se_dice_en_voz_alta() -> None:
     filas = banco(3, ["A", "B"])
-    with pytest.raises(ValueError, match="material|suficiente"):
+    with pytest.raises(ValueError, match=r"material|suficiente"):
         golden_sample.plan(filas, objetivo=100, temas_max=2)
 
 
@@ -259,7 +259,7 @@ def test_marcar_a_ciegas_es_reproducible() -> None:
 def test_no_se_pueden_marcar_mas_casos_a_ciegas_que_los_que_hay() -> None:
     filas = banco(3, ["A"])
     muestra = golden_sample.muestrear(filas, plan={"A": 3}, tipo="positivo", semilla=1)
-    with pytest.raises(ValueError, match="a ciegas|ciegas"):
+    with pytest.raises(ValueError, match=r"a ciegas|ciegas"):
         golden_sample.marcar_a_ciegas(muestra, n=10, semilla=1)
 
 

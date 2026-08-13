@@ -1060,3 +1060,67 @@ rutas de `[tool.gate].testable` que existen · **790/791 mutantes** · `G-HALLUC
 `1e`: `golden_validate.py` y enseñar al gate a leer sus cuatro artefactos. Y con él, arreglar
 que la condición 6 mida en vez de leer una caché — un `G-MUT` que publica un número que no ha
 calculado es peor que no tenerlo.
+
+---
+
+## 2026-08-13 (cont. 2) · fase 1 · `1e` a medias: el validador existe y el gate ya sabe leer
+
+**Qué se intentó**
+
+`1e` entera: `golden_validate.py` y que el gate sepa leer los artefactos que `GOALS.yaml`
+declara, que era lo que dejaba `make done MILESTONE=1` en rojo perpetuo por fontanería.
+
+**Qué falló**
+
+1. **Tres tests míos de `golden_validate`, y en los tres el fallo era del test.**
+   - `vectores_distintos` hacía `json.loads` de **todas** las líneas, incluida la inválida que
+     el propio test inyecta a propósito: reventaba en el helper antes de llegar al validador.
+   - El test de la ref con apartado **sustituía** la última línea del conjunto y se llevaba
+     por delante un negativo: fallaba por el suelo estadístico, no por la referencia.
+   - Y el que exige que los umbrales no estén escritos en el script fallaba **por los números
+     que yo mismo había puesto en la prosa explicando que no debe haber números**. Reescrita
+     la prosa sin cifras: un test que se rompe escribiendo comentarios no distingue prosa de
+     umbral, y esa rigidez aquí es justo lo que lo hace útil.
+
+2. **Un test cazó un fallo real:** derivar el «20» de `materias_con_20_casos_o_mas` con
+   `split("_")[1]` da `"con"`. Arreglado con expresión regular, que además es lo correcto —
+   por posición de palabra, un renombrado que un humano consideraría cosmético cambiaría el
+   umbral en silencio. Ese número **solo existe dentro del nombre de la etiqueta**:
+   `GOALS.yaml` no tiene campo para él, así que extraerlo es la única alternativa a escribirlo.
+
+**Números**
+
+`make done MILESTONE=0` → **exit 0, doce de doce**, 416 tests.
+`make done MILESTONE=1` → rojo en la 7, y ahora por el **motivo correcto**: `G-COV-FUNC=0`
+(antes `None`) y `G-GOLDEN-VALID=None` porque el golden set no existe todavía. Eso ya no es
+fontanería: es el estado honesto de la fase.
+`golden_validate`: 20 tests de contrato. Lector de artefactos: 15.
+
+**Decisiones**
+
+- **`gate-status.json` se resuelve en memoria, no leyendo el fichero.** La condición 7 corre
+  *antes* de que el estado se escriba, así que leerlo de disco daría el número de la corrida
+  **anterior** y el gate se aprobaría con datos viejos. Es la misma familia de fallo que
+  `G-MUT` leyendo la caché de mutmut, y aquí no se repite. Hay un test que lo fija.
+- **Un artefacto que nadie sabe leer salta.** Un test recorre **todas** las metas bloqueantes
+  de `GOALS.yaml` y exige que el gate sepa partir su artefacto; la única excepción admitida
+  es `G-REVERSION`, y está nombrada en el test. Una meta nueva con un artefacto raro no se
+  cuela en silencio.
+- **Las refs del golden set se comparan a nivel de artículo.** El índice es `articulo-v1` y
+  nunca contendrá apartados: comparar cadenas literales rechazaría `art34.1` y con ello la
+  granularidad de la que dependen `G-CITA-PRECISION` y `G-QUOTE-LIT`.
+- **Un conjunto vacío falla.** Cero casos da cero errores de esquema; sin comprobar el suelo
+  aparte, un fichero vacío pondría `G-GOLDEN-VALID` en verde.
+- **`errores` va como entero.** `GOALS.yaml` apunta a `VALIDATION.json :: errores` con umbral
+  `== 0` y unidad `count`; `[] == 0` es falso y la meta no daría verde jamás.
+
+**Lo que queda de `1e`, y no se da por hecho**
+
+La condición 6 **sigue leyendo la caché de mutmut en vez de medir**. Está diagnosticado en la
+entrada anterior y no arreglado: `mutmut` no invalida al cambiar los tests y no tiene bandera
+para forzar, y la salida limpia —comprobar que ningún fichero de test es más nuevo que la
+caché y ponerse rojo si lo es— merece su propio rojo, no un parche a las tres de la mañana.
+
+**Siguiente**
+
+Cerrar esa parte de `1e` y después `1b`: generar los ≈304 candidatos por temas.

@@ -23,6 +23,7 @@ import shlex
 import subprocess  # nosec B404 — listas fijas de argumentos, nunca shell
 import sys
 import tomllib
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -110,6 +111,14 @@ def c3_holdout() -> Resultado:
 # ------------------------------------------------------- 4 · cobertura por función ---
 def c4_cobertura_funcion() -> Resultado:
     codigo, salida = _correr("uv run python scripts/check_function_coverage.py")
+    # `G-COV-FUNC` bloquea desde la fase 1 y su artefacto es este número. Antes esta
+    # condición pasaba y la meta daba rojo por no encontrarlo: la misma verdad, verde por un
+    # camino y roja por el otro. Si el comprobador falla y no se puede leer el recuento, NO
+    # se apunta cero: se apunta 1, porque un fallo que no se sabe medir no es «ninguno».
+    cuantas = re.search(r"G-COV-FUNC roja · (\d+) funciones", salida)
+    MEDIDO["coverage.functions_without_test"] = (
+        0 if codigo == 0 else (int(cuantas.group(1)) if cuantas else 1)
+    )
     return Resultado(
         4,
         "cobertura por función",
@@ -216,24 +225,115 @@ def c7_metas(milestone: int) -> Resultado:
     )
 
 
-def _leer_artefacto(meta: dict[str, object]) -> object:
-    destino = str(meta["artefacto"])
-    if "eval-latest.json" in destino:
-        informe = RAIZ / "evals" / "reports" / "eval-latest.json"
-        if not informe.is_file():
-            return None
-        datos = json.loads(informe.read_text(encoding="utf-8"))
-        for metrica in datos["metrics"]:
-            if metrica["id"] == meta["id"]:
-                return metrica["value"]
+# Lo que ESTA corrida ha medido, por la ruta con que `GOALS.yaml` lo nombra. Se consulta en
+# vez de releer `gate-status.json`, que en el momento de evaluar las metas todavía es el de
+# la corrida anterior.
+MEDIDO: dict[str, object] = {}
+
+
+def _medir_secretos() -> int:
+    codigo, salida = _correr(
+        "uv run detect-secrets scan --baseline .secrets.baseline "
+        "--exclude-files uv\\.lock|tests/recordings/|corpus/raw/|\\.snapshot\\.json"
+    )
+    return 0 if codigo == 0 else len(re.findall(r'"type":', salida))
+
+
+# Medidas que la condición que las produce ejecuta DESPUÉS de evaluarse las metas. Se miden
+# bajo demanda y se memorizan, para no correr `detect-secrets` dos veces por gate.
+MEDIDORES: dict[str, Callable[[], object]] = {"secrets.new_findings": _medir_secretos}
+
+
+def partir_artefacto(destino: str) -> tuple[str, str] | None:
+    """`"fichero :: selector"` → `("fichero", "selector")`, o `None` si no tiene esa forma.
+
+    `None` significa «este artefacto no es un JSON con un selector», no «no pasa nada». Hoy
+    el único caso legítimo es `G-REVERSION`, que apunta a `docs/JOURNAL.md` más `.snapshots/`
+    y tiene su propio comprobador; hay un test que lo nombra, para que un artefacto nuevo
+    que nadie sepa leer salte en vez de colarse.
+
+    El paréntesis explicativo se descarta: `totals.percent_covered (filtrado a
+    [tool.gate].testable)` es una aclaración para quien lee, no parte de la clave.
+    """
+    if " :: " not in destino:
         return None
-    if "gate-status.json" in destino and meta["id"] == "G-SECRETS":
-        codigo, salida = _correr(
-            "uv run detect-secrets scan --baseline .secrets.baseline "
-            "--exclude-files uv\\.lock|tests/recordings/|corpus/raw/|\\.snapshot\\.json"
-        )
-        return 0 if codigo == 0 else len(re.findall(r'"type":', salida))
-    return None
+    ruta, _, selector = destino.partition(" :: ")
+    selector = selector.split(" (")[0].strip()
+    ruta = ruta.strip()
+    if not ruta or not selector or "+" in selector:
+        return None
+    return ruta, selector
+
+
+def seleccionar(datos: object, selector: str) -> object:
+    """Resuelve una ruta punteada, con `clave[id=X]` para buscar dentro de una lista.
+
+    Devuelve `None` en cuanto algo no encaja, y eso es lo correcto: `None` es rojo, mientras
+    que un `KeyError` a mitad del gate dejaría las condiciones siguientes sin evaluar y
+    escondería el resto de los problemas.
+    """
+    actual = datos
+    for tramo in selector.split("."):
+        indexado = re.fullmatch(r"(\w+)\[id=([^\]]+)\]", tramo)
+        if indexado:
+            clave, buscado = indexado.groups()
+            if not isinstance(actual, dict) or not isinstance(actual.get(clave), list):
+                return None
+            elegido = [x for x in actual[clave] if isinstance(x, dict) and x.get("id") == buscado]
+            if not elegido:
+                return None
+            actual = elegido[0]
+            continue
+        if not isinstance(actual, dict) or tramo not in actual:
+            return None
+        actual = actual[tramo]
+    return actual
+
+
+def leer_artefacto_ruta(ruta: str, selector: str) -> object:
+    """El valor que declara `GOALS.yaml`, venga de disco o de esta misma corrida.
+
+    **`gate-status.json` se resuelve en memoria, no leyendo el fichero.** La condición 7
+    corre *antes* de que el estado se escriba, así que leerlo del disco daría el número de
+    la corrida anterior: el gate se aprobaría con datos viejos. Es la misma familia de fallo
+    que `G-MUT` leyendo la caché de mutmut, y aquí no se repite.
+    """
+    if ruta.endswith("gate-status.json"):
+        if selector not in MEDIDO and selector in MEDIDORES:
+            MEDIDO[selector] = MEDIDORES[selector]()
+        return MEDIDO.get(selector)
+    fichero = Path(ruta) if Path(ruta).is_absolute() else RAIZ / ruta
+    if not fichero.is_file():
+        return None
+    try:
+        return seleccionar(json.loads(fichero.read_text(encoding="utf-8")), selector)
+    except json.JSONDecodeError:
+        return None
+
+
+def medido_anidado() -> dict[str, object]:
+    """`{"secrets.new_findings": 0}` → `{"secrets": {"new_findings": 0}}`.
+
+    `GOALS.yaml` escribe rutas punteadas, así que en el fichero tienen que ser objetos
+    anidados: una clave literal `"secrets.new_findings"` no la encontraría nadie que siguiera
+    el contrato.
+    """
+    salida: dict[str, object] = {}
+    for ruta, valor in MEDIDO.items():
+        tramos = ruta.split(".")
+        nodo = salida
+        for tramo in tramos[:-1]:
+            nodo = nodo.setdefault(tramo, {})  # type: ignore[assignment]
+        nodo[tramos[-1]] = valor
+    return salida
+
+
+def _leer_artefacto(meta: dict[str, object]) -> object:
+    partido = partir_artefacto(str(meta["artefacto"]))
+    if partido is None:
+        return None
+    ruta, selector = partido
+    return leer_artefacto_ruta(ruta, selector)
 
 
 def _cumple(valor: object, umbral: dict[str, object]) -> bool:
@@ -376,15 +476,18 @@ def c11_docs() -> Resultado:
 
 # --------------------------------------------------------------- 12 · secretos ---
 def c12_secretos() -> Resultado:
-    codigo, salida = _correr(
-        "uv run detect-secrets scan --baseline .secrets.baseline "
-        "--exclude-files uv\\.lock|tests/recordings/|corpus/raw/|\\.snapshot\\.json"
-    )
+    # Memorizado: si la condición 7 ya evaluó `G-SECRETS`, el escaneo está hecho y correrlo
+    # otra vez solo cuesta segundos de gate para llegar al mismo número.
+    if "secrets.new_findings" not in MEDIDO:
+        MEDIDO["secrets.new_findings"] = _medir_secretos()
+    hallazgos = MEDIDO["secrets.new_findings"]
     return Resultado(
         12,
         "sin secretos",
-        codigo == 0,
-        "sin hallazgos nuevos sobre la baseline" if codigo == 0 else salida[-300:],
+        hallazgos == 0,
+        "sin hallazgos nuevos sobre la baseline"
+        if hallazgos == 0
+        else f"{hallazgos} hallazgos nuevos sobre la baseline",
         "uv run detect-secrets scan --baseline .secrets.baseline",
     )
 
@@ -454,6 +557,9 @@ def main() -> int:
                     c.__name__ if hasattr(c, "__name__") else "lambda"
                     for c in comprobaciones[len(resultados) :]
                 ],
+                # Las medidas con la forma anidada que `GOALS.yaml` nombra, para quien lea
+                # el fichero desde fuera. Dentro de la corrida se consulta `MEDIDO`.
+                **medido_anidado(),
             },
             ensure_ascii=False,
             indent=1,

@@ -57,7 +57,10 @@ def c1_estaticos() -> Resultado:
     for orden in (
         "uv run ruff check src tests scripts",
         "uv run ruff format --check src tests scripts",
-        "uv run mypy",
+        # NO `uv run mypy` a pelo: `[tool.mypy].files` ya no existe (se quitó al derivar
+        # la lista de [tool.gate].testable) y mypy sin rutas aborta con exit 2. El gate
+        # llama al MISMO comprobador que `make typecheck`, no a una copia que pueda divergir.
+        "uv run python scripts/typecheck.py",
         "uv run bandit -q -r src",
     ):
         codigo, salida = _correr(orden)

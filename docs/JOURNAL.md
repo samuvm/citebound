@@ -906,3 +906,75 @@ disponibles frente a los ≈304 candidatos que hay que generar. Margen de sobra.
 El verde de `1a` (`schema` + `scoring`), luego el rojo y verde de `bootstrap.py`, y `1e`
 (`golden-validate`) antes de generar un solo candidato: sin el validador no hay forma de saber si
 la cola que le doy a Samuel cumple el suelo estadístico.
+
+---
+
+## 2026-08-13 · fase 1 · `make done` estaba roto, y la salida de la fase 1 es inalcanzable por fontanería
+
+**Qué se intentó**
+
+Verificar en disco el estado real antes de responder a Samuel: `make gate-fast`, la suite completa,
+y `make done` contra las fases 0 y 1. No fiarse de ningún resumen, ni de otra sesión ni mío.
+
+**Qué falló**
+
+1. **`make done MILESTONE=0` estaba en ROJO en la condición 1**, es decir, el comando que certifica
+   la fase 0 como cerrada. `a9da809` quitó `[tool.mypy].files` del `pyproject` y enrutó el
+   typecheck por `scripts/typecheck.py`, pero **`scripts/done.py` seguía llamando a `uv run mypy`
+   a pelo**, y mypy sin rutas aborta con exit 2. Es el mismo fallo de «dos listas que divergen en
+   silencio» que ese commit venía a cerrar, un nivel más arriba: arreglé la divergencia entre
+   `pyproject` y `Makefile` y creé una nueva entre `Makefile` y el gate. **Arreglado**: `done.py`
+   invoca ahora el mismo `scripts/typecheck.py` que `make typecheck`, nunca una copia.
+2. **`make done MILESTONE=1` no puede ponerse verde jamás, ni con el golden set perfecto.**
+   `_leer_artefacto` de `done.py` solo sabe leer dos cosas: `eval-latest.json` para cualquier
+   métrica, y `gate-status.json` **solo** para `G-SECRETS`. Todo lo demás devuelve `None`, y un
+   `None` es rojo.
+   - **`G-COV-FUNC`** (`gate-status.json :: coverage.functions_without_test`) bloquea desde la fase
+     1. La condición 4 ejecuta el comprobador y pasa, pero la **meta** no encuentra su número, así
+     que la misma verdad da verde por un camino y rojo por el otro.
+   - **`G-GOLDEN-VALID`** (`evals/golden/VALIDATION.json :: errores`) tampoco está contemplado:
+     cuando `1e` escriba el fichero, el gate lo seguirá ignorando.
+   - Y hay dos más ya escritas en `GOALS.yaml` que caerán igual cuando toquen:
+     `G-EVAL-DET :: eval_determinista` (fase 4) y `G-BKT-PROP :: property.knowledge` (fase 6).
+   **No arreglado en este turno**: cambia cómo el gate lee y escribe sus artefactos y merece su
+   propio rojo, no un parche de paso. Entra en `1e`.
+3. **`[tool.mutmut].paths_to_mutate` no incluye `evals/scoring.py`**, que sí está en
+   `[tool.gate].tdd_obligatorio`. `G-MUT` mide hoy sobre 3 ficheros de los 4 que le tocan. No
+   bloquea hasta la fase 3, pero es la tercera instancia del mismo patrón en el mismo día.
+
+**Números**
+
+`make gate-fast` → **VERDE**. `make done MILESTONE=0` → **exit 0, doce de doce**, tras el arreglo:
+335 tests recogidos (324 + 11 de integración) · 100 % de línea sobre las 4 rutas de
+`[tool.gate].testable` que existen · 587/588 mutantes · `G-HALLUC=0` · `G-SECRETS=0` · reserva 20/20.
+`scoring.py` en 100 % de línea y rama; `schema.py` en 94 %.
+`make done MILESTONE=1` → **ROJO en la condición 7**, con `G-GOLDEN-VALID=None` y `G-COV-FUNC=None`.
+
+**Decisiones**
+
+- **El gate no vuelve a tener su propia copia de un comando.** Si `make typecheck` y la condición 1
+  comprueban lo mismo, ejecutan el mismo fichero. Una copia es una divergencia con retraso.
+- **Un artefacto que nadie escribe es una meta que no existe.** `1e` deja de ser «escribir
+  `golden-validate`» y pasa a ser «escribir el validador **y** enseñar al gate a leer los cuatro
+  artefactos que `GOALS.yaml` ya declara», con la sintaxis `fichero :: ruta.punteada` resuelta de
+  forma genérica en vez de con un `if` por meta.
+- **Ejecutar el gate de la fase siguiente es parte del diagnóstico, no del cierre.** Los dos
+  defectos llevaban aquí desde el 10 de agosto y no los vio nadie porque `make done MILESTONE=1`
+  no se había ejecutado nunca. Se ejecuta al **abrir** una fase, no solo al cerrarla.
+
+**Siguiente**
+
+`bootstrap.py` (rojo y verde, con las tres propiedades de `RULES` §3.2) para cerrar `1a`, y después
+`1e` con el alcance ampliado de arriba. `1b` no empieza hasta que `1e` esté en verde: sin validador
+no hay forma de saber si la cola que se le da a Samuel cumple el suelo estadístico.
+
+**Cierres de Samuel (2026-08-13)**
+
+- **Ollama:** actualizado. Ya estaba en **0.32.7** desde el 10 de agosto (anotado arriba) y
+  `STATE.md` seguía listándolo como bloqueo: era la fila la que estaba caduca, no la máquina.
+  Fuera de la tabla de bloqueos. `make bench` ya no espera nada del host.
+- **Tokens de GitHub:** controlados. No se comprueba por petición suya. La mención del 10 de
+  agosto se queda donde está —el JOURNAL es histórico y no se reescribe—, pero **el asunto está
+  cerrado y no vuelve a aparecer como pendiente**.
+- **Su sitio en la tabla de bloqueos lo ocupa Q-009**, que es lo que de verdad está esperando: el
+  modelo con el que se generan los candidatos de `1b` decide cuántas correcciones le tocan en `1c`.

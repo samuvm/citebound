@@ -978,3 +978,85 @@ no hay forma de saber si la cola que se le da a Samuel cumple el suelo estadíst
   cerrado y no vuelve a aparecer como pendiente**.
 - **Su sitio en la tabla de bloqueos lo ocupa Q-009**, que es lo que de verdad está esperando: el
   modelo con el que se generan los candidatos de `1b` decide cuántas correcciones le tocan en `1c`.
+
+---
+
+## 2026-08-13 (cont.) · fase 1 · `1a` cerrada, y la mutación destapó una métrica del revés
+
+**Qué se intentó**
+
+Cerrar `1a` escribiendo `bootstrap.py` con TDD, y de paso meter `evals/scoring.py` en
+`[tool.mutmut].paths_to_mutate`, del que faltaba pese a estar en `[tool.gate].tdd_obligatorio`.
+
+**Qué falló**
+
+1. **Dos de mis propios tests de `bootstrap` estaban mal, y el código tenía razón.**
+   - `test_holm_corta_de_verdad`: esperaba que `b`(p=0,9) cortara a `c`(p=0,02). Holm ordena
+     **ascendente**, así que `c` va antes que `b` y no puede cortarla. Reescrito con un caso
+     que sí demuestra el descenso escalonado: con m=4, `c`=0,024 pasa su umbral individual
+     (0,025) y aun así no se rechaza porque `b`=0,020 rompió la cadena en la posición 1.
+     El test nuevo es **más** exigente, no menos: caza la implementación ingenua.
+   - `test_semilla_distinta`: con métricas binarias y n=10 las diferencias son múltiplos de
+     0,1, los cuantiles caen en el mismo valor discreto y dos semillas dan el mismo intervalo
+     **legítimamente**. No probaba que la semilla se usara. Reescrito con latencias continuas,
+     y con una aserción extra: `punto` NO depende de la semilla, el intervalo sí.
+
+2. **`G-ABST-FN` se podía invertir entera sin que ningún test se enterara.** El mutante
+   `if not p.abstenida` → `if p.abstenida` sobrevivía. Con la métrica del revés, el umbral
+   `<= 0,10` premiaría exactamente la conducta que castiga y **«responder siempre» pasaría el
+   gate**. Comprobado a mano, que es como se afirma esto: aplicada la inversión, los 38 tests
+   anteriores pasan los 38; el test nuevo la caza. El reparto tiene que ser asimétrico (3
+   negativos, 1 respondido): con dos y dos el valor es 0,5 en los dos sentidos.
+
+3. **20 mutantes más del mismo tipo: nadie comprobaba el `id` ni el `n` de las métricas.**
+   `Metrica(None, 0.87, 4)`, `"g-halluc"` y `n=None` pasaban con el 100 % de cobertura de
+   línea. No es cosmético: el `id` es la clave con la que `done.py` busca el número en
+   `eval-latest.json`, y dos métricas con el mismo id se tapan una a otra y el gate pasa con
+   el número que no era. `recall_at_k` es el caso claro — sin la `k` en el id, `G-RECALL5` y
+   `G-RECALL30` serían la misma entrada del informe con umbrales distintos (0,90 y 0,97).
+
+4. **El número de `G-MUT` no era de fiar, y ese es el hallazgo del día.** Tres cosas juntas:
+   - `make done` **nunca ejecuta `mutmut run`**: la condición 6 lee `mutmut results`, o sea la
+     caché. El 587/588 que el gate lleva publicando desde el 10 de agosto era de una corrida
+     anterior al código que decía estar midiendo.
+   - mutmut **no invalida al cambiar los tests**, solo al cambiar `src/`. Tras reforzar los
+     tests, `mutmut run` devolvió los mismos 24 supervivientes sin reejecutar nada.
+   - mutmut suelta `coverage.exceptions.DataError: no such table: context` y con eso falla su
+     selección de tests por mutante, que produce **falsos supervivientes**:
+     `boe_xml.x__precepto__mutmut_70` figuraba vivo y **muere con los tests que ya existían**
+     desde el 10 de agosto, sin tocar nada. Comprobado aplicando la mutación a mano.
+   Reejecutados los 24 por nombre (`mutmut run <nombres>`, sin borrar nada): **790/791**. El
+   único superviviente real es `chunking` `"utf-8"`→`"UTF-8"`, mutante equivalente ya
+   documentado. Quedan además dos avisos de configuración obsoleta: `paths_to_mutate` →
+   `source_paths` y `tests_dir` deprecado.
+
+**Números**
+
+`make done MILESTONE=0` → **exit 0, doce de doce**. 381 tests · 100 % de línea sobre las 5
+rutas de `[tool.gate].testable` que existen · **790/791 mutantes** · `G-HALLUC=0` ·
+`G-SECRETS=0` · reserva 20/20.
+`bootstrap.py`: 41 tests nuevos (rojo de 32 en `a6a3ccf`, cero por import) + 5 de refuerzo en
+`scoring`.
+
+**Decisiones**
+
+- **`semilla` y `n_resamples` son argumentos obligatorios sin defecto**, y hay un test que lee
+  el fuente para comprobar que la semilla no está escrita. `GOALS.yaml` dice «vive aqui, NUNCA
+  en el codigo»; un defecto sería una segunda fuente de verdad.
+- **El sentido de la regresión se deriva del `operador` de la meta**, no se presume. El
+  contrato §4 redacta la regla para mayor-es-mejor; `G-ABST-FP`, `G-TTFT`, `G-TTVA` y
+  `G-COLD-CACHE` llevan `<=`. No es ambigüedad que elevar: `GOALS.yaml` ya lo dice.
+- **`bootstrap.py` NO entra en `paths_to_mutate`.** `RULES` §3 dice que `evals/{scoring,
+  bootstrap}` es TDD obligatorio, pero §4 —la copia literal que lee el gate— no lo lista en
+  `tdd_obligatorio`. Es una discrepancia dentro de `RULES.md`, que es zona roja: se pregunta,
+  no se arregla por cuenta propia. Ver `PARA-SAMUEL` Q-014.
+- **Un test que falla no es un test que se cambia hasta que pase.** Dos de estos fallaron
+  porque yo tenía mal la idea, no porque el código estuviera mal, y en los dos casos la
+  corrección endureció el test. La diferencia se ve en que ambos siguen cazando la
+  implementación ingenua.
+
+**Siguiente**
+
+`1e`: `golden_validate.py` y enseñar al gate a leer sus cuatro artefactos. Y con él, arreglar
+que la condición 6 mida en vez de leer una caché — un `G-MUT` que publica un número que no ha
+calculado es peor que no tenerlo.

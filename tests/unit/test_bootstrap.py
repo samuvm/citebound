@@ -120,14 +120,21 @@ def test_misma_semilla_mismo_intervalo() -> None:
     assert uno == dos
 
 
-def test_semilla_distinta_puede_dar_intervalo_distinto() -> None:
-    """No es un capricho: si la semilla no entrara en el cálculo, `G-EVAL-DET` pasaría
-    por accidente y no probaría nada."""
-    base = [0.0, 1.0, 1.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0, 1.0]
-    head = [1.0, 1.0, 0.0, 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0]
+def test_semilla_distinta_da_intervalo_distinto() -> None:
+    """Si la semilla no entrara en el cálculo, `G-EVAL-DET` pasaría por accidente.
+
+    **Valores continuos a propósito.** Con métricas binarias y `n` pequeño las
+    diferencias por caso son múltiplos de `1/n`, los cuantiles caen en el mismo valor
+    discreto y dos semillas dan el mismo intervalo **legítimamente** — sin que eso
+    pruebe nada sobre si la semilla se usa. Aquí van latencias, donde el cuantil sí
+    discrimina.
+    """
+    base = [100.0 + i * 7.3 for i in range(30)]
+    head = [95.0 + (i * 11.7) % 60 for i in range(30)]
     uno = ic_diferencia_pareada(base, head, n_resamples=RESAMPLES, semilla=1)
     dos = ic_diferencia_pareada(base, head, n_resamples=RESAMPLES, semilla=2)
     assert (uno.inferior, uno.superior) != (dos.inferior, dos.superior)
+    assert uno.punto == dos.punto  # la diferencia observada NO depende de la semilla
 
 
 def test_nivel_configurable_y_registrado() -> None:
@@ -239,13 +246,21 @@ def test_holm_aplica_el_descenso_escalonado() -> None:
 
 
 def test_holm_corta_de_verdad_y_no_evalua_cada_una_por_su_cuenta() -> None:
-    """El fallo clásico es comparar cada p con su propio umbral sin cortar. Aquí `c`
-    tiene un p menor que su umbral individual (0,025) y aun así NO se rechaza, porque
-    `b` rompió la cadena antes."""
-    veredicto = holm({"a": 0.001, "b": 0.9, "c": 0.02}, alfa=0.05)
-    assert veredicto["a"] is True
-    assert veredicto["b"] is False
-    assert veredicto["c"] is False
+    """El fallo clásico es comparar cada p con su propio umbral **sin cortar**.
+
+    El corte ocurre en orden **ascendente**, no en el orden en que llegan las métricas.
+    Con m=4 y alfa=0,05 los umbrales por posición son 0,0125 · 0,0167 · 0,025 · 0,05:
+
+        pos0  a=0,001  <= 0,0125  → se rechaza
+        pos1  b=0,020  >  0,0167  → **corta**
+        pos2  c=0,024  <= 0,0250  → pasaría sola, pero YA está cortada
+        pos3  d=0,900  >  0,0500
+
+    `c` es el test entero: una implementación que comparase cada p con su umbral por su
+    cuenta la rechazaría, y sería más permisiva que Holm sin decirlo.
+    """
+    veredicto = holm({"a": 0.001, "b": 0.02, "c": 0.024, "d": 0.9}, alfa=0.05)
+    assert veredicto == {"a": True, "b": False, "c": False, "d": False}
 
 
 def test_holm_con_todo_a_uno_no_rechaza_nada() -> None:

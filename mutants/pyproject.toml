@@ -19,11 +19,9 @@ dependencies = [
   "fastapi==0.141.1",
   "uvicorn[standard]==0.52.1",
   "pydantic==2.13.4",
-
   # --- Almacén ---
   "psycopg[binary,pool]==3.3.4",
   "pgvector==0.5.0",
-
   # --- Agente. LangGraph SOLO como máquina de estados (R7).
   #     `langchain*` no entra aquí: check_deps.py lo verifica.
   #     -prebuilt y -checkpoint van pineados exactos a propósito: hubo un
@@ -31,23 +29,27 @@ dependencies = [
   "langgraph==1.2.10",
   "langgraph-prebuilt==1.1.0",
   "langgraph-checkpoint==4.2.0",
-
   # --- Modelos. El reranker corre EN PROCESO con MPS, nunca por Ollama (R8).
   #     El acceso al generador es HTTP contra /v1/chat/completions vía httpx. ---
   "sentence-transformers==5.7.0",
   "httpx==0.28.1",
-
   # --- Numérico ---
   "numpy==2.5.2",
   "scipy==1.18.0",
-
   # --- Observabilidad ---
   "opentelemetry-sdk==1.44.0",
   "opentelemetry-exporter-otlp==1.44.0",
+  # --- Parseo defensivo del XML del BOE.
+  #     `xml.etree` no defiende contra la expansión de entidades y no tiene interruptor
+  #     para desactivarla. Aprobado por Samuel el 2026-08-10 fuera de la lista de Q-011:
+  #     una librería probada es mejor que una guarda escrita a mano, aunque la guarda
+  #     estuviera bien hecha y cubierta con un test de billion laughs. ---
+  "defusedxml==0.7.1",
 
   # --- Validación de artefactos de gobierno (golden set, GOALS, informes) ---
   "pyyaml==6.0.3",
   "jsonschema==4.26.0",
+  "defusedxml>=0.7.1",
 ]
 
 [project.scripts]
@@ -63,13 +65,13 @@ dev = [
   "hypothesis==6.165.2",
   "testcontainers==4.15.0",
   "schemathesis==4.24.3",
-
   # --- Estáticos y anti-gaming ---
   "ruff==0.16.2",
   "mypy==2.3.0",
   "bandit==1.9.4",
   "detect-secrets==1.5.0",
   "mutmut==3.7.0",
+  "types-defusedxml>=0.7.0.20260504",
 ]
 evals = [
   # Ragas NO entra: congelado desde febrero de 2026, fuera del gate (Q-002 nº 1).
@@ -144,15 +146,13 @@ python_version = "3.12"
 strict = true
 warn_unreachable = true
 mypy_path = "src"
-# --strict SOLO sobre los paquetes de [tool.gate].testable (docs/STACK.md §1).
+# NO hay lista de `files` aquí, y es deliberado. La hubo, escrita a mano, y se quedó en
+# `domain` + `ingest` mientras `evals/` entraba en [tool.gate].testable sin que nadie lo
+# notara: dos listas divergiendo en silencio, que es justo el fallo contra el que avisaba
+# el comentario que ocupaba este sitio. Ahora `make typecheck` deriva las rutas de
+# [tool.gate].testable y se las pasa a mypy. Una sola lista, y la que manda.
 #
-# Esta lista NO se mantiene a mano: `make typecheck` la deriva de [tool.gate].testable
-# y se la pasa a mypy, para que no haya dos listas que puedan divergir en silencio —
-# que es el fallo exacto que la constitución §2.6 quiere evitar. Lo de aquí abajo es
-# solo el arranque en seco, mientras no existe el Makefile: mypy falla si le nombras
-# una ruta que todavía no está creada, así que aquí solo van las que existen y crece
-# módulo a módulo hasta que `make typecheck` la sustituya en 0.7.
-files = ["src/citebound/domain", "src/citebound/ingest"]
+# `uv run mypy` a secas ya no comprueba nada por su cuenta: usa `make typecheck`.
 
 [tool.pytest.ini_options]
 minversion = "9.0"
@@ -192,6 +192,12 @@ paths_to_mutate = [
   "src/citebound/domain/legalref.py",
   "src/citebound/ingest/boe_xml.py",
   "src/citebound/ingest/chunking.py",
+  # Entra al cerrar 1a. Estaba en [tool.gate].tdd_obligatorio desde el primer dia y
+  # fuera de aqui: G-MUT medía sobre 3 de los 4 ficheros que le tocan, que es justo
+  # "dos listas que divergen en silencio". `bootstrap.py` NO entra: RULES §4 -la copia
+  # literal que lee el gate- no lo lista en tdd_obligatorio, aunque §3 diga que si.
+  # Esa discrepancia es de RULES.md, que es zona roja, y se pregunta antes de tocarla.
+  "src/citebound/evals/scoring.py",
 ]
 tests_dir = ["tests/"]
 # mutmut copia el arbol a `mutants/` y solo lleva lo que le digas: sin esto, los

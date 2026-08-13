@@ -651,3 +651,44 @@ proyectos:
 fin de cargar `qwen3.5:27b-mlx` (17 GB) y generar candidatos de golden set. Con el banco de
 preguntas ya escrito, ese modelo sale del plan y con él la petición. Se marca así al cerrar la
 fase 1; no hace falta que respondas nada.
+
+---
+
+### Q-014 · fase 1 · NO bloquea hoy · discrepancia dentro de `docs/RULES.md`
+
+**Qué necesito:** que decidas si `src/citebound/evals/bootstrap.py` entra en
+`[tool.gate].tdd_obligatorio`, y que lo apliques tú si la respuesta es sí. `RULES.md` es zona
+roja y no lo toco.
+
+**Por qué:** el documento se contradice consigo mismo.
+
+- **`RULES.md` §3**, tabla «qué se testea y dónde vive TDD», dice: `evals/{scoring,bootstrap}`
+  → **TDD obligatorio + Hypothesis**, y añade que se congela antes de anotar el primer caso.
+- **`RULES.md` §4**, el bloque `[tool.gate]` marcado «literal, para copiar a `pyproject.toml`»,
+  lista en `tdd_obligatorio` solo `evals/scoring.py`. `bootstrap.py` aparece en `testable`,
+  pero no en `tdd_obligatorio`.
+
+Manda §4, porque es lo que lee el script. Consecuencia práctica: **`bootstrap.py` queda fuera
+de `make mutation`**, o sea que `G-MUT` no lo mide. Y `bootstrap.py` es la puerta estadística:
+decide qué cambio se acepta y cuál se revierte a partir de la fase 2.
+
+He copiado §4 al `pyproject.toml` **literalmente**, que es lo que manda el contrato, y he
+dejado el motivo escrito en el propio fichero. No lo he «arreglado» por mi cuenta: divergir la
+copia del original rompe el `diff` que sirve de test.
+
+**Opciones:**
+
+- **A (por defecto):** añadir `"src/citebound/evals/bootstrap.py"` a `tdd_obligatorio` en
+  `RULES.md` §4. *Pros:* casa §4 con §3, y la puerta estadística pasa a estar medida por
+  mutación como el resto del núcleo. Su TDD ya está hecho —rojo de 32 congelado en `a6a3ccf`—,
+  así que no cuesta trabajo nuevo, solo mide el que ya hay. *Contras:* `make mutation` tarda
+  algo más.
+- **B:** cambiar §3 para que diga solo `evals/scoring`. *Pros:* también resuelve la
+  contradicción. *Contras:* la puerta estadística se queda sin medir, y es el módulo que
+  decide si una regresión bloquea. No lo recomiendo.
+
+`[ ] A   [ ] B`
+
+**Tiempo tuyo:** 2 minutos (editar `RULES.md` §4 y la copia de `pyproject.toml`).
+**Estado: PENDIENTE**
+`>> `

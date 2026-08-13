@@ -192,6 +192,12 @@ paths_to_mutate = [
   "src/citebound/domain/legalref.py",
   "src/citebound/ingest/boe_xml.py",
   "src/citebound/ingest/chunking.py",
+  # Entra al cerrar 1a. Estaba en [tool.gate].tdd_obligatorio desde el primer dia y
+  # fuera de aqui: G-MUT medía sobre 3 de los 4 ficheros que le tocan, que es justo
+  # "dos listas que divergen en silencio". `bootstrap.py` NO entra: RULES §4 -la copia
+  # literal que lee el gate- no lo lista en tdd_obligatorio, aunque §3 diga que si.
+  # Esa discrepancia es de RULES.md, que es zona roja, y se pregunta antes de tocarla.
+  "src/citebound/evals/scoring.py",
 ]
 tests_dir = ["tests/"]
 # mutmut copia el arbol a `mutants/` y solo lleva lo que le digas: sin esto, los

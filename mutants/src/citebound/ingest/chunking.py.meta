@@ -192,7 +192,7 @@
         "citebound.ingest.chunking.x_doc_id_de__mutmut_3": 0.282563,
         "citebound.ingest.chunking.x_content_hash_de__mutmut_5": 0.707533,
         "citebound.ingest.chunking.x_doc_id_de__mutmut_5": 0.27685,
-        "citebound.ingest.chunking.x_doc_id_de__mutmut_4": 2.026415
+        "citebound.ingest.chunking.x_doc_id_de__mutmut_4": 2.008309
     },
     "estimated_durations_by_key": {
         "citebound.ingest.chunking.x__contenido__mutmut_1": 0.327848834451288,
@@ -284,7 +284,7 @@
         "citebound.ingest.chunking.x_doc_id_de__mutmut_1": 0.8523722946410999,
         "citebound.ingest.chunking.x_doc_id_de__mutmut_2": 0.8523722946410999,
         "citebound.ingest.chunking.x_doc_id_de__mutmut_3": 0.8523722946410999,
-        "citebound.ingest.chunking.x_doc_id_de__mutmut_4": 0.8523722946410999,
+        "citebound.ingest.chunking.x_doc_id_de__mutmut_4": 0.8585224186535925,
         "citebound.ingest.chunking.x_doc_id_de__mutmut_5": 0.8523722946410999
     }
 }

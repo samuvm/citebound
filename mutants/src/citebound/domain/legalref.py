@@ -91,15 +91,24 @@ _WS = re.compile(r"\s+")
 # reference, which is exactly what R1 and `scripts/check_no_chunk_ids.py` exist to
 # prevent. Widening it for a norm that does not fit this shape is a contract change
 # and needs an ADR, because `legal_ref` is a shared column.
-_NORMA = re.compile(r"^[A-Za-z]+-\d+/\d{4}$")
+_NORMA = re.compile(r"\A[A-Za-z]+-\d+/\d{4}\Z")
 
+# `\A` y `\Z`, nunca `^` y `$`. En Python `$` casa TAMBIEN justo antes de un salto de
+# linea final, asi que `^[a-z0-9]+$` aceptaba "34\n" y el constructor dejaba pasar un
+# valor no canonico mientras su propio docstring prometia lo contrario. Lo encontro la
+# reserva de tests (`tests/holdout/`), no esta suite: aqui todo entraba por `parse`, que
+# hace strip, y el fallo solo se alcanza construyendo directo — hidratar una fila de la
+# base de datos, cargar un caso del golden set. El dano habria sido callado: la
+# referencia sigue pareciendo correcta y deja de casar byte a byte con la columna
+# generada `legal_ref`.
+#
 # A hyphen JOINS segments and never dangles. One document holds three numbering spaces
 # that all restart at 1 — the Royal Decree's own preceptos, the annexed Reglamento, and
 # the articulado inside each ANEXO — and without a container prefix 47 references of the
 # frozen corpus collide. That is measured, not feared: `recall@k` is a set operation over
 # references, so a collision counts two different articles as one. See ADR-020.
-_DESIGNADOR = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_APARTADO = re.compile(r"^[a-z0-9]+(?:\.[a-z0-9]+)*$")
+_DESIGNADOR = re.compile(r"\A[a-z0-9]+(?:-[a-z0-9]+)*\Z")
+_APARTADO = re.compile(r"\A[a-z0-9]+(?:\.[a-z0-9]+)*\Z")
 
 
 from mutmut.mutation.trampoline import wrap_in_trampoline as _mutmut_mutated, MutantDict

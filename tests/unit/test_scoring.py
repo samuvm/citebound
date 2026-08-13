@@ -444,3 +444,96 @@ def test_undue_abstention_over_a_set_with_no_negatives_is_undefined() -> None:
     metrica = abstencion_indebida([caso("a", f"{NORMA}#art34")], [pred("a", f"{NORMA}#art34")])
     assert metrica.valor is None
     assert metrica.n == 0
+
+
+# --------------------------------------------------------------------------------------
+# El `id` y el `n` de cada métrica, que la mutación destapó sin cubrir
+# --------------------------------------------------------------------------------------
+#
+# `make mutation` sobre `scoring.py` dejó 22 mutantes vivos con el 100 % de cobertura de
+# línea, y 20 eran del mismo tipo: los tests miraban `.valor` y nunca `.id` ni `.n`, así
+# que `Metrica(None, 0.87, 4)` y `Metrica("g-halluc", …)` pasaban. No es cosmético:
+#
+#   · el `id` es la clave con la que `done.py` busca el número en `eval-latest.json`
+#     (`metrics[id=G-HALLUC].value`). Un id equivocado no da un número malo: da «sin
+#     artefacto», que el gate reporta como rojo de fontanería y manda a mirar donde no es.
+#     Dos métricas con el mismo id son peores: una tapa a la otra y el gate pasa con el
+#     número que no era.
+#   · el `n` es el denominador que se publica. `G-HALLUC = 0` sobre 15 y sobre 2.000 son
+#     la misma cifra y dos afirmaciones distintas; es la razón de que exista
+#     `G-HALLUC-AMPLIO`. El propio docstring de `Metrica` lo dice y ningún test lo probaba.
+
+
+def test_cada_metrica_declara_su_id_y_su_denominador_con_datos() -> None:
+    """Los identificadores son los de `docs/GOALS.yaml`, literales y en mayúsculas."""
+    casos = [
+        caso("a", f"{NORMA}#art34"),
+        caso("b", f"{NORMA}#art35"),
+        caso("c", tipo=Tipo.NEGATIVO),
+    ]
+    prediccion = [pred("a", f"{NORMA}#art34"), pred("b", abstenida=True), pred("c", abstenida=True)]
+
+    esperado = {
+        "G-CITA-PRECISION": (precision_cita(casos, prediccion), 1),
+        "G-HALLUC": (alucinacion(casos, prediccion, frozenset({f"{NORMA}#art34"})), 1),
+        "G-COBERTURA": (cobertura(casos, prediccion), 2),
+        "G-ABST-FP": (abstencion_incorrecta(casos, prediccion), 2),
+        "G-ABST-FN": (abstencion_indebida(casos, prediccion), 1),
+    }
+    for identificador, (metrica, n) in esperado.items():
+        assert metrica.id == identificador
+        assert metrica.n == n
+        assert metrica.valor is not None
+
+
+def test_cada_metrica_declara_su_id_y_denominador_cero_cuando_no_es_medible() -> None:
+    """El caso vacío también publica: `valor=None` **con `n=0`**, no con `n=None`."""
+    vacio: list[CasoGolden] = []
+    sin_pred: list[Prediccion] = []
+    for metrica, identificador in (
+        (precision_cita(vacio, sin_pred), "G-CITA-PRECISION"),
+        (alucinacion(vacio, sin_pred, frozenset()), "G-HALLUC"),
+        (cobertura(vacio, sin_pred), "G-COBERTURA"),
+        (abstencion_incorrecta(vacio, sin_pred), "G-ABST-FP"),
+        (abstencion_indebida(vacio, sin_pred), "G-ABST-FN"),
+        (recall_at_k(vacio, {}, k=5), "G-RECALL5"),
+    ):
+        assert metrica.id == identificador
+        assert metrica.valor is None
+        assert metrica.n == 0
+
+
+def test_recall_lleva_la_k_en_el_identificador() -> None:
+    """`G-RECALL5` y `G-RECALL30` son dos metas distintas de `GOALS.yaml` con umbrales
+    distintos (0,90 y 0,97). Si el id no llevara la `k`, la segunda taparía a la primera
+    en el informe y el gate leería el número equivocado sin fallar."""
+    casos = [caso("a", f"{NORMA}#art34")]
+    recuperado = {"a": [parse(f"{NORMA}#art34")]}
+    assert recall_at_k(casos, recuperado, k=5).id == "G-RECALL5"
+    assert recall_at_k(casos, recuperado, k=30).id == "G-RECALL30"
+
+
+def test_la_abstencion_indebida_cuenta_los_que_respondio_no_los_que_callo() -> None:
+    """**El mutante más grave de los 22: invertir la condición y que nadie se entere.**
+
+    `G-ABST-FN` es la fracción de negativos en los que el sistema respondió **debiendo
+    callarse**. Con la condición invertida mediría lo contrario, el umbral `<= 0,10`
+    premiaría justo la conducta que castiga, y «responder siempre» pasaría el gate.
+
+    Por eso el reparto es asimétrico —3 negativos, 1 respondido— y no mitad y mitad:
+    con 2 y 2 el valor es 0,5 en los dos sentidos y el test no prueba nada.
+    """
+    casos = [caso(c, tipo=Tipo.NEGATIVO) for c in "abc"]
+    prediccion = [pred("a", f"{NORMA}#art34"), pred("b", abstenida=True), pred("c", abstenida=True)]
+    metrica = abstencion_indebida(casos, prediccion)
+    assert metrica.valor == pytest.approx(1 / 3)
+    assert metrica.n == 3
+
+
+def test_los_casos_sin_prediccion_se_nombran_todos_y_separados_por_coma() -> None:
+    """El mensaje es el que lee quien tiene que arreglarlo: si no dice **cuáles** faltan,
+    obliga a comparar 190 identificadores a mano."""
+    casos = [caso("a", f"{NORMA}#art34"), caso("b", f"{NORMA}#art35"), caso("c", f"{NORMA}#art36")]
+    with pytest.raises(ValueError) as fallo:
+        precision_cita(casos, [pred("a", f"{NORMA}#art34")])
+    assert "casos sin predicción: b, c" in str(fallo.value)

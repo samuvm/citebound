@@ -29,10 +29,17 @@ from __future__ import annotations
 
 import re
 import unicodedata
-import xml.etree.ElementTree as ET  # nosec B405 B314 — prólogo filtrado, ver _PELIGROSO
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, replace
 from enum import StrEnum
+
+# Solo los TIPOS: `Element` para anotar y `ParseError` para capturar. El parseo va por
+# `defusedxml`, que es lo que bandit pide y lo que B405 no sabe distinguir de un import
+# que sí parsea. Por eso el `nosec` va aquí y con el motivo escrito, no como costumbre.
+from xml.etree.ElementTree import Element, ParseError  # nosec B405
+
+import defusedxml.ElementTree as DefusedET
+from defusedxml.common import DefusedXmlException
 
 from citebound.domain.legalref import LegalRef, LegalRefError
 
@@ -61,18 +68,16 @@ _NO_ES_CUERPO = frozenset(
     {"articulo", "anexo", "titulo_num", "titulo_tit", "capitulo_num", "capitulo_tit", "firma"}
 )
 
-# Entity expansion — the "billion laughs" — is the one XML attack `ElementTree` does not
-# defend against, and both markers can only appear in the PROLOG, before the root
-# element. So the whole prolog is scanned rather than a fixed prefix: a cheap guard that
-# can be evaded is worse than none, because it buys false confidence.
+# Parsing goes through `defusedxml`, which refuses entity expansion — the "billion
+# laughs" — outright. `xml.etree` does not defend against it and offers no switch to
+# turn it on, so a hand-rolled guard was the only option until Samuel approved the
+# dependency on 2026-08-10 (outside the Q-011 list, hence the asking).
 #
-# The corpus is frozen and sha256-verified before it reaches here (RULES R4), so this is
-# belt and braces today. It is not decorative tomorrow: ingest is the layer that first
-# touches bytes off the network, and this parser is the obvious thing to reuse.
-#
-# `defusedxml` would be the textbook answer and is deliberately NOT used: it is outside
-# the dependency list Samuel approved in Q-011, and widening that list is his call, not
-# the agent's. Declared as debt in `docs/JOURNAL.md` with the question attached.
+# The prolog scan stays as a belt on top of the braces, and the reason it stays is that
+# it fails with a message that says what is wrong, in Spanish, at the layer that first
+# touches bytes off the network. `defusedxml` raises `EntitiesForbidden`, which is
+# correct and unhelpful to whoever has to fix the download. The two are cheap and they
+# fail differently, which is the point.
 _PELIGROSO = ("<!doctype", "<!entity")
 
 
@@ -4841,15 +4846,17 @@ mutants_x__raiz_texto__mutmut: MutantDict = {}  # type: ignore
 
 
 @_mutmut_mutated(mutants_x__raiz_texto__mutmut)
-def _raiz_texto(xml: str) -> ET.Element:
+def _raiz_texto(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4862,15 +4869,17 @@ def _raiz_texto(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_orig(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_orig(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4883,15 +4892,17 @@ def x__raiz_texto__mutmut_orig(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_1(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_1(xml: str) -> Element:
     if xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4904,15 +4915,17 @@ def x__raiz_texto__mutmut_1(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_2(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_2(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError(None)
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4925,15 +4938,17 @@ def x__raiz_texto__mutmut_2(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_3(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_3(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("XXdocumento vacíoXX")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4946,15 +4961,17 @@ def x__raiz_texto__mutmut_3(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_4(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_4(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("DOCUMENTO VACÍO")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4967,15 +4984,17 @@ def x__raiz_texto__mutmut_4(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_5(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_5(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = None
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -4988,15 +5007,17 @@ def x__raiz_texto__mutmut_5(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_6(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_6(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].upper()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5009,15 +5030,17 @@ def x__raiz_texto__mutmut_6(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_7(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_7(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split(None, 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5030,15 +5053,17 @@ def x__raiz_texto__mutmut_7(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_8(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_8(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", None)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5051,15 +5076,17 @@ def x__raiz_texto__mutmut_8(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_9(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_9(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split(1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5072,15 +5099,17 @@ def x__raiz_texto__mutmut_9(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_10(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_10(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", )[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5093,15 +5122,17 @@ def x__raiz_texto__mutmut_10(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_11(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_11(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].rsplit("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5114,15 +5145,17 @@ def x__raiz_texto__mutmut_11(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_12(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_12(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split(None, 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5135,15 +5168,17 @@ def x__raiz_texto__mutmut_12(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_13(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_13(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", None)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5156,15 +5191,17 @@ def x__raiz_texto__mutmut_13(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_14(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_14(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split(1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5177,15 +5214,17 @@ def x__raiz_texto__mutmut_14(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_15(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_15(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", )[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5198,15 +5237,17 @@ def x__raiz_texto__mutmut_15(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_16(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_16(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.rsplit("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5219,15 +5260,17 @@ def x__raiz_texto__mutmut_16(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_17(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_17(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("XX<bloqueXX", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5240,15 +5283,17 @@ def x__raiz_texto__mutmut_17(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_18(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_18(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<BLOQUE", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5261,15 +5306,17 @@ def x__raiz_texto__mutmut_18(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_19(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_19(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 2)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5282,15 +5329,17 @@ def x__raiz_texto__mutmut_19(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_20(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_20(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[1].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5303,15 +5352,17 @@ def x__raiz_texto__mutmut_20(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_21(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_21(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("XX<responseXX", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5324,15 +5375,17 @@ def x__raiz_texto__mutmut_21(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_22(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_22(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<RESPONSE", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5345,15 +5398,17 @@ def x__raiz_texto__mutmut_22(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_23(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_23(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 2)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5366,15 +5421,17 @@ def x__raiz_texto__mutmut_23(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_24(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_24(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[1].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5387,15 +5444,17 @@ def x__raiz_texto__mutmut_24(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_25(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_25(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(None):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5408,15 +5467,17 @@ def x__raiz_texto__mutmut_25(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_26(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_26(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca not in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5429,15 +5490,17 @@ def x__raiz_texto__mutmut_26(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_27(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_27(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError(None)
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5450,15 +5513,17 @@ def x__raiz_texto__mutmut_27(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_28(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_28(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("XXel documento declara entidades o DTD y no se procesaXX")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5471,15 +5536,17 @@ def x__raiz_texto__mutmut_28(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_29(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_29(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o dtd y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5492,15 +5559,17 @@ def x__raiz_texto__mutmut_29(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_30(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_30(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("EL DOCUMENTO DECLARA ENTIDADES O DTD Y NO SE PROCESA")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5513,15 +5582,17 @@ def x__raiz_texto__mutmut_30(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_31(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_31(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = None  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = None
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5534,15 +5605,17 @@ def x__raiz_texto__mutmut_31(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_32(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_32(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(None)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(None)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5555,15 +5628,63 @@ def x__raiz_texto__mutmut_32(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_33(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_33(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(None) from err
+    except ParseError as err:
+        raise BoeXmlError(f"XML mal formado: {err}") from err
+    texto = raiz.find(".//texto")
+    if texto is None:
+        raise BoeXmlError("el documento no trae <texto>: ¿es un consolidado del BOE?")
+    return texto
+
+
+# --------------------------------------------------------------------------------------
+# internals
+# --------------------------------------------------------------------------------------
+
+
+def x__raiz_texto__mutmut_34(xml: str) -> Element:
+    if not xml.strip():
+        raise BoeXmlError("documento vacío")
+    prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
+    if any(marca in prologo for marca in _PELIGROSO):
+        raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
+    try:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(None).__name__}") from err
+    except ParseError as err:
+        raise BoeXmlError(f"XML mal formado: {err}") from err
+    texto = raiz.find(".//texto")
+    if texto is None:
+        raise BoeXmlError("el documento no trae <texto>: ¿es un consolidado del BOE?")
+    return texto
+
+
+# --------------------------------------------------------------------------------------
+# internals
+# --------------------------------------------------------------------------------------
+
+
+def x__raiz_texto__mutmut_35(xml: str) -> Element:
+    if not xml.strip():
+        raise BoeXmlError("documento vacío")
+    prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
+    if any(marca in prologo for marca in _PELIGROSO):
+        raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
+    try:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(None) from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5576,15 +5697,17 @@ def x__raiz_texto__mutmut_33(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_34(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_36(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = None
     if texto is None:
@@ -5597,15 +5720,17 @@ def x__raiz_texto__mutmut_34(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_35(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_37(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(None)
     if texto is None:
@@ -5618,15 +5743,17 @@ def x__raiz_texto__mutmut_35(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_36(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_38(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.rfind(".//texto")
     if texto is None:
@@ -5639,15 +5766,17 @@ def x__raiz_texto__mutmut_36(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_37(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_39(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find("XX.//textoXX")
     if texto is None:
@@ -5660,15 +5789,17 @@ def x__raiz_texto__mutmut_37(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_38(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_40(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//TEXTO")
     if texto is None:
@@ -5681,15 +5812,17 @@ def x__raiz_texto__mutmut_38(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_39(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_41(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is not None:
@@ -5702,15 +5835,17 @@ def x__raiz_texto__mutmut_39(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_40(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_42(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5723,15 +5858,17 @@ def x__raiz_texto__mutmut_40(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_41(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_43(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5744,15 +5881,17 @@ def x__raiz_texto__mutmut_41(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_42(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_44(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5765,15 +5904,17 @@ def x__raiz_texto__mutmut_42(xml: str) -> ET.Element:
 # --------------------------------------------------------------------------------------
 
 
-def x__raiz_texto__mutmut_43(xml: str) -> ET.Element:
+def x__raiz_texto__mutmut_45(xml: str) -> Element:
     if not xml.strip():
         raise BoeXmlError("documento vacío")
     prologo = xml.split("<bloque", 1)[0].split("<response", 1)[0].lower()
     if any(marca in prologo for marca in _PELIGROSO):
         raise BoeXmlError("el documento declara entidades o DTD y no se procesa")
     try:
-        raiz = ET.fromstring(xml)  # noqa: S314  # nosec B314 — prólogo filtrado arriba
-    except ET.ParseError as err:
+        raiz = DefusedET.fromstring(xml)
+    except DefusedXmlException as err:
+        raise BoeXmlError(f"XML defensivamente rechazado: {type(err).__name__}") from err
+    except ParseError as err:
         raise BoeXmlError(f"XML mal formado: {err}") from err
     texto = raiz.find(".//texto")
     if texto is None:
@@ -5824,6 +5965,8 @@ mutants_x__raiz_texto__mutmut['x__raiz_texto__mutmut_40'] = x__raiz_texto__mutmu
 mutants_x__raiz_texto__mutmut['x__raiz_texto__mutmut_41'] = x__raiz_texto__mutmut_41 # type: ignore # mutmut generated
 mutants_x__raiz_texto__mutmut['x__raiz_texto__mutmut_42'] = x__raiz_texto__mutmut_42 # type: ignore # mutmut generated
 mutants_x__raiz_texto__mutmut['x__raiz_texto__mutmut_43'] = x__raiz_texto__mutmut_43 # type: ignore # mutmut generated
+mutants_x__raiz_texto__mutmut['x__raiz_texto__mutmut_44'] = x__raiz_texto__mutmut_44 # type: ignore # mutmut generated
+mutants_x__raiz_texto__mutmut['x__raiz_texto__mutmut_45'] = x__raiz_texto__mutmut_45 # type: ignore # mutmut generated
 mutants_x__sin_acentos__mutmut: MutantDict = {}  # type: ignore
 
 
@@ -7368,49 +7511,49 @@ mutants_x__ultima_version__mutmut: MutantDict = {}  # type: ignore
 
 
 @_mutmut_mutated(mutants_x__ultima_version__mutmut)
-def _ultima_version(bloque: ET.Element) -> ET.Element | None:
+def _ultima_version(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("version")
     return versiones[-1] if versiones else None
 
 
-def x__ultima_version__mutmut_orig(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_orig(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("version")
     return versiones[-1] if versiones else None
 
 
-def x__ultima_version__mutmut_1(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_1(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = None
     return versiones[-1] if versiones else None
 
 
-def x__ultima_version__mutmut_2(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_2(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall(None)
     return versiones[-1] if versiones else None
 
 
-def x__ultima_version__mutmut_3(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_3(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("XXversionXX")
     return versiones[-1] if versiones else None
 
 
-def x__ultima_version__mutmut_4(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_4(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("VERSION")
     return versiones[-1] if versiones else None
 
 
-def x__ultima_version__mutmut_5(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_5(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("version")
     return versiones[+1] if versiones else None
 
 
-def x__ultima_version__mutmut_6(bloque: ET.Element) -> ET.Element | None:
+def x__ultima_version__mutmut_6(bloque: Element) -> Element | None:
     """The wording in force. **The last one, never the first.**"""
     versiones = bloque.findall("version")
     return versiones[-2] if versiones else None
@@ -7426,7 +7569,7 @@ mutants_x__parrafos__mutmut: MutantDict = {}  # type: ignore
 
 
 @_mutmut_mutated(mutants_x__parrafos__mutmut)
-def _parrafos(version: ET.Element) -> Iterator[tuple[str, str]]:
+def _parrafos(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7437,7 +7580,7 @@ def _parrafos(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_orig(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_orig(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7448,7 +7591,7 @@ def x__parrafos__mutmut_orig(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_1(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_1(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7459,7 +7602,7 @@ def x__parrafos__mutmut_1(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_2(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_2(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7470,7 +7613,7 @@ def x__parrafos__mutmut_2(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_3(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_3(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7481,7 +7624,7 @@ def x__parrafos__mutmut_3(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_4(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_4(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7492,7 +7635,7 @@ def x__parrafos__mutmut_4(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") and ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_5(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_5(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7503,7 +7646,7 @@ def x__parrafos__mutmut_5(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get(None) or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_6(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_6(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7514,7 +7657,7 @@ def x__parrafos__mutmut_6(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("XXclassXX") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_7(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_7(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7525,7 +7668,7 @@ def x__parrafos__mutmut_7(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("CLASS") or ""), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_8(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_8(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7536,7 +7679,7 @@ def x__parrafos__mutmut_8(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or "XXXX"), "".join(p.itertext()).strip()
 
 
-def x__parrafos__mutmut_9(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_9(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7547,7 +7690,7 @@ def x__parrafos__mutmut_9(version: ET.Element) -> Iterator[tuple[str, str]]:
         yield (p.get("class") or ""), "".join(None).strip()
 
 
-def x__parrafos__mutmut_10(version: ET.Element) -> Iterator[tuple[str, str]]:
+def x__parrafos__mutmut_10(version: Element) -> Iterator[tuple[str, str]]:
     """Direct `<p>` children only, as `(clase, texto)`.
 
     Direct is load-bearing: the `<blockquote class="soloTexto">` that follows a
@@ -7573,7 +7716,7 @@ mutants_x__precepto__mutmut: MutantDict = {}  # type: ignore
 
 @_mutmut_mutated(mutants_x__precepto__mutmut)
 def _precepto(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7617,7 +7760,7 @@ def _precepto(
 
 
 def x__precepto__mutmut_orig(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7661,7 +7804,7 @@ def x__precepto__mutmut_orig(
 
 
 def x__precepto__mutmut_1(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7705,7 +7848,7 @@ def x__precepto__mutmut_1(
 
 
 def x__precepto__mutmut_2(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7749,7 +7892,7 @@ def x__precepto__mutmut_2(
 
 
 def x__precepto__mutmut_3(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7793,7 +7936,7 @@ def x__precepto__mutmut_3(
 
 
 def x__precepto__mutmut_4(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7837,7 +7980,7 @@ def x__precepto__mutmut_4(
 
 
 def x__precepto__mutmut_5(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7881,7 +8024,7 @@ def x__precepto__mutmut_5(
 
 
 def x__precepto__mutmut_6(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7925,7 +8068,7 @@ def x__precepto__mutmut_6(
 
 
 def x__precepto__mutmut_7(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -7969,7 +8112,7 @@ def x__precepto__mutmut_7(
 
 
 def x__precepto__mutmut_8(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8013,7 +8156,7 @@ def x__precepto__mutmut_8(
 
 
 def x__precepto__mutmut_9(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8057,7 +8200,7 @@ def x__precepto__mutmut_9(
 
 
 def x__precepto__mutmut_10(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8101,7 +8244,7 @@ def x__precepto__mutmut_10(
 
 
 def x__precepto__mutmut_11(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8145,7 +8288,7 @@ def x__precepto__mutmut_11(
 
 
 def x__precepto__mutmut_12(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8189,7 +8332,7 @@ def x__precepto__mutmut_12(
 
 
 def x__precepto__mutmut_13(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8233,7 +8376,7 @@ def x__precepto__mutmut_13(
 
 
 def x__precepto__mutmut_14(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8277,7 +8420,7 @@ def x__precepto__mutmut_14(
 
 
 def x__precepto__mutmut_15(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8321,7 +8464,7 @@ def x__precepto__mutmut_15(
 
 
 def x__precepto__mutmut_16(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8365,7 +8508,7 @@ def x__precepto__mutmut_16(
 
 
 def x__precepto__mutmut_17(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8409,7 +8552,7 @@ def x__precepto__mutmut_17(
 
 
 def x__precepto__mutmut_18(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8453,7 +8596,7 @@ def x__precepto__mutmut_18(
 
 
 def x__precepto__mutmut_19(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8497,7 +8640,7 @@ def x__precepto__mutmut_19(
 
 
 def x__precepto__mutmut_20(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8541,7 +8684,7 @@ def x__precepto__mutmut_20(
 
 
 def x__precepto__mutmut_21(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8585,7 +8728,7 @@ def x__precepto__mutmut_21(
 
 
 def x__precepto__mutmut_22(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8629,7 +8772,7 @@ def x__precepto__mutmut_22(
 
 
 def x__precepto__mutmut_23(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8673,7 +8816,7 @@ def x__precepto__mutmut_23(
 
 
 def x__precepto__mutmut_24(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8717,7 +8860,7 @@ def x__precepto__mutmut_24(
 
 
 def x__precepto__mutmut_25(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8761,7 +8904,7 @@ def x__precepto__mutmut_25(
 
 
 def x__precepto__mutmut_26(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8805,7 +8948,7 @@ def x__precepto__mutmut_26(
 
 
 def x__precepto__mutmut_27(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8849,7 +8992,7 @@ def x__precepto__mutmut_27(
 
 
 def x__precepto__mutmut_28(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8893,7 +9036,7 @@ def x__precepto__mutmut_28(
 
 
 def x__precepto__mutmut_29(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8937,7 +9080,7 @@ def x__precepto__mutmut_29(
 
 
 def x__precepto__mutmut_30(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -8981,7 +9124,7 @@ def x__precepto__mutmut_30(
 
 
 def x__precepto__mutmut_31(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9025,7 +9168,7 @@ def x__precepto__mutmut_31(
 
 
 def x__precepto__mutmut_32(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9069,7 +9212,7 @@ def x__precepto__mutmut_32(
 
 
 def x__precepto__mutmut_33(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9113,7 +9256,7 @@ def x__precepto__mutmut_33(
 
 
 def x__precepto__mutmut_34(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9157,7 +9300,7 @@ def x__precepto__mutmut_34(
 
 
 def x__precepto__mutmut_35(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9201,7 +9344,7 @@ def x__precepto__mutmut_35(
 
 
 def x__precepto__mutmut_36(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9245,7 +9388,7 @@ def x__precepto__mutmut_36(
 
 
 def x__precepto__mutmut_37(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9289,7 +9432,7 @@ def x__precepto__mutmut_37(
 
 
 def x__precepto__mutmut_38(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9332,7 +9475,7 @@ def x__precepto__mutmut_38(
 
 
 def x__precepto__mutmut_39(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9375,7 +9518,7 @@ def x__precepto__mutmut_39(
 
 
 def x__precepto__mutmut_40(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9418,7 +9561,7 @@ def x__precepto__mutmut_40(
 
 
 def x__precepto__mutmut_41(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9461,7 +9604,7 @@ def x__precepto__mutmut_41(
 
 
 def x__precepto__mutmut_42(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9504,7 +9647,7 @@ def x__precepto__mutmut_42(
 
 
 def x__precepto__mutmut_43(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9547,7 +9690,7 @@ def x__precepto__mutmut_43(
 
 
 def x__precepto__mutmut_44(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9590,7 +9733,7 @@ def x__precepto__mutmut_44(
 
 
 def x__precepto__mutmut_45(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9633,7 +9776,7 @@ def x__precepto__mutmut_45(
 
 
 def x__precepto__mutmut_46(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9676,7 +9819,7 @@ def x__precepto__mutmut_46(
 
 
 def x__precepto__mutmut_47(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9719,7 +9862,7 @@ def x__precepto__mutmut_47(
 
 
 def x__precepto__mutmut_48(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9762,7 +9905,7 @@ def x__precepto__mutmut_48(
 
 
 def x__precepto__mutmut_49(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9806,7 +9949,7 @@ def x__precepto__mutmut_49(
 
 
 def x__precepto__mutmut_50(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9850,7 +9993,7 @@ def x__precepto__mutmut_50(
 
 
 def x__precepto__mutmut_51(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9894,7 +10037,7 @@ def x__precepto__mutmut_51(
 
 
 def x__precepto__mutmut_52(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9938,7 +10081,7 @@ def x__precepto__mutmut_52(
 
 
 def x__precepto__mutmut_53(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -9982,7 +10125,7 @@ def x__precepto__mutmut_53(
 
 
 def x__precepto__mutmut_54(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10026,7 +10169,7 @@ def x__precepto__mutmut_54(
 
 
 def x__precepto__mutmut_55(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10070,7 +10213,7 @@ def x__precepto__mutmut_55(
 
 
 def x__precepto__mutmut_56(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10114,7 +10257,7 @@ def x__precepto__mutmut_56(
 
 
 def x__precepto__mutmut_57(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10158,7 +10301,7 @@ def x__precepto__mutmut_57(
 
 
 def x__precepto__mutmut_58(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10202,7 +10345,7 @@ def x__precepto__mutmut_58(
 
 
 def x__precepto__mutmut_59(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10246,7 +10389,7 @@ def x__precepto__mutmut_59(
 
 
 def x__precepto__mutmut_60(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10290,7 +10433,7 @@ def x__precepto__mutmut_60(
 
 
 def x__precepto__mutmut_61(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10334,7 +10477,7 @@ def x__precepto__mutmut_61(
 
 
 def x__precepto__mutmut_62(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10378,7 +10521,7 @@ def x__precepto__mutmut_62(
 
 
 def x__precepto__mutmut_63(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10422,7 +10565,7 @@ def x__precepto__mutmut_63(
 
 
 def x__precepto__mutmut_64(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10466,7 +10609,7 @@ def x__precepto__mutmut_64(
 
 
 def x__precepto__mutmut_65(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10510,7 +10653,7 @@ def x__precepto__mutmut_65(
 
 
 def x__precepto__mutmut_66(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10554,7 +10697,7 @@ def x__precepto__mutmut_66(
 
 
 def x__precepto__mutmut_67(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10598,7 +10741,7 @@ def x__precepto__mutmut_67(
 
 
 def x__precepto__mutmut_68(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10642,7 +10785,7 @@ def x__precepto__mutmut_68(
 
 
 def x__precepto__mutmut_69(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10686,7 +10829,7 @@ def x__precepto__mutmut_69(
 
 
 def x__precepto__mutmut_70(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,
@@ -10730,7 +10873,7 @@ def x__precepto__mutmut_70(
 
 
 def x__precepto__mutmut_71(
-    bloque: ET.Element,
+    bloque: Element,
     rotulo: str,
     norma: str,
     contenedor: str,

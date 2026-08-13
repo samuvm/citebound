@@ -109,6 +109,10 @@ done:  ## LA UNICA DEFINICION DE HECHO. Uso: make done MILESTONE=0
 	@test -n "$(MILESTONE)" || { echo "falta MILESTONE. Uso: make done MILESTONE=0"; exit 2; }
 	$(UV) python scripts/done.py --milestone $(MILESTONE)
 
+clean-mutants:  ## tira el arbol y el estado cacheado de mutmut. Obligatorio tras tocar su config
+	rm -rf mutants
+	@echo "estado de mutmut borrado · el proximo 'make mutation' mide de cero"
+
 clean:  ## borra cachés y el indice derivado
 	rm -rf .pytest_cache .ruff_cache .mypy_cache .hypothesis htmlcov coverage.json .coverage
 	rm -rf corpus/index

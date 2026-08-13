@@ -1124,3 +1124,81 @@ caché y ponerse rojo si lo es— merece su propio rojo, no un parche a las tres
 **Siguiente**
 
 Cerrar esa parte de `1e` y después `1b`: generar los ≈304 candidatos por temas.
+
+---
+
+## 2026-08-13 (cont. 3) · fase 1 · `1e` cerrada, y `G-MUT` resultó no ser reproducible
+
+**Qué se intentó**
+
+Aplicar Q-014 con el criterio que dio Samuel —**ante dos reglas contradictorias, manda la más
+estricta**—, cerrar la parte de `1e` que quedaba (que la mutación mida en vez de leer su caché)
+y seguir hacia `1b`.
+
+**Qué falló**
+
+Cuatro causas reales encadenadas, cada una tapando a la siguiente:
+
+1. **`also_copy` no llevaba `docs/GOALS.yaml`.** `golden_validate` lee de ahí sus umbrales, así
+   que dentro del árbol copiado a `mutants/` sus tests reventaban y la corrida ni arrancaba.
+   Es la contrapartida de no escribir los números en el código, y es barata.
+2. **`dynamic_context = "test_function"` chocaba con `--cov-context=test`.** Coverage avisaba
+   «Conflicting dynamic contexts» y el `.coverage` resultante se quedaba **sin la tabla
+   `context`**. De ahí el `no such table: context` que mutmut lleva soltando desde el principio
+   y que rompía su selección de tests por mutante. Un aviso de configuración degradando `G-MUT`
+   en silencio. Quitado, y `G-COV-FUNC` sigue verde.
+3. **La config de mutmut estaba deprecada, y no era cosmético.** `tests_dir` está deprecado y
+   mutmut lo ignora: **no sabía dónde están los tests** y clasificaba los 108 mutantes de
+   `bootstrap.py` como «no tests» — ni muertos ni vivos, simplemente **sin medir**. Migrado a
+   `source_paths` y con `tests/` dentro de `pytest_add_cli_args_test_selection`.
+4. **Un *fixture* de ámbito `module` producía falsos supervivientes.** `--cov-context=test`
+   atribuye las líneas de un fixture de módulo **solo al primer test que lo pide**, así que
+   mutmut seleccionaba 9 tests para un mutante de `parse_norma` y **dejaba fuera los dos que lo
+   matan**. Verificado a mano: `x__precepto__mutmut_65` figuraba vivo y muere con los tests que
+   ya existían. Cambiado a ámbito de función; el fragmento es pequeño y reparsearlo son
+   milisegundos.
+
+**Y con todo eso arreglado, la herramienta sigue sin ser determinista.** Mismo código, mismos
+tests, sin tocar nada entre corridas: 1 superviviente · 3 · 3 · **100** con `--max-children 1`.
+Los nombres cambian por completo entre corridas. Además hay un **falso muerto** verificado a
+mano: `chunking` `"utf-8"` → `"UTF-8"` se reporta muerto, es equivalente —mismo códec, mismo
+sha256— y aplicándolo pasan los 409 tests. Un falso muerto es peor que un falso superviviente:
+infla la métrica en vez de mandarte a buscar un agujero inexistente. **Q-015 abierta.**
+
+**Números**
+
+`make done MILESTONE=0` → **exit 0, doce de doce**. 428 tests.
+Mutación tras arreglar las cuatro causas: **896-899 de 899** según la corrida (99,7-99,9 %), y
+**88,9 %** en la corrida de un solo proceso. `mutantes_muertos_min` es 70: el umbral no está en
+riesgo, la reproducibilidad sí.
+
+**Seis agujeros reales cerrados con test**, todos destapados al empezar a medir de verdad:
+
+| Mutante | Qué escondía |
+|---|---|
+| `recall_at_k` `+=` → `=` | El recall publicaría el del **último** caso como si fuera el de los 190 |
+| `alucinacion` `/` → `*` | Ningún test tenía a la vez una cita inventada y más de un caso |
+| `precision_cita` `/` → `*` | Lo mismo en la meta de portada |
+| `recall_at_k` `k < 1` → `k <= 1` | Nadie llamaba con `k=1`, la frontera del guardia |
+| `holm` `>` → `>=` | Un p **exactamente igual** al umbral: la puerta se volvía más estricta que el contrato |
+| `parse_norma` `"capitulo"` | Falso superviviente del fixture de módulo |
+
+**Decisiones**
+
+- **Q-014 aplicada con el criterio de Samuel:** `bootstrap.py` entra en `tdd_obligatorio`. Esa
+  línea es hoy lo **único** del `pyproject` que no es copia literal de `RULES` §4, y está
+  marcada como tal en el propio fichero. Falta que él la añada allí.
+- **`make clean-mutants` en vez de un `rm -rf` suelto.** Había que tirar el estado de mutmut y
+  `rm -rf` está prohibido: se declara un target en el `Makefile`, donde es revisable, en vez de
+  ejecutarlo a mano. `make clean` no valía: borra también `corpus/index`.
+- **El gate detecta que la medida está caducada en vez de medir.** Correr la mutación dentro de
+  `make done` costaría medio minuto por corrida; comparar la fecha de `mutants/` con la del
+  código y los tests cuesta milisegundos y da la misma garantía, con la instrucción de qué
+  ejecutar. mutmut solo invalida al cambiar `src/`, nunca al cambiar los tests: ese era el
+  agujero por el que el gate publicaba desde el 10 de agosto un número calculado sobre otro
+  código.
+
+**Siguiente**
+
+`1b`: generar los ≈304 candidatos por temas. `G-MUT` queda esperando a Q-015 y **no bloquea la
+fase 1**.

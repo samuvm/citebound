@@ -162,9 +162,45 @@ def c5_cobertura_linea() -> Resultado:
 
 
 # ---------------------------------------------------------------- 6 · mutación ---
+def mutacion_caducada() -> str | None:
+    """¿Hay código o tests más nuevos que la última corrida de mutación?
+
+    Existe porque `make done` **no ejecuta** `mutmut run`: lee su caché. Y mutmut solo
+    invalida al cambiar `src/`, nunca al cambiar los tests — así que el gate llevaba desde
+    el 10 de agosto publicando un `587/588` calculado sobre un código que ya no existía.
+    Un número que no se ha calculado es peor que no tener número, porque además da confianza.
+
+    Correr la mutación entera dentro del gate costaría medio minuto en cada `make done`; que
+    el gate **detecte** que la medida está caducada y se ponga rojo cuesta milisegundos y da
+    la misma garantía, con la instrucción de qué ejecutar.
+    """
+    cache = RAIZ / "mutants"
+    if not cache.is_dir():
+        return "no hay ninguna corrida de mutación"
+    medido_en = cache.stat().st_mtime
+    for carpeta in ("src", "tests"):
+        for fichero in (RAIZ / carpeta).rglob("*.py"):
+            if "__pycache__" in fichero.parts:
+                continue
+            if fichero.stat().st_mtime > medido_en:
+                return f"{fichero.relative_to(RAIZ)} es más nuevo que la última mutación"
+    return None
+
+
 def c6_mutacion(milestone: int) -> Resultado:
     cfg = tomllib.loads((RAIZ / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["gate"]
     minimo = cfg["mutantes_muertos_min"]
+    caducada = mutacion_caducada()
+    if caducada is not None:
+        return Resultado(
+            6,
+            "mutación",
+            milestone < 3,
+            f"medida caducada: {caducada}. NO se da por buena la corrida anterior: mutmut "
+            "solo invalida al cambiar `src/`, nunca al cambiar los tests, y el gate leería "
+            "un número calculado sobre otro código",
+            "make clean-mutants && make mutation",
+        )
     _, salida = _correr("uv run mutmut results --all true")
     muertos = len(re.findall(r": killed", salida))
     vivos = re.findall(r"(\S+): survived", salida)

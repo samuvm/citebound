@@ -687,8 +687,72 @@ copia del original rompe el `diff` que sirve de test.
   contradicción. *Contras:* la puerta estadística se queda sin medir, y es el módulo que
   decide si una regresión bloquea. No lo recomiendo.
 
-`[ ] A   [ ] B`
+`[x] A   [ ] B`
 
 **Tiempo tuyo:** 2 minutos (editar `RULES.md` §4 y la copia de `pyproject.toml`).
+**Estado: RESPONDIDA · 2026-08-13**
+`>> ` **A**, con el criterio general de que ante dos reglas contradictorias manda **la más
+estricta**. Aplicado en `pyproject.toml`: `bootstrap.py` entra en `tdd_obligatorio` y en
+`paths_to_mutate`, así que `G-MUT` ya lo mide.
+
+**Queda tuyo, 30 segundos:** añadir `"src/citebound/evals/bootstrap.py"` a `tdd_obligatorio` en
+`RULES.md` §4. Hasta que lo hagas, esa línea del `pyproject` es lo único que **no** es copia
+literal de §4, y está marcada como tal en el propio fichero para que nadie la confunda con una
+divergencia accidental.
+
+---
+
+### Q-015 · fase 3 · `G-MUT` no es reproducible · NO bloquea la fase 1
+
+**Qué necesito:** que elijas cómo se mide `G-MUT`, porque la herramienta que lo mide da un
+número distinto cada vez.
+
+**Por qué:** `mutmut 3.7.0` no es determinista en este repo. Medido hoy, con el **mismo código
+y los mismos tests**, sin tocar una línea entre corridas:
+
+| Corrida | Supervivientes | `G-MUT` |
+|---|---:|---:|
+| limpia, en paralelo | 1 | 99,9 % |
+| limpia, en paralelo (repetida) | 3 | 99,7 % |
+| limpia, en paralelo (otra vez) | 3 | 99,7 % |
+| limpia, `--max-children 1` | **100** | **88,9 %** |
+
+Y los nombres de los supervivientes **cambian por completo** entre corridas, no son los mismos
+tres. Además verifiqué a mano dos casos concretos:
+
+- **Falso superviviente:** `boe_xml.x__precepto__mutmut_70` figuraba vivo y **muere** con tests
+  que existían desde el 10 de agosto. Causa encontrada y arreglada: un *fixture* de ámbito
+  `module` hacía que `--cov-context=test` atribuyera el parseo solo al primer test del fichero,
+  y mutmut selecciona por contexto de cobertura.
+- **Falso muerto:** `chunking` `"utf-8"` → `"UTF-8"` se reportó como muerto. Es **equivalente**
+  —mismo códec, mismos bytes, mismo sha256— y aplicándolo a mano **los 409 tests pasan**.
+
+Un falso muerto es peor que un falso superviviente: infla la métrica en vez de mandarte a
+buscar un agujero que no existe.
+
+Ya he arreglado tres causas reales por el camino (el *fixture* de módulo, el
+`dynamic_context` que rompía la tabla de contextos de coverage, y la config deprecada de mutmut
+que dejaba 108 mutantes sin medir). La variabilidad que queda es de la herramienta.
+
+**El umbral no está en riesgo:** `mutantes_muertos_min` es 70 y el peor número medido es 88,9 %.
+El problema no es pasar, es que **el número no se puede reproducir**, y eso choca de frente con
+el criterio de aceptación nº 2 del proyecto y con el espíritu de `G-EVAL-DET`.
+
+**Opciones:**
+
+- **A (por defecto):** se queda mutmut, y el protocolo de medida pasa a ser **tres corridas
+  limpias y se publica la peor**. *Pros:* cero dependencias nuevas, conservador por
+  construcción, y la frase «publicamos el peor de tres» se defiende en una entrevista.
+  *Contras:* `make mutation` tarda el triple, y sigue sin ser reproducible caso a caso.
+- **B:** cambiar a `cosmic-ray`. *Pros:* guarda los resultados en una base de datos propia y
+  su modelo de ejecución es reproducible. *Contras:* dependencia nueva —necesita tu permiso
+  explícito, Q-011— y hay que reescribir la integración con el gate.
+- **C:** `G-MUT` deja de bloquear y pasa a diagnóstico, publicando el rango medido. *Contras:*
+  la mutación es lo único que distingue cobertura de verificación; degradarla es perder
+  justo la meta que hace creíble el 100 % de cobertura.
+
+`[ ] A   [ ] B   [ ] C`
+
+**Tiempo tuyo:** 5 minutos. **No corre prisa:** `G-MUT` bloquea desde la fase 3.
 **Estado: PENDIENTE**
 `>> `

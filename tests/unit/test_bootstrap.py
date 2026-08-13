@@ -305,3 +305,19 @@ def test_el_modulo_no_deja_nombres_sueltos_sin_declarar() -> None:
         "ic_diferencia_pareada",
     }
     assert not re.search(r"^import random$", Path(modulo.__file__).read_text("utf-8"), re.M)
+
+
+def test_holm_rechaza_cuando_el_p_valor_iguala_exactamente_su_umbral() -> None:
+    """La frontera, que es donde vive el mutante `>` → `>=`.
+
+    Holm rechaza cuando `p <= alfa/(m-i)`, así que un p **exactamente igual** al umbral se
+    rechaza y no corta la cadena. Con `>=` la comparación se invierte en ese punto y la
+    puerta se vuelve más estricta de lo que dice el contrato: bloquearía un cambio que la
+    definición admite, y un bloqueo sin causa es lo que acaba con alguien desactivando la
+    puerta.
+
+    Con m=2 y alfa=0,05 el umbral de la primera posición es exactamente 0,025.
+    """
+    veredicto = holm({"a": 0.025, "b": 0.04}, alfa=0.05)
+    assert veredicto["a"] is True
+    assert veredicto["b"] is True

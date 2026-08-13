@@ -537,3 +537,88 @@ def test_los_casos_sin_prediccion_se_nombran_todos_y_separados_por_coma() -> Non
     with pytest.raises(ValueError) as fallo:
         precision_cita(casos, [pred("a", f"{NORMA}#art34")])
     assert "casos sin predicción: b, c" in str(fallo.value)
+
+
+# --------------------------------------------------------------------------------------
+# Dos agujeros que solo aparecieron cuando la mutación empezó a medir de verdad
+# --------------------------------------------------------------------------------------
+
+
+def test_el_recall_promedia_sobre_todos_los_casos_y_no_se_queda_con_el_ultimo() -> None:
+    """El mutante era `total = ...` en vez de `total += ...`, y sobrevivía porque **todos
+    los tests de recall usaban un solo caso**: con n=1 las dos versiones dan lo mismo.
+
+    Con la acumulación rota, `G-RECALL5` publicaría el recall del último caso del golden
+    set como si fuera el de los 190. Aquí el reparto es asimétrico —uno acierta, otro
+    falla— para que la media (0,5) no coincida con ninguno de los dos valores sueltos.
+    """
+    casos = [caso("a", f"{NORMA}#art34"), caso("b", f"{NORMA}#art35")]
+    recuperado = {
+        "a": [parse(f"{NORMA}#art34")],  # acierta
+        "b": [parse(f"{NORMA}#art99")],  # falla
+    }
+    metrica = recall_at_k(casos, recuperado, k=5)
+    assert metrica.valor == pytest.approx(0.5)
+    assert metrica.n == 2
+
+
+def test_la_alucinacion_divide_entre_los_respondidos_y_no_multiplica() -> None:
+    """El mutante cambiaba `inventadas / len(respondidos)` por `inventadas * len(...)` y
+    sobrevivía porque **ningún test tenía a la vez una cita inventada y más de un caso
+    respondido**: con `inventadas = 0`, dividir y multiplicar dan cero igual.
+
+    Es la meta con umbral `== 0` y `propuesta_admisible: false`. Que su aritmética no
+    estuviera comprobada cuando el numerador no es cero es exactamente el agujero que la
+    mutación existe para encontrar.
+    """
+    casos = [caso(c, f"{NORMA}#art34") for c in "abcd"]
+    prediccion = [
+        pred("a", f"{NORMA}#art999"),  # inventada
+        pred("b", f"{NORMA}#art34"),
+        pred("c", f"{NORMA}#art34"),
+        pred("d", f"{NORMA}#art34"),
+    ]
+    metrica = alucinacion(casos, prediccion, frozenset({f"{NORMA}#art34"}))
+    assert metrica.valor == pytest.approx(0.25)  # 1/4, no 1*4
+    assert metrica.n == 4
+
+
+def test_recall_admite_k_igual_a_uno_que_es_la_frontera_del_guardia() -> None:
+    """`k=1` es válido y hasta ahora nadie lo probaba: los mutantes `k <= 1` y `k < 2`
+    sobrevivían los dos.
+
+    No es un caso de laboratorio. `recall@1` es el diagnóstico que dice si el reranker
+    está poniendo el artículo correcto **el primero**, que es lo que de verdad ve el
+    generador cuando el presupuesto de contexto aprieta. Si el guardia lo rechazara, ese
+    diagnóstico no se podría medir y el mensaje de error culparía a quien lo pidió.
+    """
+    casos = [caso("a", f"{NORMA}#art34")]
+    recuperado = {"a": [parse(f"{NORMA}#art34"), parse(f"{NORMA}#art35")]}
+    metrica = recall_at_k(casos, recuperado, k=1)
+    assert metrica.id == "G-RECALL1"
+    assert metrica.valor == pytest.approx(1.0)
+
+    # Y con el correcto en segunda posición, `k=1` no lo alcanza: el corte se aplica.
+    recuperado_al_reves = {"a": [parse(f"{NORMA}#art35"), parse(f"{NORMA}#art34")]}
+    assert recall_at_k(casos, recuperado_al_reves, k=1).valor == pytest.approx(0.0)
+
+
+def test_la_precision_de_cita_divide_entre_los_respondidos_y_no_multiplica() -> None:
+    """Mismo patrón que en `alucinacion`: `aciertos / n` y `aciertos * n` solo se
+    distinguen si hay **más de un caso respondido y al menos un acierto**, y todos los
+    tests de precisión usaban un caso.
+
+    Es la meta que forma pareja atómica con `cobertura` y la que se publica en la portada
+    del README. Que su aritmética no estuviera comprobada con más de un caso es el tipo de
+    agujero que el 100 % de cobertura de línea no ve.
+    """
+    casos = [caso(c, f"{NORMA}#art34") for c in "abcd"]
+    prediccion = [
+        pred("a", f"{NORMA}#art34"),
+        pred("b", f"{NORMA}#art34"),
+        pred("c", f"{NORMA}#art34"),
+        pred("d", f"{NORMA}#art35"),  # el artículo adyacente: existe, pero no es el suyo
+    ]
+    metrica = precision_cita(casos, prediccion)
+    assert metrica.valor == pytest.approx(0.75)  # 3/4, no 3*4
+    assert metrica.n == 4

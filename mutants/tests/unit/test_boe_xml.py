@@ -48,8 +48,19 @@ CORPUS = Path(__file__).resolve().parents[2] / "corpus" / "raw" / "BOE-A-2003-23
 FIXTURE = (FIXTURES / "boe-fragmento.xml").read_text(encoding="utf-8")
 
 
-@pytest.fixture(scope="module")
+@pytest.fixture
 def preceptos() -> tuple[Precepto, ...]:
+    """Ámbito de FUNCIÓN a propósito, aunque parezca desperdicio.
+
+    Con `scope="module"` el parseo corre **una sola vez**, y `--cov-context=test` atribuye
+    esas líneas únicamente al primer test del fichero que pidió el fixture. Consecuencia
+    medida el 2026-08-13: mutmut selecciona los tests por contexto de cobertura, así que
+    para un mutante dentro de `parse_norma` elegía 9 tests y **dejaba fuera los dos que de
+    verdad lo matan** — `x__precepto__mutmut_65` figuraba como superviviente y muere con
+    estos mismos tests. `G-MUT` sub-declaraba, que es la dirección peligrosa: un
+    superviviente falso manda a buscar un agujero que no existe y esconde que la medida no
+    es de fiar. El fragmento es pequeño y volver a parsearlo cuesta milisegundos.
+    """
     return parse_norma(FIXTURE, norma=NORMA)
 
 

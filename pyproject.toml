@@ -107,6 +107,11 @@ tdd_obligatorio = [
   "src/citebound/retrieval/fusion.py",
   "src/citebound/agent/stream_guard.py",
   "src/citebound/evals/scoring.py",
+  # Q-014, respondida por Samuel el 2026-08-13: ante la contradiccion entre RULES §3
+  # (que lo declara TDD obligatorio) y RULES §4 (que no lo listaba), manda LA MAS
+  # ESTRICTA. Esta linea es por tanto lo UNICO que hoy no es copia literal de §4;
+  # queda pendiente que Samuel la anada alli para que los dos documentos coincidan.
+  "src/citebound/evals/bootstrap.py",
 ]
 tdd_prohibido = [
   "src/citebound/agent/graph.py",
@@ -172,7 +177,12 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["src/citebound"]
-dynamic_context = "test_function"
+# `dynamic_context = "test_function"` NO va aqui, y quitarlo arreglo un fallo real. Chocaba
+# con el `--cov-context=test` de addopts: coverage avisaba «Conflicting dynamic contexts» y
+# el fichero .coverage resultante se quedaba SIN la tabla `context`. Eso rompia la seleccion
+# de tests por mutante de mutmut («no such table: context»), que empezaba a declarar
+# supervivientes falsos -- boe_xml__mutmut_70 figuraba vivo y moria con los tests que ya
+# existian. Un aviso de configuracion que degradaba G-MUT en silencio (JOURNAL 2026-08-13).
 
 [tool.coverage.json]
 # Sin esto el informe JSON NO lleva los contextos, aunque pytest los grabe en el
@@ -188,21 +198,34 @@ exclude_also = ["if TYPE_CHECKING:", "raise NotImplementedError"]
 # Solo los paquetes de [tool.gate].tdd_obligatorio que ya existen. Es lo unico que
 # distingue cobertura de verificacion: 100 % de lineas cubiertas y 0 % de mutantes
 # muertos significa que la suite ejecuta el codigo sin comprobar nada.
-paths_to_mutate = [
+# `source_paths`, no `paths_to_mutate`: la vieja esta deprecada y mutmut lo avisaba en cada
+# corrida. Lo mismo con `tests_dir`, que ademas NO era cosmetico -- ver abajo.
+source_paths = [
   "src/citebound/domain/legalref.py",
   "src/citebound/ingest/boe_xml.py",
   "src/citebound/ingest/chunking.py",
-  # Entra al cerrar 1a. Estaba en [tool.gate].tdd_obligatorio desde el primer dia y
-  # fuera de aqui: G-MUT medía sobre 3 de los 4 ficheros que le tocan, que es justo
-  # "dos listas que divergen en silencio". `bootstrap.py` NO entra: RULES §4 -la copia
-  # literal que lee el gate- no lo lista en tdd_obligatorio, aunque §3 diga que si.
-  # Esa discrepancia es de RULES.md, que es zona roja, y se pregunta antes de tocarla.
+  # Entran al cerrar 1a. `scoring.py` estaba en [tool.gate].tdd_obligatorio desde el
+  # primer dia y fuera de aqui: G-MUT medía sobre 3 de los 4 ficheros que le tocan, que
+  # es justo "dos listas que divergen en silencio". `bootstrap.py` entra por Q-014,
+  # donde Samuel decide que ante dos reglas contradictorias manda la mas estricta.
   "src/citebound/evals/scoring.py",
+  "src/citebound/evals/bootstrap.py",
 ]
-tests_dir = ["tests/"]
 # mutmut copia el arbol a `mutants/` y solo lleva lo que le digas: sin esto, los
 # tests de contrato no encuentran `citebound.api` y falla al recolectar.
-also_copy = ["src/", "tests/", "scripts/", "corpus/", "docs/CONTRACTS/", "compose.yaml"]
+# `docs/GOALS.yaml` entra porque `golden_validate` LEE de ahi sus umbrales y sus tests lo
+# comprueban: sin el fichero, la corrida de mutacion ni siquiera arranca. Es la contrapartida
+# de no escribir los numeros en el codigo, y es barata.
+also_copy = [
+  "src/", "tests/", "scripts/", "corpus/", "docs/CONTRACTS/", "docs/GOALS.yaml", "compose.yaml"
+]
 # La suite de mutacion corre sin integracion: levantar Postgres por cada mutante
 # multiplicaria minutos por cientos y el gate se acabaria desactivando.
-pytest_add_cli_args_test_selection = ["-m", "not integration", "--no-cov", "-p", "no:randomly"]
+#
+# `tests/` va AQUI y no en el `tests_dir` deprecado, y esto no era cosmetico: con la clave
+# vieja ignorada, mutmut no sabia donde estan los tests y clasificaba los 108 mutantes de
+# `bootstrap.py` como "no tests" -- ni muertos ni vivos, simplemente sin medir. Un aviso de
+# deprecacion que degradaba G-MUT en silencio (JOURNAL 2026-08-13).
+pytest_add_cli_args_test_selection = [
+  "tests/", "-m", "not integration", "--no-cov", "-p", "no:randomly"
+]

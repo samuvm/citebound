@@ -85,6 +85,9 @@ openapi:  ## regenera el snapshot de OpenAPI
 eval:  ## fase 0: mide G-HALLUC y escribe el informe conforme al contrato
 	$(UV) python scripts/eval_f0.py
 
+golden-validate:  ## SALIDA DE LA FASE 1 · G-GOLDEN-VALID. Necesita Ollama: mide duplicados
+	$(UV) python scripts/golden_validate.py
+
 mutation:  ## mutmut sobre [tool.gate].tdd_obligatorio. Solo en `done`
 	$(UV) mutmut run
 

@@ -25,7 +25,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-
 from scripts import golden_validate
 
 RAIZ = Path(__file__).resolve().parents[2]
@@ -82,8 +81,17 @@ def conjunto_valido() -> list[str]:
 
 
 def vectores_distintos(lineas: list[str]) -> dict[str, list[float]]:
-    """Un vector ortogonal por caso: ninguna pareja se parece."""
-    ids = [json.loads(x)["id"] for x in lineas]
+    """Un vector ortogonal por caso: ninguna pareja se parece.
+
+    Se salta las líneas que no son JSON, porque varios tests inyectan una a propósito y el
+    helper reventaría antes de llegar al validador — que es justo lo que se está probando.
+    """
+    ids = []
+    for linea in lineas:
+        try:
+            ids.append(json.loads(linea)["id"])
+        except json.JSONDecodeError:
+            continue
     return {ident: [1.0 if j == i else 0.0 for j in range(len(ids))] for i, ident in enumerate(ids)}
 
 
@@ -159,8 +167,12 @@ def test_una_referencia_con_apartado_vale_si_su_articulo_esta_en_el_indice() -> 
     """El índice se construye por artículo (`articulo-v1`), pero el golden set cita al
     apartado cuando el caso lo exige. Comparar cadenas literales rechazaría `art34.1` por
     no estar en un índice que nunca va a contener apartados, y eso invalidaría de golpe la
-    granularidad de la que dependen `G-CITA-PRECISION` y `G-QUOTE-LIT`."""
-    lineas = [*conjunto_valido()[:-1], caso("x", refs=[f"{NORMA}#art34.1"])]
+    granularidad de la que dependen `G-CITA-PRECISION` y `G-QUOTE-LIT`.
+
+    Se **añade** al conjunto en vez de sustituir la última línea: sustituirla se llevaba por
+    delante un negativo y el test fallaba por el suelo estadístico, no por la referencia.
+    """
+    lineas = [*conjunto_valido(), caso("x", refs=[f"{NORMA}#art34.1"])]
     assert errores_de(lineas) == []
 
 

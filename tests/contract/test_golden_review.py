@@ -93,7 +93,7 @@ def test_un_caso_normal_ensena_la_propuesta() -> None:
     assert vista.nota == "porque si"
 
 
-def test_un_caso_a_ciegas_NO_ensena_la_propuesta() -> None:
+def test_un_caso_a_ciegas_nunca_ensena_la_propuesta() -> None:
     """Si se le enseña, deja de medir lo que existe para medir."""
     vista = golden_review.vista(
         caso("gs-0015", a_ciegas=True), {"ref": f"{NORMA}#art82.2", "nota": "porque si"}
@@ -233,3 +233,46 @@ def test_todas_las_propuestas_reales_cubren_la_cola_real() -> None:
     sin_propuesta = [c["id"] for c in cola if c["id"] not in propuestas]
     assert sin_propuesta == []
     assert len(cola) == 304
+
+
+# --------------------------------------------------------------------------------------
+# Los negativos que NO lo son tienen que verse
+# --------------------------------------------------------------------------------------
+
+
+def test_un_negativo_marcado_como_falso_ensena_el_articulo_que_lo_responde() -> None:
+    """El defecto que esto cierra apareció mirando la pantalla de verdad, no el código.
+
+    Seis de los 64 negativos SÍ los responde el Reglamento. Si la cola los presenta como
+    «confirma que el corpus no responde» y se traga la nota, Samuel confirmaría los seis y
+    `G-ABST-FN` pasaría a penalizar al sistema justo por acertar. El hallazgo tiene que
+    llegar a la pantalla o no sirve de nada.
+    """
+    v = golden_review.vista(
+        caso("gs-0280", tipo="negativo"),
+        {"negativo": False, "responde": f"{NORMA}#art129.3", "nota": "FALSO NEGATIVO: ..."},
+        texto="Salvo en los casos en que, manifiestamente...",
+    )
+    assert v.ref_propuesta == f"{NORMA}#art129.3"
+    assert v.nota is not None and "FALSO NEGATIVO" in v.nota
+    assert v.texto is not None
+
+
+def test_un_negativo_confirmado_sigue_sin_referencia() -> None:
+    v = golden_review.vista(
+        caso("gs-0290", tipo="negativo"), {"negativo": True, "responde": None, "nota": ""}
+    )
+    assert v.ref_propuesta is None
+
+
+def test_un_falso_negativo_a_ciegas_no_delata_nada() -> None:
+    """`gs-0252` es las dos cosas a la vez. Gana el ciego: si se le ensena el art20, se
+    pierde justo la medida mas limpia que hay en toda la cola."""
+    v = golden_review.vista(
+        caso("gs-0252", tipo="negativo", a_ciegas=True),
+        {"negativo": False, "responde": f"{NORMA}#art20", "nota": "FALSO NEGATIVO"},
+        texto="No podran circular...",
+    )
+    assert v.ref_propuesta is None
+    assert v.nota is None
+    assert v.texto is None

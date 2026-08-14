@@ -15,7 +15,7 @@ OLLAMA_MIN := 0.32.6
 
 .PHONY: help up down warm lint typecheck test-fast test test-int smoke-f0 \
         gate-fast gate-full done eval mutation cov-func secrets clean \
-        check-ollama check-r1 openapi ingest golden-sample golden-validate \
+        check-ollama check-r1 openapi ingest golden-sample golden-validate golden-review \
         clean-mutants
 
 help:  ## esta ayuda
@@ -88,6 +88,9 @@ eval:  ## fase 0: mide G-HALLUC y escribe el informe conforme al contrato
 
 golden-sample:  ## 1b · elige las 304 preguntas de la cola. Necesita Ollama: deduplica
 	$(UV) python -m scripts.golden_sample
+
+golden-review:  ## 1c · LA COLA DE SAMUEL. Una tecla por caso, se reanuda sola
+	$(UV) python -m scripts.golden_review
 
 golden-validate:  ## SALIDA DE LA FASE 1 · G-GOLDEN-VALID. Necesita Ollama: mide duplicados
 	$(UV) python scripts/golden_validate.py

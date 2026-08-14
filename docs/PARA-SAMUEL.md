@@ -10,6 +10,32 @@ Prioridad de lectura: **Q-001, Q-002, Q-012 y Q-013 bloquean el arranque**; **Q-
 de botella del proyecto entero**. Las demás pueden esperar, pero cada una dice exactamente en qué
 fase deja de poder esperar.
 
+## Cómo se le piden las cosas a Samuel · norma del 2026-08-14
+
+El **formato de una entrada `Q-NNN` lo fija la constitución §3** y no cambia: identificador, fase
+que bloquea, qué pido, por qué, opciones con pros y contras, alternativa si dice que no, estado.
+
+Lo que fija esta norma es **cómo se le presenta en la conversación** lo que tiene pendiente. No se
+le resume el estado del proyecto ni se le describe el trabajo: se le dan **instrucciones que puede
+ejecutar**, en este formato y sin excepción:
+
+1. **Ordenadas por cuándo**, no por importancia: lo de **ahora** separado de lo que **puede
+   esperar**, y dicho explícitamente qué **no** tiene que hacer todavía.
+2. **Un paso, una acción.** Qué fichero abre o qué escribe, literal. Qué decide. Nada más.
+3. **Una línea de por qué**, en castellano llano. Sin nombres de módulos ni de métricas si se
+   puede evitar.
+4. **Cuánto le cuesta**, en minutos u horas.
+5. **Cuál se puede quedar sin contestar** y qué pasa entonces. Si hay una opción por defecto
+   segura, se dice que no hacer nada también vale.
+
+**Por qué esta norma existe.** Lo pidió él el 2026-08-14, después de que se le explicaran sus
+pendientes en términos del proyecto en vez de en términos de sus manos. Una lista de temas
+pendientes se pospone; una lista de pasos se ejecuta. Y sus horas son el recurso más escaso del
+proyecto: 17-28 h irreducibles según la tabla del final de este fichero.
+
+**Dónde se aplica:** al cerrar cualquier turno que le deje algo pendiente, la última sección es la
+lista de pasos — no el resumen de lo hecho.
+
 ---
 
 ## Decisiones transversales

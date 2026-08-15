@@ -254,7 +254,7 @@ paso al arranque en 10 minutos (`G-COLD-CACHE`).
 - **B:** se adopta si mejora ≥ 3 puntos de `G-RECALL30`. *Pros:* mejor recall y puedes decir BM25
   sin mentir. *Contras:* imagen propia, `Dockerfile` que mantener, arranque más lento.
 
-`[ ] A   [ ] B (umbral de adopción: ____ puntos)`
+`[x] A   [ ] B (umbral de adopción: ____ puntos)`
 
 **Tiempo tuyo:** 5 minutos.
 **Estado: PENDIENTE**
@@ -777,7 +777,7 @@ el criterio de aceptación nº 2 del proyecto y con el espíritu de `G-EVAL-DET`
   la mutación es lo único que distingue cobertura de verificación; degradarla es perder
   justo la meta que hace creíble el 100 % de cobertura.
 
-`[ ] A   [ ] B   [ ] C`
+`[x] A   [ ] B   [ ] C`
 
 **Tiempo tuyo:** 5 minutos. **No corre prisa:** `G-MUT` bloquea desde la fase 3.
 **Estado: PENDIENTE**

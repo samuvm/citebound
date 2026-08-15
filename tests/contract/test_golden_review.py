@@ -195,12 +195,20 @@ def test_el_resumen_da_la_tasa_de_acierto_real() -> None:
 
 
 def test_el_resumen_separa_los_casos_a_ciegas() -> None:
-    """La tasa sobre los casos que Samuel vio con propuesta esta contaminada por el anclaje.
-    La limpia es la de los ciegos, y por eso se publica aparte."""
-    hechos = [veredicto("gs-0001", que="ok"), veredicto("gs-0002", que="corregir")]
-    hechos[0]["a_ciegas"] = True
-    hechos[1]["a_ciegas"] = True
-    hechos.append(veredicto("gs-0003", que="ok"))
+    """La tasa sobre los casos vistos con propuesta está contaminada por el anclaje. La
+    limpia es la de los ciegos, y por eso se publica aparte.
+
+    **Este test estaba mal y el ensayo del 2026-08-15 lo demostró.** Antes construía los
+    casos ciegos con `veredicto="ok"` / `"corregir"` y esperaba que la tasa contara la
+    tecla. Pero en un caso ciego no hay propuesta que aceptar: la tecla es siempre
+    `corregir`, y lo que dice si hubo acuerdo es `coincide`. Medir la tecla daba 22 % donde
+    había 79 %. Se reescribe con la semántica real, no se relaja.
+    """
+    hechos = [
+        {"id": "gs-0001", "veredicto": "corregir", "a_ciegas": True, "coincide": True},
+        {"id": "gs-0002", "veredicto": "corregir", "a_ciegas": True, "coincide": False},
+        veredicto("gs-0003", que="ok"),
+    ]
     r = golden_review.resumen(hechos)
     assert r["n_ciegas"] == 2
     assert r["tasa_acierto_ciegas"] == pytest.approx(0.5)
@@ -276,3 +284,60 @@ def test_un_falso_negativo_a_ciegas_no_delata_nada() -> None:
     assert v.ref_propuesta is None
     assert v.nota is None
     assert v.texto is None
+
+
+# --------------------------------------------------------------------------------------
+# El fallo que destapó el ensayo automático del 2026-08-15
+# --------------------------------------------------------------------------------------
+
+
+def test_en_un_positivo_a_ciegas_la_tecla_de_aceptar_no_vale() -> None:
+    """**El defecto que costó un número falso.** En un caso a ciegas no se ve ninguna
+    propuesta, así que `a` («ok») no tiene nada que aceptar y la única tecla que registra
+    referencia es `e`. Resultado del ensayo: 11 de las 14 «correcciones» ciegas eran
+    IDÉNTICAS a mi propuesta, y al contar la tecla en vez de la referencia salió un 22 % de
+    acuerdo donde en realidad había un 79 %.
+    """
+    assert not golden_review.tecla_valida("a", tipo="positivo", a_ciegas=True)
+    assert golden_review.tecla_valida("e", tipo="positivo", a_ciegas=True)
+
+
+def test_en_un_negativo_a_ciegas_aceptar_si_vale() -> None:
+    """Ahí sí hay algo que confirmar: que el Reglamento no responde. No hay referencia que
+    derivar, así que `a` es la respuesta natural."""
+    assert golden_review.tecla_valida("a", tipo="negativo", a_ciegas=True)
+
+
+def test_con_la_propuesta_a_la_vista_aceptar_siempre_vale() -> None:
+    assert golden_review.tecla_valida("a", tipo="positivo", a_ciegas=False)
+
+
+def test_un_veredicto_a_ciegas_guarda_las_dos_referencias_y_si_coinciden() -> None:
+    """Sin las dos, el acuerdo no se puede recalcular después sin volver a cruzar ficheros —
+    y cruzarlos mal es exactamente lo que produjo el 22 %."""
+    r = golden_review.registrar_ciego(
+        "gs-0015", tecleada=f"{NORMA}#art84.3", del_agente=f"{NORMA}#art84.3", segundos=42.0
+    )
+    assert r["ref"] == f"{NORMA}#art84.3"
+    assert r["ref_agente"] == f"{NORMA}#art84.3"
+    assert r["coincide"] is True
+
+
+def test_un_veredicto_a_ciegas_marca_la_discrepancia() -> None:
+    r = golden_review.registrar_ciego(
+        "gs-0026", tecleada=f"{NORMA}#art108.2", del_agente=f"{NORMA}#art109.2", segundos=90.0
+    )
+    assert r["coincide"] is False
+
+
+def test_el_acuerdo_a_ciegas_se_mide_comparando_referencias() -> None:
+    """La medida correcta, y la que el resumen tiene que publicar."""
+    hechos = [
+        {"id": "a", "veredicto": "corregir", "a_ciegas": True, "coincide": True, "segundos": 1},
+        {"id": "b", "veredicto": "corregir", "a_ciegas": True, "coincide": True, "segundos": 1},
+        {"id": "c", "veredicto": "corregir", "a_ciegas": True, "coincide": False, "segundos": 1},
+        {"id": "d", "veredicto": "ok", "a_ciegas": False, "segundos": 1},
+    ]
+    r = golden_review.resumen(hechos)
+    assert r["n_ciegas"] == 3
+    assert r["tasa_acierto_ciegas"] == pytest.approx(2 / 3)

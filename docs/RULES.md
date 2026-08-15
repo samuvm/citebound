@@ -166,6 +166,7 @@ tdd_obligatorio = [
   "src/citebound/retrieval/fusion.py",
   "src/citebound/agent/stream_guard.py",
   "src/citebound/evals/scoring.py",
+  "src/citebound/evals/bootstrap.py",
 ]
 tdd_prohibido = [
   "src/citebound/agent/graph.py",

@@ -1,72 +1,323 @@
 {
-  "_formato": "negativo=true significa que el Reglamento NO responde la pregunta. Si es false, el corpus SI la responde y el caso esta mal clasificado: entraria como falso negativo y G-ABST-FN penalizaria al sistema por acertar.",
-
-  "gs-0241": {"negativo": false, "responde": "RD-1428/2003#art28.1", "nota": "FALSO NEGATIVO: el art28 regula las pruebas de deteccion de estupefacientes y quien esta obligado a someterse. Esta en el corpus"},
-  "gs-0242": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0243": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0244": {"negativo": true, "responde": null, "nota": "el corpus prohibe conducir bajo sus efectos (art27) pero no describe que produce el LSD"},
-  "gs-0245": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0246": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0247": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0248": {"negativo": true, "responde": null, "nota": "menciona el limite legal pero pregunta por los efectos, que el corpus no describe"},
-  "gs-0249": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0250": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0251": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0252": {"negativo": false, "responde": "RD-1428/2003#art20", "nota": "FALSO NEGATIVO: el art20 dice literalmente 0,5 gramos por litro en sangre y 0,25 miligramos por litro en aire espirado. Ademas es CIEGO, asi que Samuel lo derivaria sin ver nada mio"},
-  "gs-0253": {"negativo": true, "responde": null, "nota": ""},
-
-  "gs-0254": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0255": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0256": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0257": {"negativo": true, "responde": null, "nota": "DUDOSO: el art18 regula el USO del movil al conducir; la pregunta va del riesgo de llevarlo encendido, que es otra cosa"},
-  "gs-0258": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0259": {"negativo": false, "responde": "RD-1428/2003#art46.1.a", "nota": "PROBABLE FALSO NEGATIVO: el 46.1.a obliga a moderar la velocidad cuando haya peatones, 'principalmente si se trata de ninos, ancianos, invidentes u otras personas manifiestamente impedidas'. Es casi la pregunta"},
-  "gs-0260": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0261": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0262": {"negativo": true, "responde": null, "nota": "DUDOSO: el art122 dice como DEBEN situarse los peatones; la pregunta va de estadistica de conductas de riesgo"},
-  "gs-0263": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0264": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0265": {"negativo": true, "responde": null, "nota": "DUDOSO: el art45 obliga a adecuar la velocidad a las condiciones meteorologicas, pero no habla de seleccionar marcha"},
-  "gs-0266": {"negativo": true, "responde": null, "nota": ""},
-
-  "gs-0267": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0268": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0269": {"negativo": true, "responde": null, "nota": "el art37 permite restringir la circulacion por motivos medioambientales, pero las categorias del distintivo son del Reglamento General de Vehiculos"},
-  "gs-0270": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0271": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0272": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0273": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0274": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0275": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0276": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0277": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0278": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0279": {"negativo": true, "responde": null, "nota": ""},
-
-  "gs-0280": {"negativo": false, "responde": "RD-1428/2003#art129.3", "nota": "FALSO NEGATIVO LITERAL: 'Salvo en los casos en que, manifiestamente, no sea necesaria su colaboracion, todo usuario que advierta que se ha producido un accidente sin estar implicado en el debera...'. La respuesta del banco es casi una cita"},
-  "gs-0281": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0282": {"negativo": false, "responde": "RD-1428/2003#art129.3", "nota": "FALSO NEGATIVO: mismo articulo que gs-0280, y ademas menciona la personacion de los agentes, que es la coletilla final del 129.3"},
-  "gs-0283": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0284": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0285": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0286": {"negativo": false, "responde": "RD-1428/2003#art129.2", "nota": "FALSO NEGATIVO: 'facilitar su identidad' esta en la letra b del 129.2, dentro de las medidas que debe adoptar todo usuario implicado"},
-  "gs-0287": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0288": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0289": {"negativo": true, "responde": null, "nota": "la regla PAS es protocolo de emergencias, no norma de circulacion"},
-  "gs-0290": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0291": {"negativo": true, "responde": null, "nota": "DUDOSO: el art129.1 obliga a auxiliar, asi que la CONDUCTA si esta en el corpus. Lo que no esta es que sea DELITO, que es Codigo Penal. La pregunta va del delito"},
-  "gs-0292": {"negativo": true, "responde": null, "nota": ""},
-
-  "gs-0293": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0294": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0295": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0296": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0297": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0298": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0299": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0300": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0301": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0302": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0303": {"negativo": true, "responde": null, "nota": ""},
-  "gs-0304": {"negativo": true, "responde": null, "nota": ""}
+ "_formato": "negativo=true significa que el Reglamento NO responde la pregunta. Si es false, el corpus SI la responde y el caso esta mal clasificado: entraria como falso negativo y G-ABST-FN penalizaria al sistema por acertar.",
+ "gs-0241": {
+  "negativo": false,
+  "responde": "RD-1428/2003#art28.1",
+  "nota": "FALSO NEGATIVO: el art28 regula las pruebas de deteccion de estupefacientes y quien esta obligado a someterse. Esta en el corpus"
+ },
+ "gs-0242": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0243": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0244": {
+  "negativo": true,
+  "responde": null,
+  "nota": "el corpus prohibe conducir bajo sus efectos (art27) pero no describe que produce el LSD"
+ },
+ "gs-0245": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0246": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0247": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0248": {
+  "negativo": true,
+  "responde": null,
+  "nota": "menciona el limite legal pero pregunta por los efectos, que el corpus no describe"
+ },
+ "gs-0249": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0250": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0251": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0252": {
+  "negativo": false,
+  "responde": "RD-1428/2003#art20",
+  "nota": "FALSO NEGATIVO: el art20 dice literalmente 0,5 gramos por litro en sangre y 0,25 miligramos por litro en aire espirado. Ademas es CIEGO, asi que Samuel lo derivaria sin ver nada mio"
+ },
+ "gs-0253": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0254": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0255": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0256": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0257": {
+  "negativo": true,
+  "responde": null,
+  "nota": "DUDOSO: el art18 regula el USO del movil al conducir; la pregunta va del riesgo de llevarlo encendido, que es otra cosa"
+ },
+ "gs-0258": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0259": {
+  "negativo": false,
+  "responde": "RD-1428/2003#art17.1",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art46.1.a. PROBABLE FALSO NEGATIVO: el 46.1.a obliga a moderar la velocidad cuando haya peatones, 'principalmente si se trata de ninos, ancianos, invidentes u otras personas manifiestamente impedidas'. Es casi la pregunta"
+ },
+ "gs-0260": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0261": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0262": {
+  "negativo": true,
+  "responde": null,
+  "nota": "DUDOSO: el art122 dice como DEBEN situarse los peatones; la pregunta va de estadistica de conductas de riesgo"
+ },
+ "gs-0263": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0264": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0265": {
+  "negativo": true,
+  "responde": null,
+  "nota": "DUDOSO: el art45 obliga a adecuar la velocidad a las condiciones meteorologicas, pero no habla de seleccionar marcha"
+ },
+ "gs-0266": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0267": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0268": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0269": {
+  "negativo": true,
+  "responde": null,
+  "nota": "el art37 permite restringir la circulacion por motivos medioambientales, pero las categorias del distintivo son del Reglamento General de Vehiculos"
+ },
+ "gs-0270": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0271": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0272": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0273": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0274": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0275": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0276": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0277": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0278": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0279": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0280": {
+  "negativo": false,
+  "responde": "RD-1428/2003#art129.3",
+  "nota": "FALSO NEGATIVO LITERAL: 'Salvo en los casos en que, manifiestamente, no sea necesaria su colaboracion, todo usuario que advierta que se ha producido un accidente sin estar implicado en el debera...'. La respuesta del banco es casi una cita"
+ },
+ "gs-0281": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0282": {
+  "negativo": false,
+  "responde": "RD-1428/2003#art129.3",
+  "nota": "FALSO NEGATIVO: mismo articulo que gs-0280, y ademas menciona la personacion de los agentes, que es la coletilla final del 129.3"
+ },
+ "gs-0283": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0284": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0285": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0286": {
+  "negativo": false,
+  "responde": "RD-1428/2003#art129.2",
+  "nota": "FALSO NEGATIVO: 'facilitar su identidad' esta en la letra b del 129.2, dentro de las medidas que debe adoptar todo usuario implicado"
+ },
+ "gs-0287": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0288": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0289": {
+  "negativo": true,
+  "responde": null,
+  "nota": "la regla PAS es protocolo de emergencias, no norma de circulacion"
+ },
+ "gs-0290": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0291": {
+  "negativo": true,
+  "responde": null,
+  "nota": "DUDOSO: el art129.1 obliga a auxiliar, asi que la CONDUCTA si esta en el corpus. Lo que no esta es que sea DELITO, que es Codigo Penal. La pregunta va del delito"
+ },
+ "gs-0292": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0293": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0294": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0295": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0296": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0297": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0298": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0299": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0300": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0301": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0302": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0303": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ },
+ "gs-0304": {
+  "negativo": true,
+  "responde": null,
+  "nota": ""
+ }
 }

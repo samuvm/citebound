@@ -1,32 +1,131 @@
 {
-  "gs-0091": {"ref": "RD-1428/2003#art106.2", "nota": ""},
-  "gs-0092": {"ref": "RD-1428/2003#art98.2", "nota": "PROBABLE NEGATIVO: el reglaje de los faros es equipamiento y remite a las normas reguladoras de los vehiculos (art98.2). El RGC no lo regula"},
-  "gs-0093": {"ref": "RD-1428/2003#art99.1", "nota": ""},
-  "gs-0094": {"ref": "RD-1428/2003#art100.1", "nota": "segundo parrafo: la larga podra utilizarse aisladamente o con la de corto alcance"},
-  "gs-0095": {"ref": "RD-1428/2003#art99.1", "nota": "PROBABLE NEGATIVO: el RGC dice CUANDO se encienden las luces de posicion, no QUE significan. La definicion es del Reglamento General de Vehiculos"},
-  "gs-0096": {"ref": "RD-1428/2003#art104.a", "nota": ""},
-  "gs-0097": {"ref": "RD-1428/2003#art102.2", "nota": "el 102.2 es justo el del deslumbramiento por retrovisor a quien va delante en el mismo sentido"},
-  "gs-0098": {"ref": "RD-1428/2003#art101.2.b", "nota": ""},
-  "gs-0099": {"ref": "RD-1428/2003#art102.1", "nota": ""},
-  "gs-0100": {"ref": "RD-1428/2003#art98.2", "nota": "PROBABLE NEGATIVO: la altura de los faros con carga es equipamiento, no circulacion"},
-  "gs-0101": {"ref": "RD-1428/2003#art100.1", "nota": "DUDOSA: el art107 habla de averia pero para circular con alumbrado de intensidad INFERIOR; aqui se usa la larga en lugar de la corta, que es superior. El 100.1 regula el uso de la larga y el 102.1 impone no deslumbrar"},
-  "gs-0102": {"ref": "RD-1428/2003#art102.1", "nota": ""},
-  "gs-0103": {"ref": "RD-1428/2003#art102.1", "nota": ""},
-  "gs-0104": {"ref": "RD-1428/2003#art100.1", "nota": ""},
-  "gs-0105": {"ref": "RD-1428/2003#art105.2", "nota": ""},
-  "gs-0106": {"ref": "RD-1428/2003#art100.1", "nota": ""},
-  "gs-0107": {"ref": "RD-1428/2003#art98.2", "nota": "PROBABLE NEGATIVO: que hacen las luces adaptativas es equipamiento, no norma de circulacion"},
-  "gs-0108": {"ref": "RD-1428/2003#art106.1", "nota": ""},
-  "gs-0109": {"ref": "RD-1428/2003#art98.2", "nota": "PROBABLE NEGATIVO: cuantas luces debe llevar INSTALADAS una moto es del Reglamento General de Vehiculos"},
-  "gs-0110": {"ref": "RD-1428/2003#art98.2", "nota": "PEDAGOGICA + equipamiento. Candidata a descartar o a negativo"},
-  "gs-0111": {"ref": "RD-1428/2003#art98.2", "nota": "PEDAGOGICA: la suciedad del faro no la regula el RGC"},
-  "gs-0112": {"ref": "RD-1428/2003#art98.2", "nota": "PROBABLE NEGATIVO: equipamiento de la motocicleta"},
-  "gs-0113": {"ref": "RD-1428/2003#art98.2", "nota": "PROBABLE NEGATIVO: cuantas luces de corto alcance lleva instaladas una moto es del Reglamento General de Vehiculos"},
-  "gs-0114": {"ref": "RD-1428/2003#art101.1", "nota": ""},
-  "gs-0115": {"ref": "RD-1428/2003#art99.1", "nota": ""},
-  "gs-0116": {"ref": "RD-1428/2003#art106.2", "nota": ""},
-  "gs-0117": {"ref": "RD-1428/2003#art106.2", "nota": ""},
-  "gs-0118": {"ref": "RD-1428/2003#art106.2", "nota": "la antiniebla delantera solo vale en esos casos o en vias estrechas con muchas curvas"},
-  "gs-0119": {"ref": "RD-1428/2003#art106.2", "nota": ""},
-  "gs-0120": {"ref": "RD-1428/2003#art101.1", "nota": ""}
+ "gs-0091": {
+  "ref": "RD-1428/2003#art106.2",
+  "nota": ""
+ },
+ "gs-0092": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: el reglaje de los faros es equipamiento y remite a las normas reguladoras de los vehiculos (art98.2). El RGC no lo regula",
+  "descartar_sugerido": true
+ },
+ "gs-0093": {
+  "ref": "RD-1428/2003#art99.1",
+  "nota": ""
+ },
+ "gs-0094": {
+  "ref": "RD-1428/2003#art100.1",
+  "nota": "segundo parrafo: la larga podra utilizarse aisladamente o con la de corto alcance"
+ },
+ "gs-0095": {
+  "ref": "RD-1428/2003#art99.1",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: el RGC dice CUANDO se encienden las luces de posicion, no QUE significan. La definicion es del Reglamento General de Vehiculos",
+  "descartar_sugerido": true
+ },
+ "gs-0096": {
+  "ref": "RD-1428/2003#art104.a",
+  "nota": ""
+ },
+ "gs-0097": {
+  "ref": "RD-1428/2003#art102.2",
+  "nota": "el 102.2 es justo el del deslumbramiento por retrovisor a quien va delante en el mismo sentido"
+ },
+ "gs-0098": {
+  "ref": "RD-1428/2003#art101.2.b",
+  "nota": ""
+ },
+ "gs-0099": {
+  "ref": "RD-1428/2003#art102.1",
+  "nota": ""
+ },
+ "gs-0100": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: la altura de los faros con carga es equipamiento, no circulacion",
+  "descartar_sugerido": true
+ },
+ "gs-0101": {
+  "ref": "RD-1428/2003#art100.1",
+  "nota": "DUDOSA: el art107 habla de averia pero para circular con alumbrado de intensidad INFERIOR; aqui se usa la larga en lugar de la corta, que es superior. El 100.1 regula el uso de la larga y el 102.1 impone no deslumbrar"
+ },
+ "gs-0102": {
+  "ref": "RD-1428/2003#art102.1",
+  "nota": ""
+ },
+ "gs-0103": {
+  "ref": "RD-1428/2003#art102.1",
+  "nota": ""
+ },
+ "gs-0104": {
+  "ref": "RD-1428/2003#art100.1",
+  "nota": ""
+ },
+ "gs-0105": {
+  "ref": "RD-1428/2003#art105.2",
+  "nota": ""
+ },
+ "gs-0106": {
+  "ref": "RD-1428/2003#art100.1",
+  "nota": ""
+ },
+ "gs-0107": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: que hacen las luces adaptativas es equipamiento, no norma de circulacion",
+  "descartar_sugerido": true
+ },
+ "gs-0108": {
+  "ref": "RD-1428/2003#art106.1",
+  "nota": ""
+ },
+ "gs-0109": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: cuantas luces debe llevar INSTALADAS una moto es del Reglamento General de Vehiculos",
+  "descartar_sugerido": true
+ },
+ "gs-0110": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PEDAGOGICA + equipamiento. Candidata a descartar o a negativo",
+  "descartar_sugerido": true
+ },
+ "gs-0111": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PEDAGOGICA: la suciedad del faro no la regula el RGC",
+  "descartar_sugerido": true
+ },
+ "gs-0112": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: equipamiento de la motocicleta",
+  "descartar_sugerido": true
+ },
+ "gs-0113": {
+  "ref": "RD-1428/2003#art98.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: cuantas luces de corto alcance lleva instaladas una moto es del Reglamento General de Vehiculos",
+  "descartar_sugerido": true
+ },
+ "gs-0114": {
+  "ref": "RD-1428/2003#art101.1",
+  "nota": ""
+ },
+ "gs-0115": {
+  "ref": "RD-1428/2003#art99.1",
+  "nota": ""
+ },
+ "gs-0116": {
+  "ref": "RD-1428/2003#art106.2",
+  "nota": ""
+ },
+ "gs-0117": {
+  "ref": "RD-1428/2003#art106.2",
+  "nota": ""
+ },
+ "gs-0118": {
+  "ref": "RD-1428/2003#art106.2",
+  "nota": "la antiniebla delantera solo vale en esos casos o en vias estrechas con muchas curvas"
+ },
+ "gs-0119": {
+  "ref": "RD-1428/2003#art106.2",
+  "nota": ""
+ },
+ "gs-0120": {
+  "ref": "RD-1428/2003#art101.1",
+  "nota": ""
+ }
 }

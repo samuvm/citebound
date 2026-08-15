@@ -1202,3 +1202,67 @@ riesgo, la reproducibilidad sí.
 
 `1b`: generar los ≈304 candidatos por temas. `G-MUT` queda esperando a Q-015 y **no bloquea la
 fase 1**.
+
+---
+
+## 2026-08-15 · fase 1 · el ensayo automático de Samuel, y las tres cosas que me desmintió
+
+**Qué se intentó**
+
+Samuel pasó la cola de revisión entera de forma **automática y a propósito**, para detectar
+errores antes de arriesgar sus 10-16 horas. 304 casos en 31,5 minutos.
+
+**Qué falló**
+
+Lo mío, en tres capas, y de peor a mejor:
+
+1. **Afirmé como comprobado lo que no había comprobado.** Tres veces:
+   - «El poste de socorro no aparece en el corpus» → está en el **97.3.d**, con esas palabras.
+     Simplemente no lo busqué; usé la herramienta de búsqueda para otros casos y para este no.
+   - «El Reglamento no dice por qué carril se sale de una glorieta. **Buscado en todo el
+     corpus**» → lo dice el **art. 77**. Mi expresión regular exigía la palabra «glorieta» en
+     el mismo párrafo, y el 77 dice «cualquier otra vía». La búsqueda era estrecha y presenté
+     su resultado como definitivo, que es exactamente la forma de mentir sin querer.
+   - El **art. 108** no lo abrí. Volqué el 109 y el 110 y me salté el que gobierna la jerarquía
+     «señalización luminosa o, en su defecto, con el brazo». Seis correcciones van ahí.
+   Los dos racimos —**108 con 6, 97 con 4**— no son casos difíciles: son artículos que no leí.
+
+2. **Un fallo de diseño de la cola que produjo un número al revés.** En un caso a ciegas no se
+   ve propuesta, así que `a` no tenía nada que aceptar y la única tecla que registraba
+   referencia era `e`. Las 14 respuestas ciegas se guardaron como «corregir» y **11 llevaban
+   una referencia idéntica a la mía**. Contando la tecla: **22 %** de acuerdo. Comparando
+   referencias: **79 %**. Publiqué el 22 % antes de mirarlo bien.
+
+3. **Mi propio validador no puede detectar una revisión no humana.** `golden_validate`
+   comprueba que `revisado_por` esté relleno, no quién lo rellenó. Es un límite real del gate y
+   conviene que esté escrito.
+
+**Números**
+
+Ensayo: 243 ok · 34 corregir · 27 descartar. **Los 27 descartes eran los 27 que yo ya había
+marcado** — el sistema de notas acertó el 100 % en ese lado.
+Acuerdo con la propuesta a la vista: **92 %** (239/259). A ciegas, comparando referencias:
+**79 %** (11/14). El anclaje son **13 puntos**, no 70.
+Tras aplicar el ensayo: **213 positivos** (suelo 150), **64 negativos** (suelo 40), **8
+materias** con ≥20 (suelo 6).
+Reauditoría propia de los 243 aceptados contra los dos puntos ciegos y contra las señales del
+título V: **cero errores adicionales**. Los siete `art109` que quedan son la *forma* del gesto,
+que sí es el 109; lo que se corrigió al 108 era la *jerarquía*. Son preguntas distintas.
+
+**Decisiones**
+
+- **El ensayo se archiva, no se usa.** Ni un caso suyo entra en `v1.jsonl`: la regla dura nº 3
+  del contrato exige revisión humana y esto no lo fue. Queda en
+  `evals/golden/cola/ensayo-2026-08-15/` como evidencia de qué encontró.
+- **Sus hallazgos sí se aplican**, y marcados: las 23 referencias corregidas llevan en su nota
+  «CORREGIDA EN EL ENSAYO AUTOMATICO» con la que yo proponía, y los 27 descartes van sugeridos,
+  no ejecutados. Samuel sigue siendo quien decide; solo empieza desde un sitio mejor.
+- **`a` deja de ser válida en un positivo a ciegas**, y al teclear la referencia se revela la
+  mía y se guarda si coinciden. Ya ha decidido, así que enseñárselo no contamina nada y le da
+  la única señal útil que existe sobre si el candidato servía.
+- **Un test que codificaba el fallo se reescribe, no se relaja.** `test_el_resumen_separa_los_
+  casos_a_ciegas` construía los casos ciegos con la tecla y esperaba que la tasa la contara.
+
+**Siguiente**
+
+La cola está limpia y Samuel la hace a mano. Después, `1d` y el cierre de fase.

@@ -167,6 +167,41 @@ def vista(
     )
 
 
+def tecla_valida(tecla: str, *, tipo: str, a_ciegas: bool) -> bool:
+    """En un positivo a ciegas, `a` no vale: no hay propuesta que aceptar.
+
+    Es el defecto que destapó el ensayo automático del 2026-08-15. Al no existir una tecla
+    para «coincido», las 14 respuestas ciegas se registraron todas como `corregir` — 11 de
+    ellas con una referencia IDÉNTICA a la propuesta— y contar la tecla en vez de la
+    referencia produjo un 22 % de acuerdo donde había un 79 %. Un número que se publica
+    con esa diferencia no es un error de cálculo: es una conclusión al revés.
+    """
+    if tecla not in TECLAS:
+        return False
+    return not (tecla == "a" and a_ciegas and tipo != "negativo")
+
+
+def registrar_ciego(
+    caso_id: str, *, tecleada: str, del_agente: str | None, segundos: float
+) -> dict[str, object]:
+    """Guarda las DOS referencias y si coinciden.
+
+    Guardar solo la tecleada obligaría a volver a cruzar ficheros para medir el acuerdo, y
+    cruzarlos mal es justo lo que pasó. Con `coincide` escrito en el propio veredicto, el
+    número se lee y no se deriva.
+    """
+    return {
+        "id": caso_id,
+        "veredicto": "corregir",
+        "ref": tecleada,
+        "ref_agente": del_agente,
+        "coincide": tecleada == del_agente,
+        "a_ciegas": True,
+        "segundos": round(segundos, 1),
+        "en": datetime.now(UTC).isoformat(timespec="seconds"),
+    }
+
+
 def validar_correccion(texto: str, *, indice: frozenset[str]) -> LegalRef:
     """Una corrección tiene que existir en el corpus, o no entra.
 
@@ -217,7 +252,9 @@ def resumen(hechos: Sequence[Mapping[str, object]], pendientes: int = 0) -> dict
     """
     juzgados = [h for h in hechos if h.get("veredicto") in ("ok", "corregir", "descartar")]
     decididos = [h for h in juzgados if h["veredicto"] in ("ok", "corregir")]
-    ciegas = [h for h in decididos if h.get("a_ciegas")]
+    # A ciegas el acuerdo se lee de `coincide`, que compara REFERENCIAS. Contar la tecla
+    # daría un número al revés: ver `tecla_valida` y el ensayo del 2026-08-15.
+    ciegas = [h for h in decididos if h.get("a_ciegas") and h.get("coincide") is not None]
     tiempos = [float(h["segundos"]) for h in hechos if h.get("segundos") is not None]
     mediana = statistics.median(tiempos) if tiempos else None
 
@@ -226,12 +263,17 @@ def resumen(hechos: Sequence[Mapping[str, object]], pendientes: int = 0) -> dict
             return None
         return sum(1 for h in muestra if h["veredicto"] == "ok") / len(muestra)
 
+    def tasa_ciegas(muestra: Sequence[Mapping[str, object]]) -> float | None:
+        if not muestra:
+            return None
+        return sum(1 for h in muestra if h["coincide"]) / len(muestra)
+
     return {
         "n": len(juzgados),
         "aciertos": sum(1 for h in decididos if h["veredicto"] == "ok"),
         "tasa_acierto": tasa(decididos),
         "n_ciegas": len(ciegas),
-        "tasa_acierto_ciegas": tasa(ciegas),
+        "tasa_acierto_ciegas": tasa_ciegas(ciegas),
         "descartados": sum(1 for h in juzgados if h["veredicto"] == "descartar"),
         "mediana_segundos": mediana,
         "restante_horas": (mediana * pendientes / 3600) if mediana is not None else None,
@@ -350,12 +392,14 @@ def main() -> int:
 
         arranque = monotonic()
         tecla = _tecla()
-        if tecla == "q":
-            break
-        while tecla not in TECLAS:
-            tecla = _tecla()
+        while True:
             if tecla == "q":
-                return _cerrar(hechos, len(cola_pendiente))
+                return _cerrar(hechos, len(pendientes(cola, hechos)))
+            if tecla_valida(tecla, tipo=v.tipo, a_ciegas=v.a_ciegas):
+                break
+            if tecla == "a" and v.a_ciegas:
+                print("\n  va a ciegas: no hay propuesta que aceptar. Usa [e] y escribe la tuya")
+            tecla = _tecla()
 
         registro: dict[str, object] = {
             "id": v.id,
@@ -369,10 +413,23 @@ def main() -> int:
             while True:
                 escrito = input("\n  referencia correcta (p. ej. RD-1428/2003#art36.2): ").strip()
                 try:
-                    registro["ref"] = format_ref(validar_correccion(escrito, indice=indice))
+                    tecleada = format_ref(validar_correccion(escrito, indice=indice))
                     break
                 except ValueError as err:
                     print(f"  ✗ {err}")
+            if v.a_ciegas:
+                # Ahora sí se revela: ya ha decidido, así que enseñarlo no contamina nada y
+                # le da la única señal útil que existe sobre si el candidato servía.
+                registro = registrar_ciego(
+                    v.id,
+                    tecleada=tecleada,
+                    del_agente=str(ref) if ref else None,
+                    segundos=monotonic() - arranque,
+                )
+                igual = registro["coincide"]
+                print(f"  yo proponía: {ref}   {'· coincidimos' if igual else '· NO coincidimos'}")
+            else:
+                registro["ref"] = tecleada
         anotar(VEREDICTOS, registro)
         hechos.append(registro)
 

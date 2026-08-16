@@ -60,9 +60,23 @@ def _sin_empates(entrada: list[list[str]]) -> bool:
     return len(set(puntos.values())) == len(puntos)
 
 
-@given(entrada=listas, doc=docs)
+@st.composite
+def entrada_y_documento(draw: st.DrawFn) -> tuple[list[list[str]], str]:
+    """Las listas **y** un documento que de verdad está en ellas.
+
+    Generarlos por separado y filtrar con `assume` descarta el 85 % de los casos: Hypothesis
+    avisa, y con razón — el filtrado deforma la distribución y deja el test probando mucho
+    menos de lo que parece.
+    """
+    entrada = draw(listas)
+    presentes = sorted({d for lista in entrada for d in lista})
+    assume(presentes)
+    return entrada, draw(st.sampled_from(presentes))
+
+
+@given(caso=entrada_y_documento())
 def test_monotonia_empeorar_el_rango_nunca_mejora_el_resultado(
-    entrada: list[list[str]], doc: str
+    caso: tuple[list[list[str]], str],
 ) -> None:
     """RULES §3.2 nº 3, y la más importante de las tres.
 
@@ -70,7 +84,7 @@ def test_monotonia_empeorar_el_rango_nunca_mejora_el_resultado(
     fusionada. Un fusionador que violara esto premiaría a los peores resultados de los dos
     recuperadores a la vez, y el síntoma sería un recall mediocre sin causa visible.
     """
-    assume(any(doc in lista for lista in entrada))
+    entrada, doc = caso
     antes = fusionar(entrada)
     peor = [_atras(lista, doc) for lista in entrada]
     despues = fusionar(peor)

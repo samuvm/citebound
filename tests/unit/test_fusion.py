@@ -30,11 +30,28 @@ def test_una_sola_lista_conserva_su_orden() -> None:
 def test_lo_que_aparece_en_las_dos_listas_sube() -> None:
     """El punto entero de RRF: el acuerdo entre recuperadores es la señal.
 
-    `b` va segundo en las dos; `a` va primero en una y último en la otra. La suma de
-    recíprocos premia la coincidencia frente al primer puesto aislado.
+    `b` sale segundo en las dos listas; `a` y `c` salen primeros, pero cada uno en una sola.
+    Aparecer dos veces gana a un primer puesto aislado, que es exactamente lo que se le pide
+    a un fusionador híbrido.
+    """
+    fusionada = fusionar([["a", "b"], ["c", "b"]])
+    assert fusionada[0] == "b"
+
+
+def test_con_rangos_simetricos_ganan_los_extremos_y_no_el_centro() -> None:
+    """Una propiedad de RRF que NO es intuitiva y que conviene tener escrita.
+
+    Con `[[a,b,c],[c,b,a]]`, `b` va segundo en las dos y `a` y `c` van primero en una y
+    tercero en la otra. Parece que `b` debería ganar, y pierde: `1/61 + 1/63 > 2/62` porque
+    `1/x` es **convexa**. Con rangos simétricos, RRF premia a quien destaca en una lista
+    aunque falle en la otra, frente a quien es mediocre en las dos.
+
+    No es un defecto: es lo que hace que un recuperador que encuentra algo que el otro no ve
+    siga aportando. Pero si alguien mira este caso esperando lo contrario, va a pensar que la
+    fusión está rota.
     """
     fusionada = fusionar([["a", "b", "c"], ["c", "b", "a"]])
-    assert fusionada[0] == "b"
+    assert fusionada[-1] == "b"
 
 
 def test_un_documento_en_una_sola_lista_no_desaparece() -> None:

@@ -808,3 +808,103 @@ de tres, no el mejor de tres.
 
 <!-- Marca [x] puesta por Samuel. Cierre formalizado por el agente el 2026-08-16, con su permiso
      explícito y por una sola vez. La opción la eligió él. -->
+
+---
+
+### Q-016 · fase 2 · AMBIGÜEDAD DE CONTRATO · BLOQUEA publicar `G-RECALL5` y `G-RECALL30`
+
+**Qué necesito:** que decidas a qué granularidad se compara el recall.
+
+**Por qué:** `docs/CONTRACTS/retrieval-metrics.md` §2 define
+`recall@k = |R(q) ∩ P_k(q)| / |R(q)|` como una intersección de conjuntos de `legal_ref`, y
+**calla sobre la granularidad**. La regla del apartado está escrita, pero para *precisión de
+cita*, no para recall.
+
+Y aquí eso no es un matiz: el troceador es `articulo-v1`, así que **ninguna** de las 235
+referencias del índice lleva apartado, mientras que **190 de las 219** del golden set (86 %) sí.
+Con la lectura literal el recall está **acotado por construcción**, con el mejor recuperador
+imaginable.
+
+Medido hoy sobre los 219 casos positivos:
+
+| | Lectura literal | A nivel de artículo | Umbral |
+|---|---|---|---|
+| `G-RECALL5` | 0,068 | 0,717 | ≥ 0,90 |
+| `G-RECALL30` | 0,128 | 0,954 | ≥ 0,97 |
+
+**Opciones:**
+
+- **A (por defecto):** el recall se compara **a nivel de artículo**. Traer el artículo correcto
+  es trabajo del recuperador; bajar al apartado es del generador, y para eso está
+  `G-CITA-PRECISION`, cuya regla de granularidad **sí** está en el contrato. *Pros:* la métrica
+  mide lo que el recuperador puede controlar, y el rigor del apartado no se pierde — se cobra
+  en la fase 3. *Contras:* es una **interpretación** del contrato compartido, así que hay que
+  decírselo a los otros dos repos o los números dejan de ser comparables.
+- **B:** lectura literal, y entonces el troceador tiene que bajar al apartado para que la
+  métrica sea alcanzable. *Pros:* cero interpretación. *Contras:* rehacer el troceado y
+  reindexar; y ADR-001 explica que el apartado **no es estructural** en el XML del BOE, así que
+  el troceo por apartado se deriva del texto y mete error propio en la métrica más dura.
+- **C:** dejar `G-RECALL` como diagnóstico y que no bloquee. *Contras:* es la única meta de
+  calidad barata que hay; sin ella la fase 2 no tiene criterio de salida.
+
+`[ ] A   [ ] B   [ ] C`
+
+**Si dices que no a todo:** se publican las dos columnas y el README explica por qué, pero
+entonces `make done MILESTONE=2` no puede evaluar la meta y la fase no cierra.
+
+**Tiempo tuyo:** 5 minutos. **Es un contrato compartido**, así que si eliges A conviene
+decírselo al 02 y al 04 — igual que se hizo con Q-012 y Q-013.
+**Estado: PENDIENTE**
+`>> `
+
+---
+
+### Q-017 · fase 2 · BLOQUEA llegar a `G-RECALL5` · el transporte del reordenador
+
+**Qué necesito:** elegir **cómo se sirve** el reordenador, ahora que está medido que hace falta.
+
+**Por qué:** preguntaste si todo modelo debería pasar por Ollama o un proveedor compatible, y
+la respuesta corta es que Ollama **no tiene** endpoint de rerank — comprobado hoy contra tu
+0.32.14: `/api/rerank` y `/v1/rerank` devuelven 404. `docs/STACK.md` §2.1 ya lo decía y sigue
+siendo cierto.
+
+Y no se puede esquivar sin reordenador. Medido sobre los 219 casos:
+
+| Canal | recall@5 | recall@30 |
+|---|---:|---:|
+| Solo vectorial | 0,790 | 0,941 |
+| Solo léxico | 0,365 | 0,804 |
+| Híbrido | **0,717** | **0,954** |
+
+El material correcto **ya está** entre los 30 en el 95 % de los casos: no hay que buscar mejor,
+hay que **ordenar** mejor. Y ninguna combinación de los dos canales llega a 0,90 en el top-5
+sin reordenar — el vectorial solo, que es el mejor de los dos ahí, se queda en 0,790.
+
+**Opciones:**
+
+- **A (por defecto):** cross-encoder **en proceso** (`Qwen3-Reranker-0.6B` con
+  `sentence-transformers`), que es lo que dice hoy `STACK.md`. *Pros:* es lo más preciso y lo
+  más rápido, y no añade un salto de red al presupuesto de `G-TTFT`. **No exige Mac**: MPS es
+  el backend aquí, pero el mismo código corre sobre CUDA o CPU en cualquier máquina.
+  *Contras:* es un **segundo camino** para servir modelos —Hugging Face además de Ollama—, son
+  ~2 GB de dependencias, y añade una descarga al camino de `G-COLD-CACHE`.
+- **B:** el **generador como reordenador**, por `/v1/chat/completions`. *Pros:* cumple tu regla
+  de un solo transporte, cero dependencias nuevas, y `G-COLD-CACHE` se queda como está.
+  *Contras:* mucho más lento —entra en el presupuesto de `G-TTFT`, que tiene 210 ms de holgura—
+  y su calidad como reordenador hay que medirla, no está dada.
+- **C:** sin reordenador, y se propone bajar el umbral de `G-RECALL5`. *Contras:* `GOALS.yaml`
+  admite propuesta sobre esa meta, pero bajar un umbral para que pase lo que hay es justo lo
+  que `CLAUDE.md` prohíbe hacer sin diagnóstico. El diagnóstico está hecho y dice que el
+  problema tiene arreglo.
+
+`[ ] A   [ ] B   [ ] C`
+
+**Si dices que no a todo:** la fase 2 se queda en 0,717 y no cierra. Se puede seguir a la
+fase 3 y volver, pero entonces el agente se construye sobre un recuperador que sabemos flojo.
+
+**Recomendación:** **B primero**, porque cumple tu regla y se mide en una tarde. Si su latencia
+no cabe en `G-TTFT`, entonces A con su ADR explicando por qué se aceptó el segundo transporte.
+
+**Tiempo tuyo:** 5 minutos.
+**Estado: PENDIENTE**
+`>> `

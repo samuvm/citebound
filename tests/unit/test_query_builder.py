@@ -35,7 +35,10 @@ def test_ningun_valor_del_usuario_aparece_en_la_cadena_sql() -> None:
     consulta = busqueda_lexica(peligro, k=5)
     assert peligro not in consulta.sql
     assert "DROP" not in consulta.sql.upper()
-    assert peligro in consulta.parametros
+    # Y desde el arreglo del 2026-08-17, tampoco llega entero a los parámetros: se tokeniza a
+    # palabras, así que los signos con los que se construye una inyección desaparecen antes.
+    assert peligro not in consulta.parametros
+    assert not any(isinstance(p, str) and ("'" in p or ";" in p) for p in consulta.parametros)
 
 
 def test_todos_los_huecos_del_sql_son_marcadores_de_parametro() -> None:
@@ -111,9 +114,9 @@ def test_un_k_no_positivo_es_un_error(k: int) -> None:
 
 
 def test_una_pregunta_vacia_es_un_error() -> None:
-    """`websearch_to_tsquery('')` devuelve una consulta vacía que casa con todo y ordena por
-    nada. Es peor que un error: da 30 resultados arbitrarios que parecen recall."""
-    with pytest.raises(ValueError, match=r"vac|pregunta"):
+    """Una consulta vacía casa con todo y ordena por nada. Es peor que un error: da 30
+    resultados arbitrarios que parecen recall."""
+    with pytest.raises(ValueError, match=r"término|termino|vac"):
         busqueda_lexica("   ", k=5)
 
 
@@ -131,3 +134,50 @@ def test_devuelve_las_columnas_que_el_recuperador_necesita() -> None:
     for columna in ("legal_ref", "content", "titulo"):
         assert columna in consulta.sql
     assert "chunk_id" not in consulta.sql
+
+
+# --------------------------------------------------------------------------------------
+# El bug que encontró la primera medición de recall · 2026-08-17
+# --------------------------------------------------------------------------------------
+
+
+def test_los_terminos_se_combinan_con_or_y_no_con_and() -> None:
+    """**El defecto que dejaba la pata léxica devolviendo listas vacías.**
+
+    `websearch_to_tsquery` combina con AND: la pregunta entera exige que el artículo contenga
+    *todas* sus palabras. «Al acercarse a un centro docente, ¿qué precauciones debe tomar?»
+    daba **cero** chunks, aunque el 46.1.b diga literalmente «centros docentes», porque el
+    artículo no dice «precauciones» ni «tomar». Con OR casan 94 y el 46 entra en el top 5.
+
+    Con AND, el canal léxico solo acierta cuando la pregunta es un trozo literal del BOE —
+    o sea, casi nunca. Y no falla ruidosamente: devuelve la lista vacía, que es exactamente
+    lo que devuelve una búsqueda legítima sin resultados.
+    """
+    consulta = busqueda_lexica("centro docente precauciones", k=5)
+    expresion = next(p for p in consulta.parametros if isinstance(p, str) and " or " in p)
+    assert expresion == "centro or docente or precauciones"
+
+
+def test_la_puntuacion_y_los_signos_no_llegan_al_tsquery() -> None:
+    """Tokenizar por palabras deja fuera comillas, guiones y `¿?`. Es lo que hace que la carga
+    de inyección quede desarmada **antes** de llegar a Postgres, y no solo parametrizada."""
+    consulta = busqueda_lexica("curva'; DROP TABLE chunk_v1; --", k=5)
+    expresion = next(p for p in consulta.parametros if isinstance(p, str) and " or " in p)
+    assert "'" not in expresion
+    assert ";" not in expresion
+    assert "-" not in expresion
+
+
+def test_una_pregunta_de_solo_signos_es_un_error() -> None:
+    """`¿?` no deja ni un término. Sin términos no hay consulta, y una consulta vacía casa con
+    todo: 30 resultados arbitrarios con pinta de recall."""
+    with pytest.raises(ValueError, match=r"término|termino|vac"):
+        busqueda_lexica("¿... ?", k=5)
+
+
+def test_los_terminos_se_normalizan_a_minusculas() -> None:
+    """El tsvector está en minúsculas por la configuración; la consulta también, para que el
+    resultado no dependa de cómo escribió la pregunta quien la hizo."""
+    consulta = busqueda_lexica("Velocidad MÁXIMA", k=5)
+    expresion = next(p for p in consulta.parametros if isinstance(p, str) and " or " in p)
+    assert expresion == expresion.lower()

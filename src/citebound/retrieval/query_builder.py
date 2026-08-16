@@ -18,6 +18,7 @@ nada avise. Un cero por sintaxis y un cero por no encontrar nada se parecen dema
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 __all__ = ["CONFIG_TS", "Consulta", "busqueda_lexica"]
@@ -30,6 +31,12 @@ columna estaría indexada con una configuración y la consulta usaría otra."""
 # `chunks_active` es el alias que resuelve ADR-018. Consultar `chunk_v1` directamente ataría
 # la búsqueda a una versión física del índice y rompería la conmutación sin parar el servicio.
 TABLA = "chunks_active"
+
+# Palabras, y nada más: fuera comillas, guiones, `¿?` y cualquier símbolo. Además de desarmar
+# una carga de inyección antes de llegar a Postgres, evita que `websearch_to_tsquery` lea un
+# `-` como negación o unas comillas como frase exacta, que es lo que haría con una pregunta
+# escrita en lenguaje natural.
+_TERMINO = re.compile(r"\w+", re.UNICODE)
 
 
 @dataclass(frozen=True, slots=True)
@@ -57,13 +64,26 @@ def busqueda_lexica(pregunta: str, *, k: int, materia: str | None = None) -> Con
     """
     if k < 1:
         raise ValueError(f"k debe ser al menos 1, recibido {k}")
-    if not pregunta.strip():
-        raise ValueError(
-            "la pregunta no puede estar vacía: `websearch_to_tsquery('')` casa con todo y "
-            "ordena por nada, o sea que devolvería resultados arbitrarios con pinta de recall"
-        )
 
-    parametros: list[object] = [CONFIG_TS, pregunta, CONFIG_TS, pregunta]
+    # **OR y no AND**, que es el defecto que encontró la primera medición de recall.
+    # `websearch_to_tsquery` combina los términos con AND: la pregunta entera exigía que el
+    # artículo contuviera TODAS sus palabras. «Al acercarse a un centro docente, ¿qué
+    # precauciones debe tomar?» daba cero chunks aunque el 46.1.b diga «centros docentes»,
+    # porque el artículo no dice «precauciones» ni «tomar». Con AND este canal solo acierta
+    # cuando la pregunta es un trozo literal del BOE, o sea casi nunca — y no falla
+    # ruidosamente: devuelve la lista vacía, igual que una búsqueda legítima sin resultados.
+    #
+    # Con OR casan muchos chunks y el orden lo pone `ts_rank_cd`, que premia al que concentra
+    # más términos. El `LIMIT` ya acota, así que el filtro ancho no cuesta nada.
+    terminos = _TERMINO.findall(pregunta.lower())
+    if not terminos:
+        raise ValueError(
+            f"{pregunta!r} no deja ni un término buscable: sin términos la consulta casaría "
+            "con todo y ordenaría por nada"
+        )
+    expresion = " or ".join(terminos)
+
+    parametros: list[object] = [CONFIG_TS, expresion, CONFIG_TS, expresion]
     filtro = ""
     if materia is not None:
         filtro = "\n           AND materia = %s"

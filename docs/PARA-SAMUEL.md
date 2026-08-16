@@ -847,15 +847,20 @@ Medido hoy sobre los 219 casos positivos:
 - **C:** dejar `G-RECALL` como diagnóstico y que no bloquee. *Contras:* es la única meta de
   calidad barata que hay; sin ella la fase 2 no tiene criterio de salida.
 
-`[ ] A   [ ] B   [ ] C`
+`[x] A   [ ] B   [ ] C`
 
 **Si dices que no a todo:** se publican las dos columnas y el README explica por qué, pero
 entonces `make done MILESTONE=2` no puede evaluar la meta y la fase no cierra.
 
 **Tiempo tuyo:** 5 minutos. **Es un contrato compartido**, así que si eliges A conviene
 decírselo al 02 y al 04 — igual que se hizo con Q-012 y Q-013.
-**Estado: PENDIENTE**
-`>> `
+**Estado: RESPONDIDA · 2026-08-17**
+`>> ` **A**. El recall se compara **a nivel de artículo**: traer el artículo correcto es trabajo
+del recuperador y bajar al apartado es del generador, que es lo que cobra `G-CITA-PRECISION`.
+
+**Queda pendiente decírselo al 02 y al 04**, porque es una interpretación de un contrato
+compartido y sin avisar los tres repos dejarían de ser comparables. Va con la misma propagación
+que Q-012 y Q-013.
 
 ---
 
@@ -897,7 +902,7 @@ sin reordenar — el vectorial solo, que es el mejor de los dos ahí, se queda e
   que `CLAUDE.md` prohíbe hacer sin diagnóstico. El diagnóstico está hecho y dice que el
   problema tiene arreglo.
 
-`[ ] A   [ ] B   [ ] C`
+`[ ] A   [x] B   [ ] C`
 
 **Si dices que no a todo:** la fase 2 se queda en 0,717 y no cierra. Se puede seguir a la
 fase 3 y volver, pero entonces el agente se construye sobre un recuperador que sabemos flojo.
@@ -906,5 +911,8 @@ fase 3 y volver, pero entonces el agente se construye sobre un recuperador que s
 no cabe en `G-TTFT`, entonces A con su ADR explicando por qué se aceptó el segundo transporte.
 
 **Tiempo tuyo:** 5 minutos.
-**Estado: PENDIENTE**
-`>> `
+**Estado: RESPONDIDA · 2026-08-17**
+`>> ` **B**. El reordenador es el generador por `/v1/chat/completions`: **un solo transporte**
+para todos los modelos del proyecto. `docs/STACK.md` §2.1 y `CLAUDE.md` invariante 6 dicen hoy
+otra cosa —cross-encoder en proceso— así que su cambio va como propuesta aparte; esta entrada
+solo fija la decisión.

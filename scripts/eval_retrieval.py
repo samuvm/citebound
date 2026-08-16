@@ -33,14 +33,17 @@ from pathlib import Path
 from citebound.domain.legalref import LegalRef
 from citebound.evals.schema import CasoGolden, Tipo
 from citebound.evals.scoring import recall_at_k
+from citebound.providers.chat import generador_por_defecto
 from citebound.providers.embeddings import embedder_por_defecto
 from citebound.retrieval import pipeline
+from citebound.retrieval.rerank import CacheJuicios, ReordenadorLLM
 
 __all__ = ["a_nivel_articulo", "main", "medir"]
 
 RAIZ = Path(__file__).resolve().parents[1]
 GOLDEN = RAIZ / "evals" / "golden" / "v1.jsonl"
 INFORME = RAIZ / "evals" / "reports" / "retrieval-latest.json"
+CACHE_RERANK = RAIZ / "evals" / "cache" / "rerank.json"
 K_MEDIDOS = (5, 30)
 
 
@@ -72,9 +75,13 @@ class _Precalculado:
         return (self._vector,)
 
 
-def medir(cur: object, casos: Sequence[CasoGolden], *, k_canal: int = 30) -> dict[str, object]:
+def medir(
+    cur: object, casos: Sequence[CasoGolden], *, k_canal: int = 30, con_reranker: bool = False
+) -> dict[str, object]:
     """Recupera para cada caso positivo y devuelve las dos lecturas del recall."""
     positivos = [c for c in casos if c.tipo is Tipo.POSITIVO and c.refs]
+    cache = CacheJuicios(CACHE_RERANK) if con_reranker else None
+    reordenador = ReordenadorLLM(generador_por_defecto(), cache=cache) if con_reranker else None
     embedder = embedder_por_defecto()
     arranque = time.monotonic()
     vectores = embedder.embed([c.pregunta for c in positivos])
@@ -88,6 +95,7 @@ def medir(cur: object, casos: Sequence[CasoGolden], *, k_canal: int = 30) -> dic
             embedder=_Precalculado(vector, embedder.model, embedder.dim),
             k=k_canal,
             k_canal=k_canal,
+            reordenador=reordenador,
         )
         recuperado[caso.id] = [r.ref for r in traidos]
 
@@ -97,6 +105,9 @@ def medir(cur: object, casos: Sequence[CasoGolden], *, k_canal: int = 30) -> dic
     por_articulo = [
         c.model_copy(update={"refs": [a_nivel_articulo(r) for r in c.refs]}) for c in positivos
     ]
+
+    if cache is not None:
+        cache.volcar()
 
     medidas: dict[str, object] = {
         "n_casos": len(positivos),
@@ -128,7 +139,7 @@ def main() -> int:
 
     arranque = time.monotonic()
     with psycopg.connect(url) as conn, conn.cursor() as cur:
-        medidas = medir(cur, casos)
+        medidas = medir(cur, casos, con_reranker=os.environ.get("CITEBOUND_RERANK") == "1")
     total = time.monotonic() - arranque
 
     INFORME.parent.mkdir(parents=True, exist_ok=True)

@@ -229,11 +229,28 @@ minuto 60, no en la hora 12.
   del 15 % de negativos, `G-ABST-FN` no es calculable.
 - **C:** no reservar y hacerlo "a ratos". *Contras:* es exactamente el modo en que muere.
 
-`[ ] A   [ ] B   [ ] C`  ·  `Fechas reservadas: ______`
+`[x] A   [ ] B   [ ] C`  ·  `Fechas reservadas: noche del 15 al 16 de agosto de 2026`
 
 **Tiempo tuyo:** **10-16 h** (A) / 7-10 h (B). Es la partida más grande de todo el proyecto.
-**Estado: PENDIENTE**
-`>> `
+**Estado: RESPONDIDA · 2026-08-16 — HECHA**
+`>> ` **A**, y ejecutada. Lo que salió, medido y no estimado:
+
+| | |
+|---|---|
+| Casos revisados | **304** (240 positivos + 64 negativos, el 1,6× de esta entrada) |
+| Veredictos | 261 ok · 16 corregidos · 27 descartados |
+| Tiempo | **15,3 h**, mediana de 180 s/caso — dentro de las 10-16 previstas |
+| Golden set resultante | **277 casos**: 219 positivos, 58 negativos, 8 materias con ≥20 |
+| Acuerdo en los casos a ciegas | **14 de 14**, al nivel del apartado |
+
+**Antes de gastar las horas se hizo un ensayo automático de 31 minutos**, a propósito, para
+detectar errores sin arriesgar la sesión larga. Encontró 34 correcciones, dos artículos que el
+agente nunca había abierto (el 97 y el 108), tres afirmaciones falsas del agente sobre lo que
+«no aparece en el corpus», y un fallo de diseño de la propia cola. Fue la mejor inversión de
+tiempo de la fase. Detalle en `evals/golden/cola/PROCEDENCIA.md`.
+
+<!-- Registro escrito por el agente el 2026-08-16 con permiso explícito de Samuel y por una sola
+     vez. No decide nada: recoge lo que ya estaba hecho y medido en veredictos.jsonl. -->
 
 ---
 
@@ -257,8 +274,12 @@ paso al arranque en 10 minutos (`G-COLD-CACHE`).
 `[x] A   [ ] B (umbral de adopción: ____ puntos)`
 
 **Tiempo tuyo:** 5 minutos.
-**Estado: PENDIENTE**
-`>> `
+**Estado: RESPONDIDA · 2026-08-16**
+`>> ` **A**. El spike de BM25 se hace y su resultado va a un ADR, pero no se adopta: se queda
+`ts_rank_cd` y el README dirá qué mejoró y por qué no se adoptó.
+
+<!-- Marca [x] puesta por Samuel. El cierre del Estado lo formalizó el agente el 2026-08-16 con
+     su permiso explícito y por una sola vez: la opción la eligió él, aquí no se decide nada. -->
 
 ---
 
@@ -780,5 +801,10 @@ el criterio de aceptación nº 2 del proyecto y con el espíritu de `G-EVAL-DET`
 `[x] A   [ ] B   [ ] C`
 
 **Tiempo tuyo:** 5 minutos. **No corre prisa:** `G-MUT` bloquea desde la fase 3.
-**Estado: PENDIENTE**
-`>> `
+**Estado: RESPONDIDA · 2026-08-16**
+`>> ` **A**. Se queda mutmut y el protocolo pasa a ser **tres corridas limpias, publicando la
+peor**. `make mutation` tardará el triple y el README dirá que el número publicado es el mínimo
+de tres, no el mejor de tres.
+
+<!-- Marca [x] puesta por Samuel. Cierre formalizado por el agente el 2026-08-16, con su permiso
+     explícito y por una sola vez. La opción la eligió él. -->

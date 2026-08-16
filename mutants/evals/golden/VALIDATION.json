@@ -1,0 +1,23 @@
+{
+ "detalle": [],
+ "errores": 0,
+ "n": 277,
+ "negativos": 58,
+ "por_materia": {
+  "03 Marcas Viales": 28,
+  "04 Cambios de direccion, de sentido y marcha atrás": 30,
+  "05 Inmovilizaciones": 28,
+  "06 Uso de la via y Adelantamientos": 29,
+  "09 Arcenes y Carriles Especiales": 25,
+  "10 Preferencias": 29,
+  "11 Permisos de Conducir": 12,
+  "12 Primeros Auxilios": 13,
+  "14 Mecánica": 13,
+  "15 Velocidad": 23,
+  "16 Luces": 21,
+  "17 Tiempo y Distancia de Reacción y Factores Que Intervienen": 13,
+  "18 Factores Humano, Vía, Vehículo": 13
+ },
+ "positivos": 219,
+ "sha256": "0f757e2446f4a8142e8f6ec5455c1f5266a5cb01527e294ddcbfe4dcc3d02936"
+}

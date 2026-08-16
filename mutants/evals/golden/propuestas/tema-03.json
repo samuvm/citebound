@@ -1,0 +1,124 @@
+{
+ "gs-0121": {
+  "ref": "RD-1428/2003#art82.2",
+  "nota": "el 82.2 nombra expresamente a los tranvias que marchen por la zona central como excepcion para adelantar por la derecha"
+ },
+ "gs-0122": {
+  "ref": "RD-1428/2003#art59.1",
+  "nota": ""
+ },
+ "gs-0123": {
+  "ref": "RD-1428/2003#art167",
+  "nota": "el 167 no numera sus parrafos (usa letras dentro de un unico bloque), asi que la referencia se queda en el articulo. La prohibicion de circular por la izquierda es solo cuando la marca separa los dos sentidos"
+ },
+ "gs-0124": {
+  "ref": "RD-1428/2003#art59.1",
+  "nota": ""
+ },
+ "gs-0125": {
+  "ref": "RD-1428/2003#art168",
+  "nota": "marca transversal continua = linea de detencion"
+ },
+ "gs-0126": {
+  "ref": "RD-1428/2003#art169",
+  "nota": "flecha de seleccion de carriles"
+ },
+ "gs-0127": {
+  "ref": "RD-1428/2003#art168",
+  "nota": "DEPENDE DEL DIBUJO. El 168.a tiene el parrafo del 'detenerse de nuevo' cuando desde el primer punto no hay visibilidad suficiente"
+ },
+ "gs-0128": {
+  "ref": "RD-1428/2003#art169",
+  "nota": ""
+ },
+ "gs-0129": {
+  "ref": "RD-1428/2003#art167",
+  "nota": ""
+ },
+ "gs-0130": {
+  "ref": "RD-1428/2003#art168",
+  "nota": "PARCIAL: el 168.a cubre la linea de detencion, pero 'a la altura del semaforo sin rebasarlo' NO aparece en el corpus. Buscado en los 292.784 caracteres"
+ },
+ "gs-0131": {
+  "ref": "RD-1428/2003#art94.2.b",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art171. DUDOSA: el 171.f explica que las marcas azules limitan la duracion, pero la obligacion del distintivo y la inmovilizacion son de la ordenanza municipal y de la Ley, no del RGC"
+ },
+ "gs-0132": {
+  "ref": "RD-1428/2003#art135",
+  "nota": "literal: toda senal se aplica a toda la anchura de la calzada, y su aplicacion podra limitarse a uno o mas carriles mediante marcas"
+ },
+ "gs-0133": {
+  "ref": "RD-1428/2003#art30.1",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art167. ojo: el 167.f excluye expresamente las lineas de borde del regimen de este articulo y las manda al 170.h. La prohibicion de circular por el arcen viene del 30/31, no de la marca"
+ },
+ "gs-0134": {
+  "ref": "RD-1428/2003#art171",
+  "nota": "damero blanco y rojo, letra e"
+ },
+ "gs-0135": {
+  "ref": "RD-1428/2003#art170",
+  "nota": "marca de paso a nivel, letra b"
+ },
+ "gs-0136": {
+  "ref": "RD-1428/2003#art170",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: 'guias sonoras' NO aparece en ninguna parte del corpus. Ademas la pregunta va de su FINALIDAD estadistica, no de una norma",
+  "descartar_sugerido": true
+ },
+ "gs-0137": {
+  "ref": "RD-1428/2003#art169",
+  "nota": ""
+ },
+ "gs-0138": {
+  "ref": "RD-1428/2003#art167",
+  "nota": "letra b, 1: trazos sensiblemente mas cortos = riesgo especial"
+ },
+ "gs-0139": {
+  "ref": "RD-1428/2003#art169",
+  "nota": "letra b: si el simbolo esta en un carril delimitado por lineas longitudinales, la obligacion es solo para quien circula por ese carril"
+ },
+ "gs-0140": {
+  "ref": "RD-1428/2003#art171",
+  "nota": "marca amarilla longitudinal continua, letra b"
+ },
+ "gs-0141": {
+  "ref": "RD-1428/2003#art167",
+  "nota": "misma norma que gs-0138"
+ },
+ "gs-0142": {
+  "ref": "RD-1428/2003#art168",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: hacer o no senales a un peaton para que cruce no lo regula el RGC. Es consejo de seguridad vial",
+  "descartar_sugerido": true
+ },
+ "gs-0143": {
+  "ref": "RD-1428/2003#art59.1",
+  "nota": ""
+ },
+ "gs-0144": {
+  "ref": "RD-1428/2003#art88.2",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art85.4. DUDOSA: el 85.4 obliga a ocupar parte o la totalidad del carril contrario para adelantar a ciclistas, pero el 'aunque la linea sea continua' NO es literal en el corpus. El 167 no recoge esa excepcion"
+ },
+ "gs-0145": {
+  "ref": "RD-1428/2003#art169",
+  "nota": "DEPENDE DEL DIBUJO: 'ceder el paso a los que se aproximen por ambos lados' encaja con stop, letra b"
+ },
+ "gs-0146": {
+  "ref": "RD-1428/2003#art59.1",
+  "nota": ""
+ },
+ "gs-0147": {
+  "ref": "RD-1428/2003#art64.2.a",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art168. el 168.d dice literalmente que en el paso para ciclistas estos tienen preferencia. La norma general de prioridad de ciclistas es el art64: si Samuel prefiere anclarlo ahi, es defendible"
+ },
+ "gs-0148": {
+  "ref": "RD-1428/2003#arttvi-153.1",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art36.1. DUDOSA: que el ciclista pase a la calzada al acabarse el carril bici no esta escrito asi en el corpus. El 36.1 dice que si no hay via especialmente destinada circula por el arcen y, si no es transitable, por la calzada"
+ },
+ "gs-0149": {
+  "ref": "RD-1428/2003#art170",
+  "nota": "cebreado, letra g"
+ },
+ "gs-0150": {
+  "ref": "RD-1428/2003#art167",
+  "nota": "letra a: dos lineas continuas adosadas tienen el mismo significado que una"
+ }
+}

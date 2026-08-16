@@ -1,0 +1,127 @@
+{
+ "gs-0061": {
+  "ref": "RD-1428/2003#art40.1",
+  "nota": "DEPENDE DEL DIBUJO, pero la respuesta nombra el concepto: marcas dobles discontinuas a ambos lados = carril reversible"
+ },
+ "gs-0062": {
+  "ref": "RD-1428/2003#art42.1",
+  "nota": "el 42 (adicional circunstancial) NO limita por tipo de vehiculo; el que si prohibe los turismos con remolque es el 41 (sentido contrario al habitual). Confundirlos invierte la respuesta"
+ },
+ "gs-0063": {
+  "ref": "RD-1428/2003#art41.1",
+  "nota": ""
+ },
+ "gs-0064": {
+  "ref": "RD-1428/2003#art143.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: el significado de las luces de los semaforos esta en el apartado 4 del ANEXO I, y en este corpus el anexo I es SOLO el indice (1.043 caracteres de titulos). El 143.2 es la remision, no el contenido",
+  "descartar_sugerido": true
+ },
+ "gs-0065": {
+  "ref": "RD-1428/2003#art36.1",
+  "nota": ""
+ },
+ "gs-0066": {
+  "ref": "RD-1428/2003#art42.1",
+  "nota": ""
+ },
+ "gs-0067": {
+  "ref": "RD-1428/2003#art122.1",
+  "nota": "regla general el arcen IZQUIERDO; el derecho es la excepcion por razones de seguridad. La respuesta recoge las dos"
+ },
+ "gs-0068": {
+  "ref": "RD-1428/2003#art122.1",
+  "nota": ""
+ },
+ "gs-0069": {
+  "ref": "RD-1428/2003#art38.2",
+  "nota": "la respuesta junta dos normas: abandonar por la primera salida (38.2) y circular por el arcen (36.1, parrafo segundo). Se ancla en el 38.2 porque es la especifica de autopistas"
+ },
+ "gs-0070": {
+  "ref": "RD-1428/2003#art36.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. CONTRADICE AL TEXTO: el 36.2 prohibe la posicion paralela y excepciona SOLO a las bicicletas. La respuesta del banco anade los ciclomotores. Candidata a descartar",
+  "descartar_sugerido": true
+ },
+ "gs-0071": {
+  "ref": "RD-1428/2003#art125.1",
+  "nota": "el 125.1 nombra expresamente las explanadas de estaciones de peaje"
+ },
+ "gs-0072": {
+  "ref": "RD-1428/2003#art36.1",
+  "nota": "DEPENDE DEL DIBUJO: la calzada solo procede si el arcen no es transitable o suficiente"
+ },
+ "gs-0073": {
+  "ref": "RD-1428/2003#art40.1",
+  "nota": ""
+ },
+ "gs-0074": {
+  "ref": "RD-1428/2003#art41.1",
+  "nota": ""
+ },
+ "gs-0075": {
+  "ref": "RD-1428/2003#arttvi-155",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: 'arrastrados' NO aparece en ninguna parte del corpus. La prohibicion estaba en el antiguo art121.4; el titulo VI vigente remite a la Autoridad municipal y no la recoge",
+  "descartar_sugerido": true
+ },
+ "gs-0076": {
+  "ref": "RD-1428/2003#art35.2.a",
+  "nota": ""
+ },
+ "gs-0077": {
+  "ref": "RD-1428/2003#art36.1",
+  "nota": "DEPENDE DE LA FOTO: el 36.1 permite la parte imprescindible de la calzada si el arcen no es transitable"
+ },
+ "gs-0078": {
+  "ref": "RD-1428/2003#art36.1",
+  "nota": "parrafo segundo: vehiculos de MMA <= 3.500 kg que por emergencia circulen a velocidad anormalmente reducida"
+ },
+ "gs-0079": {
+  "ref": "RD-1428/2003#art36.1",
+  "nota": "los vehiculos para personas de movilidad reducida estan en la enumeracion del 36.1"
+ },
+ "gs-0080": {
+  "ref": "RD-1428/2003#art41.1",
+  "nota": ""
+ },
+ "gs-0081": {
+  "ref": "RD-1428/2003#art36.1",
+  "nota": "el tractor de 3.000 kg entra como vehiculo especial de MMA <= 3.500"
+ },
+ "gs-0082": {
+  "ref": "RD-1428/2003#art143.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO: mismo motivo que gs-0064, el significado del semaforo de carril esta en el anexo I que aqui es solo indice",
+  "descartar_sugerido": true
+ },
+ "gs-0083": {
+  "ref": "RD-1428/2003#art122.2.a",
+  "nota": ""
+ },
+ "gs-0084": {
+  "ref": "RD-1428/2003#art41.1",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art142.1. DUDOSA: el 41 limita los carriles en sentido contrario a motocicletas y turismos, pero lo hace por razones de FLUIDEZ. Aqui la causa son obras, que es senalizacion circunstancial (142). Si Samuel considera que aplica el 41, la respuesta del banco seria incorrecta"
+ },
+ "gs-0085": {
+  "ref": "RD-1428/2003#art57.1.c",
+  "nota": ""
+ },
+ "gs-0086": {
+  "ref": "RD-1428/2003#art35.2.a",
+  "nota": "los ciclomotores estan expresamente prohibidos en el carril VAO"
+ },
+ "gs-0087": {
+  "ref": "RD-1428/2003#art35.2.a",
+  "nota": ""
+ },
+ "gs-0088": {
+  "ref": "RD-1428/2003#art77",
+  "nota": "CORREGIDA EN EL ENSAYO AUTOMATICO del 2026-08-15: yo propuse art57.1.c. PROBABLE NEGATIVO: el Reglamento NO dice por que carril se sale de una glorieta. Buscado en todo el corpus. Es practica docente de la DGT, no norma"
+ },
+ "gs-0089": {
+  "ref": "RD-1428/2003#art143.2",
+  "nota": "EL ENSAYO PROPONE DESCARTAR. PROBABLE NEGATIVO, igual que gs-0064",
+  "descartar_sugerido": true
+ },
+ "gs-0090": {
+  "ref": "RD-1428/2003#art124.4",
+  "nota": ""
+ }
+}

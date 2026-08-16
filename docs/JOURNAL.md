@@ -1266,3 +1266,63 @@ que sí es el 109; lo que se corrigió al 108 era la *jerarquía*. Son preguntas
 **Siguiente**
 
 La cola está limpia y Samuel la hace a mano. Después, `1d` y el cierre de fase.
+
+---
+
+## 2026-08-16 · fase 1 CERRADA · `make done MILESTONE=1` en verde, doce de doce
+
+**Qué se intentó**
+
+Cerrar la fase 1: montar `v1.jsonl` desde la revisión de Samuel (`1d`) y pasar el gate.
+
+**Qué falló**
+
+1. **`mutmut` no arrancaba.** `also_copy` no llevaba `evals/golden/`, y desde `1d` los tests de
+   contrato de la cola y del montaje leen la cola real y el golden set. Es la segunda vez que
+   esa lista se queda corta —la primera fue `docs/GOALS.yaml`— y el patrón es el mismo: un test
+   que lee un fichero de datos rompe la corrida entera, y el gate lo da por bueno porque `G-MUT`
+   no bloquea hasta la fase 3. Añadido.
+2. **Dos nombres de test en mayúsculas** que `ruff` rechaza (`N802`). Sin consecuencia, pero
+   pararon el gate en la condición 1 las dos veces.
+
+**Sobre la revisión, y por qué merece estar escrito**
+
+Samuel hizo primero un **ensayo automático a propósito** para no arriesgar sus horas. Encontró
+34 correcciones, dos artículos que yo nunca había abierto (**97** y **108**), tres afirmaciones
+mías falsas sobre lo que «no aparece en el corpus», y un fallo de diseño de la cola que producía
+un número de acuerdo **al revés** —22 % contando teclas donde había 79 % comparando referencias—.
+31 minutos de ensayo evitaron 10 horas mal gastadas y me desmintieron cuatro veces.
+
+Después revisó los 304 a mano sobre un CSV y volcó los veredictos. Los tiempos se registraron en
+ese volcado, no con cronómetro por pulsación; él confirma que reflejan su ritmo real y **decide
+publicarlos**. Queda dicho en `evals/golden/cola/PROCEDENCIA.md`: el dato y su procedencia, que
+es lo que pide **D-06**.
+
+**Números**
+
+`make done MILESTONE=1` → **exit 0, doce de doce**.
+`v1.jsonl`: **277 casos** · 219 positivos (suelo 150) · 58 negativos (suelo 40, y el 20,9 % del
+conjunto frente al 15 % del contrato) · **8 materias** con 20 casos o más (suelo 6) · sha256
+`0f757e24…`.
+`make golden-validate` → **0 errores**.
+495 tests · 100 % de línea en `[tool.gate].testable` · **898/899 mutantes**.
+Revisión: 261 ok · 16 corregidos · 27 descartados · **15,3 h**, dentro de las 10-16 de Q-004.
+Acuerdo en los 14 casos ciegos: **14 de 14**, al nivel del apartado.
+
+**Decisiones**
+
+- **Un negativo que resulta respondible cambia de bando en el montaje**, no antes. Seis de los
+  64 lo eran; si hubieran entrado como negativos, `G-ABST-FN` habría contado como fallo cada
+  acierto del sistema. Tiene su test.
+- **La dificultad se deriva de `pct_fallo`.** El contrato exige la etiqueta, que es un juicio;
+  el banco trae el porcentaje real de gente que falla cada pregunta. Se deriva del dato y los
+  dos viajan juntos.
+- **El sello es del fichero, no de la lista en memoria.** Existe para que un tercero verifique
+  lo que hay en disco; de la otra forma no verificaría nada.
+- **El ensayo automático se archiva y no se usa.** Ni un caso suyo entra en `v1.jsonl`.
+
+**Siguiente**
+
+Parar. `make done` verde exige presentar números y esperar el visto bueno (CLAUDE.md regla 5).
+Samuel negó abrir la fase 2 el 2026-08-15 hasta cerrar la 1; la 1 ya está cerrada, así que la
+pregunta se le vuelve a hacer.

@@ -216,8 +216,11 @@ source_paths = [
 # `docs/GOALS.yaml` entra porque `golden_validate` LEE de ahi sus umbrales y sus tests lo
 # comprueban: sin el fichero, la corrida de mutacion ni siquiera arranca. Es la contrapartida
 # de no escribir los numeros en el codigo, y es barata.
+# `evals/golden/` entra desde 1d: los tests de contrato de la cola y del montaje leen la
+# cola real y el golden set, y sin ellos la corrida de mutacion ni siquiera arranca.
 also_copy = [
-  "src/", "tests/", "scripts/", "corpus/", "docs/CONTRACTS/", "docs/GOALS.yaml", "compose.yaml"
+  "src/", "tests/", "scripts/", "corpus/", "docs/CONTRACTS/", "docs/GOALS.yaml",
+  "evals/golden/", "compose.yaml"
 ]
 # La suite de mutacion corre sin integracion: levantar Postgres por cada mutante
 # multiplicaria minutos por cientos y el gate se acabaria desactivando.

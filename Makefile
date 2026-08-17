@@ -44,9 +44,13 @@ up: check-ollama  ## levanta Postgres y espera a que este sano
 down:  ## tumba el entorno, sin volumenes huerfanos
 	$(COMPOSE) down --remove-orphans
 
-warm: check-ollama  ## precalienta el modelo. NUNCA dentro de `up`: rompe el cronometro
+warm: check-ollama  ## precalienta los modelos. NUNCA dentro de `up`: rompe el cronometro
 	@curl -sf $(OLLAMA_URL)/v1/embeddings -H 'Content-Type: application/json' \
-	  -d '{"model":"bge-m3","input":["calentando"]}' >/dev/null && echo "  bge-m3 residente"
+	  -d '{"model":"qwen3-embedding:0.6b","input":["calentando"]}' >/dev/null \
+	  && echo "  qwen3-embedding:0.6b residente"
+	@curl -sf $(OLLAMA_URL)/v1/chat/completions -H 'Content-Type: application/json' \
+	  -d '{"model":"qwen3.5:4b-mlx","messages":[{"role":"user","content":"ok"}],"max_tokens":1,"reasoning_effort":"none"}' \
+	  >/dev/null && echo "  qwen3.5:4b-mlx residente (generador y reordenador)"
 
 # ---------------------------------------------------------------- estatica ---
 lint:  ## ruff check + format --check

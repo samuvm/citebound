@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 940 520" width="940" height="520"
+     font-family="ui-sans-serif, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
+     role="img" aria-labelledby="titulo desc">
+  <title id="titulo">Cita cerrada: el generador no puede escribir una referencia</title>
+  <desc id="desc">La pregunta se recupera por dos canales, se fusiona y se reordena hasta cinco
+    candidatos. El modelo redacta con huecos numerados. Codigo, no el modelo, traduce cada hueco
+    a su referencia legal y verifica el fragmento letra a letra. Las tres salidas son responder,
+    retractar y reintentar, o abstenerse.</desc>
+
+  <rect width="940" height="520" fill="#fbfbfa"/>
+
+  <!-- ══ recuperacion ══ -->
+  <rect x="24" y="24" width="892" height="118" rx="10" fill="#f2f1ee" stroke="#d8d5cd"/>
+  <text x="44" y="50" font-size="12" font-weight="600" fill="#8a8578" letter-spacing="1.2">RECUPERAR</text>
+
+  <rect x="44" y="62" width="150" height="58" rx="7" fill="#fff" stroke="#c9c5ba"/>
+  <text x="119" y="86" font-size="14" fill="#2b2a26" text-anchor="middle">pregunta</text>
+  <text x="119" y="104" font-size="11" fill="#8a8578" text-anchor="middle">en lenguaje natural</text>
+
+  <path d="M198 91 h30" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+
+  <rect x="234" y="58" width="176" height="30" rx="6" fill="#fff" stroke="#c9c5ba"/>
+  <text x="322" y="78" font-size="13" fill="#2b2a26" text-anchor="middle">vectorial · HNSW coseno</text>
+  <rect x="234" y="94" width="176" height="30" rx="6" fill="#fff" stroke="#c9c5ba"/>
+  <text x="322" y="114" font-size="13" fill="#2b2a26" text-anchor="middle">léxico · ts_rank_cd</text>
+
+  <path d="M414 91 h26" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+
+  <rect x="446" y="62" width="120" height="58" rx="7" fill="#fff" stroke="#c9c5ba"/>
+  <text x="506" y="86" font-size="14" fill="#2b2a26" text-anchor="middle">fusión RRF</text>
+  <text x="506" y="104" font-size="11" fill="#8a8578" text-anchor="middle">30 candidatos</text>
+
+  <path d="M570 91 h26" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+
+  <rect x="602" y="62" width="130" height="58" rx="7" fill="#fff" stroke="#c9c5ba"/>
+  <text x="667" y="86" font-size="14" fill="#2b2a26" text-anchor="middle">reordenar</text>
+  <text x="667" y="104" font-size="11" fill="#8a8578" text-anchor="middle">los 30, no los 10</text>
+
+  <path d="M736 91 h26" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+
+  <rect x="768" y="62" width="128" height="58" rx="7" fill="#efece3" stroke="#b9b3a3"/>
+  <text x="832" y="86" font-size="14" font-weight="600" fill="#2b2a26" text-anchor="middle">top 5</text>
+  <text x="832" y="104" font-size="11" fill="#8a8578" text-anchor="middle">y nada más</text>
+
+  <path d="M832 142 v28" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+  <text x="846" y="161" font-size="11" fill="#8a8578">lo único que el modelo verá</text>
+
+  <!-- ══ generacion ══ -->
+  <rect x="24" y="178" width="892" height="104" rx="10" fill="#f2f1ee" stroke="#d8d5cd"/>
+  <text x="44" y="204" font-size="12" font-weight="600" fill="#8a8578" letter-spacing="1.2">REDACTAR</text>
+
+  <rect x="44" y="216" width="330" height="50" rx="7" fill="#fff" stroke="#c9c5ba"/>
+  <text x="209" y="238" font-size="14" fill="#2b2a26" text-anchor="middle">el modelo escribe con huecos</text>
+  <text x="209" y="256" font-size="12" fill="#8a8578" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">[[REF:n]] · n ∈ {1..5}</text>
+
+  <rect x="398" y="216" width="518" height="50" rx="7" fill="#fff" stroke="#c9c5ba" stroke-dasharray="4 3"/>
+  <text x="657" y="238" font-size="14" fill="#2b2a26" text-anchor="middle">
+    <tspan font-weight="600">Citar un artículo inexistente es inexpresable.</tspan>
+  </text>
+  <text x="657" y="256" font-size="12" fill="#8a8578" text-anchor="middle">No hay forma de escribir otra cosa: elige entre 1 y 5, o no elige</text>
+
+  <path d="M470 282 v30" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+
+  <!-- ══ verificacion ══ -->
+  <rect x="24" y="320" width="892" height="86" rx="10" fill="#eceade" stroke="#c8c2ac"/>
+  <text x="44" y="346" font-size="12" font-weight="600" fill="#7d7660" letter-spacing="1.2">CÓDIGO · NO EL MODELO</text>
+
+  <rect x="44" y="356" width="416" height="34" rx="6" fill="#fff" stroke="#c1baa4"/>
+  <text x="252" y="378" font-size="13" fill="#2b2a26" text-anchor="middle">resolver &#160;n → LegalRef&#160; contra lo recuperado</text>
+
+  <rect x="480" y="356" width="416" height="34" rx="6" fill="#fff" stroke="#c1baa4"/>
+  <text x="688" y="378" font-size="13" fill="#2b2a26" text-anchor="middle">¿el fragmento está literal en ese artículo?</text>
+
+  <path d="M180 406 v26" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+  <path d="M470 406 v26" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+  <path d="M760 406 v26" stroke="#a8a396" stroke-width="1.5" marker-end="url(#f)"/>
+
+  <!-- ══ salidas ══ -->
+  <rect x="44" y="440" width="272" height="56" rx="7" fill="#fff" stroke="#8fa886" stroke-width="1.5"/>
+  <text x="180" y="464" font-size="14" font-weight="600" fill="#3f5738" text-anchor="middle">responder con la cita</text>
+  <text x="180" y="482" font-size="11" fill="#6d7a68" text-anchor="middle">verificada letra a letra, sin LLM y sin coste</text>
+
+  <rect x="334" y="440" width="272" height="56" rx="7" fill="#fff" stroke="#b09a6a" stroke-width="1.5"/>
+  <text x="470" y="464" font-size="14" font-weight="600" fill="#6b5a2c" text-anchor="middle">retractar y reintentar</text>
+  <text x="470" y="482" font-size="11" fill="#8a7a52" text-anchor="middle">en el token en que aparece · máximo 2</text>
+
+  <rect x="624" y="440" width="272" height="56" rx="7" fill="#fff" stroke="#9a8f9e" stroke-width="1.5"/>
+  <text x="760" y="464" font-size="14" font-weight="600" fill="#524a56" text-anchor="middle">abstenerse con motivo</text>
+  <text x="760" y="482" font-size="11" fill="#7a7280" text-anchor="middle">salida de primera clase, medida en los dos sentidos</text>
+
+  <defs>
+    <marker id="f" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0 L10 5 L0 10 z" fill="#a8a396"/>
+    </marker>
+  </defs>
+</svg>

@@ -43,7 +43,14 @@ __all__ = [
 # a new table and a re-index (see the note in `chunks-ddl.sql`).
 DIM_CONTRATO = 1024
 
-_MODELO_POR_DEFECTO = "bge-m3"
+_MODELO_POR_DEFECTO = "qwen3-embedding:0.6b"
+"""El principal de `docs/STACK.md` §2.2, que la fase 0 nunca llegó a usar.
+
+Se indexó con `bge-m3` —el **retador**— porque ya estaba descargado, y ahí se quedó. Medido el
+2026-08-17 sobre los mismos 216 casos: `recall@30` 0,977 contra 0,954, y `recall@5` con
+reordenador 0,856 contra 0,847. Gana el que el documento ratificado ya decía, así que el
+código deja de contradecirlo. 1024 dimensiones: cabe en `vector(1024)` sin tocar el DDL.
+"""
 _BASE_POR_DEFECTO = "http://localhost:11434/v1"
 
 

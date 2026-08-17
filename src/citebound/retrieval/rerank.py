@@ -16,9 +16,14 @@ proyecto entera —el 34 habla de cómputo de carriles y el 35 de separación la
 es exactamente el error que el golden set existe para medir— y un modelo instruido puede
 recibirla, mientras que una distancia coseno no.
 
-**Nunca pierde ni inventa un candidato.** El modelo devuelve números; si se salta uno, se
-añade al final en su orden original, y si escribe uno que no existe, se ignora. Un reordenador
-que perdiera documentos bajaría el recall por su cuenta y el diagnóstico apuntaría al índice.
+**Nunca pierde ni inventa un candidato.** El modelo devuelve etiquetas; si se salta una, su
+candidato se añade al final en su orden original, y si escribe una que no existe, se ignora. Un
+reordenador que perdiera documentos bajaría el recall por su cuenta y el diagnóstico apuntaría
+al índice, que es donde no estaría el problema.
+
+**Al modelo no se le enseña la referencia, solo el texto.** El texto ya abre con «Artículo 108.
+Obligación de advertir las maniobras», así que la ref no añadía nada — y sí añadía un segundo
+número junto al del candidato, que es lo que hizo que en `gs-0199` contestara `108,75,24`.
 """
 
 from __future__ import annotations
@@ -34,16 +39,23 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = [
     "CARACTERES_POR_CANDIDATO",
+    "PEDIDOS",
     "PROMPT_VERSION",
     "CacheJuicios",
     "ReordenadorLLM",
     "clave_de",
-    "ordenar_por_numeros",
+    "etiquetas",
+    "ordenar_por_etiquetas",
 ]
 
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2
 """Sube cuando cambie `_PLANTILLA`. Forma parte de la clave de caché: un juicio emitido con
-otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería mentir sobre qué se midió."""
+otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería mentir sobre qué se midió.
+
+`2` (2026-08-17): etiquetas de dos letras en vez de números, y se piden exactamente `PEDIDOS`
+en vez de una ordenación completa. Los dos cambios salen de leer lo que el modelo contestaba,
+no de tunear — el detalle está abajo.
+"""
 
 # Cuánto texto de cada artículo se le enseña al modelo. No es una constante caprichosa: con
 # 30 candidatos completos el prompt pasa de 5.000 tokens y la llamada deja de caber en el
@@ -51,33 +63,70 @@ otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería mentir sobre
 # son lo que decide si un artículo tipifica la conducta; el resto son excepciones y remisiones.
 CARACTERES_POR_CANDIDATO = 500
 
-_NUMERO = re.compile(r"\d+")
+PEDIDOS = 5
+"""Cuántos se le piden. **Son los mismos 5 de la cita cerrada**: es la decisión que hace falta.
+
+Pedir la ordenación entera parecía más general y era peor. El modelo nombraba **2, 3 o 4** de
+los 30 y paraba —medido el 2026-08-17 sobre los fallos— así que el top-5 acababa siendo una
+mezcla: los pocos que el modelo eligió, y detrás los primeros de la fusión que él no había
+mirado. Esa mezcla **expulsa** aciertos que la fusión ya tenía dentro: `gs-0002` estaba en el
+puesto 4 y salió en el 6; `gs-0239` estaba en el 3 y salió en el 7.
+
+Pidiendo cinco, el top-5 es exactamente lo que el modelo decidió. Si se equivoca, se equivoca
+él y se mide; antes se perdía por una discrepancia entre lo que el prompt pedía y lo que el
+código daba por hecho.
+"""
+
+_ETIQUETA = re.compile(r"\b[A-Z]{2}\b")
+
+_ALFABETO = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+
+def etiquetas(cuantas: int) -> list[str]:
+    """`AA, AB, … AZ, BA, …` — tantas como candidatos haya.
+
+    **Dos letras y no números, y no es cosmética.** El texto de cada candidato empieza por
+    «Artículo 108.», así que un candidato numerado `[3]` le ofrece al modelo dos números
+    distintos y ninguna forma de saber cuál se le pide. Contestó lo que tenía que contestar:
+    en `gs-0199` respondió `108,75,24` — el número del **artículo**, no el del candidato. El
+    parseo descartó 108 y 75 por fuera de rango y se quedó con un 24 que no significaba nada.
+
+    Instruir «usa el número entre corchetes» habría sido pedirle que se porte bien. Con letras
+    la confusión es **inexpresable**, que es la misma idea que la cita cerrada.
+    """
+    if cuantas > len(_ALFABETO) ** 2:
+        raise ValueError(f"{cuantas} candidatos no caben en etiquetas de dos letras")
+    return [_ALFABETO[i // 26] + _ALFABETO[i % 26] for i in range(cuantas)]
+
 
 _PLANTILLA = """Pregunta: {pregunta}
 
 Artículos candidatos:
 {bloques}
 
-Ordena los números del artículo MÁS relevante al menos relevante.
+De los candidatos anteriores, elige los {pedidos} MÁS relevantes, del más al menos relevante.
 
 Relevante significa: el artículo que TIPIFICA la conducta por la que se pregunta, no el que
 solo la menciona de pasada ni el que regula algo parecido.
 
-Responde ÚNICAMENTE con los números separados por comas. Sin explicación.
+Responde ÚNICAMENTE con {pedidos} etiquetas separadas por comas, así: {ejemplo}
+Nada más: ni el número del artículo, ni explicación.
 """
 
 
-def ordenar_por_numeros(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
-    """`"3, 1, 7"` → los candidatos en ese orden, y detrás los que el modelo no nombró.
+def ordenar_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
+    """`"AC, AA, AG"` → los candidatos en ese orden, y detrás los que el modelo no nombró.
 
-    Defensivo a propósito: los números fuera de rango se ignoran y los repetidos cuentan una
+    Defensivo a propósito: las etiquetas fuera de rango se ignoran y las repetidas cuentan una
     vez. Lo que **nunca** ocurre es perder un candidato — el recall del sistema no puede
-    depender de que el modelo se acuerde de listarlos todos.
+    depender de que el modelo se acuerde de listarlos todos, y `recall@30` se mide sobre esta
+    misma lista.
     """
+    indice = {e: i for i, e in enumerate(etiquetas(len(candidatos)))}
     elegidos: list[int] = []
-    for crudo in _NUMERO.findall(respuesta):
-        i = int(crudo) - 1
-        if 0 <= i < len(candidatos) and i not in elegidos:
+    for cruda in _ETIQUETA.findall(respuesta):
+        i = indice.get(cruda)
+        if i is not None and i not in elegidos:
             elegidos.append(i)
     elegidos.extend(i for i in range(len(candidatos)) if i not in elegidos)
     return [candidatos[i] for i in elegidos]
@@ -165,14 +214,21 @@ class ReordenadorLLM:
             ordenada += [r for r in cabeza if r not in ordenada]
             return ordenada + cola
 
+        marcas = etiquetas(len(cabeza))
         bloques = "\n\n".join(
-            f"[{i}] {r.ref}\n{r.content[:CARACTERES_POR_CANDIDATO]}"
-            for i, r in enumerate(cabeza, start=1)
+            f"[{e}] {r.content[:CARACTERES_POR_CANDIDATO]}"
+            for e, r in zip(marcas, cabeza, strict=True)
         )
         respuesta = self._generador.completar(
-            _PLANTILLA.format(pregunta=pregunta, bloques=bloques), max_tokens=96
+            _PLANTILLA.format(
+                pregunta=pregunta,
+                bloques=bloques,
+                pedidos=PEDIDOS,
+                ejemplo=", ".join(marcas[:PEDIDOS]),
+            ),
+            max_tokens=48,
         )
-        ordenada = ordenar_por_numeros(respuesta.texto, cabeza)
+        ordenada = ordenar_por_etiquetas(respuesta.texto, cabeza)
         if self._cache is not None:
             self._cache.guardar(clave, [str(r.ref) for r in ordenada])
         return ordenada + cola

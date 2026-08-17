@@ -1394,3 +1394,161 @@ Umbrales: 0,90 y 0,97. Faltan **12 casos** en el primero y **uno** en el segundo
 
 Medir si el hueco de `G-RECALL5` es el tamaño del modelo o cuánto texto ve, sobre los 52 casos
 rescatables. Y si ninguna configuración llega, decirlo tal cual en vez de seguir buscando.
+
+---
+
+## 2026-08-17 (cont.) · fase 2 · tres mentiras sin síntoma, y el modelo de embeddings que ya estaba ratificado
+
+Iba a probar `Qwen3-Embedding-0.6B` —el modelo **principal** de `docs/STACK.md`, que la fase 0
+nunca llegó a usar porque `bge-m3` ya estaba descargado— y el reindexado destapó tres defectos
+que llevaban ahí desde entonces. Los tres comparten la misma forma: **no producen error**.
+
+### 1 · La fila que decía ser de otro índice
+
+`chunk_id` es función pura de (documento, contenido, ocurrencia) y **no depende del modelo de
+embedding**. Reindexar el mismo corpus con otro modelo de la misma dimensión cae por tanto en el
+`ON CONFLICT` y sustituye los vectores en sitio. El `SET` no tocaba `index_version`: la fila se
+quedaba con los vectores de un modelo y el nombre de otro.
+
+Comprobado midiendo la distancia euclídea del vector guardado contra lo que produce cada modelo
+para el mismo texto:
+
+| modelo | distancia al vector guardado |
+|---|---:|
+| `qwen3-embedding:0.6b` | **0,000000** |
+| `bge-m3` | 1,420182 |
+
+Los vectores eran los nuevos; la columna decía lo contrario.
+
+**Consecuencia que se declara en vez de disimularse:** a igual dimensión el reindexado es
+**destructivo en sitio**, así que la conmutación sin parar el servicio de ADR-018 solo vale entre
+dimensiones distintas, que son las que viven en tablas distintas. Con dos modelos de 1024 no hay
+dos índices a la vez.
+
+### 2 · El informe que no decía qué había medido
+
+El contrato compartido lo pone en mayúsculas (`chunks-ddl.sql`, sección final): todo informe de
+eval registra el **destino físico resuelto**, nunca el alias. `evals/reports/retrieval-latest.json`
+no llevaba ni `index_version` ni `physical_table`. Con el alias solo, dos corridas sobre datos
+distintos producen informes idénticos y `G-EVAL-DET` deja de medir nada.
+
+De paso: `sin_reranker: true` estaba **fijo en el código** y mentía en cuanto el reordenador
+corría de verdad.
+
+### 3 · El que no tiene síntoma en absoluto
+
+Los vectores del índice y el de la consulta viven en el mismo espacio o no significan nada, y
+nada lo comprobaba. Si no coinciden: las dimensiones son iguales, `<=>` calcula, la búsqueda
+devuelve sus 30 filas y **todas están mal**. Ni excepción ni aviso — solo un recall peor sin
+causa aparente, que es justo el tipo de número que se acaba atribuyendo al troceado o al modelo.
+
+Estuvo a un `make eval-retrieval` de pasar: la base quedó con `qwen3-embedding:0.6b` y
+`CITEBOUND_EMBEDDING_MODEL` sigue por defecto en `bge-m3`; el target del Makefile no pasa la
+variable.
+
+**La regla que lo hace imposible en vez de detectable:** *el índice es el dato y la consulta lo
+obedece.* Quien elige modelo es la ingesta, que es la que construye el índice; a partir de ahí el
+nombre viaja en `index_version` y `embedder_del_indice` lo lee de la base. Cambian los tres
+caminos de consulta —evaluador, CLI y API— y `embedder_por_defecto` se queda donde le toca.
+
+### 4 · `G-COV-LINE` llevaba en rojo perpetuo por fontanería
+
+La condición 5 del gate calcula la cobertura filtrada a `[tool.gate].testable` y la enseña en
+verde, pero la escribe en `.coverage-gate.json`; la condición 7 buscaba
+`coverage.json :: totals.percent_covered` y no encontraba nada. Misma familia que
+`G-GOLDEN-VALID` y `G-COV-FUNC` en la fase 1: la meta no fallaba, **no se podía leer**.
+
+Y no bastaba con apuntar al fichero de coverage: su `totals` mide `src/citebound` entero,
+`api/`, `db/` y `providers/` incluidos, que están excluidos a propósito. El paréntesis del
+artefacto —«filtrado a `[tool.gate].testable`»— es la instrucción, no un adorno.
+
+**Números medidos** (216 casos positivos de `v2`, sin reordenador, en 4,0 s):
+
+| índice | recall@5 | recall@30 |
+|---|---:|---:|
+| `v1-bge-m3-1024` | 0,727 | 0,954 |
+| `v1-qwen3-embedding-0.6b-1024` | 0,727 | **0,977** |
+
+**`G-RECALL30` cierra**: 0,977 contra un umbral de 0,97. Y el techo del reordenador sube, porque
+ahora ve el artículo correcto en 211 de 216 casos en vez de en 206.
+
+### 5 · Y entonces leí lo que el reordenador contestaba de verdad
+
+Con `G-RECALL30` cerrada, el hueco era `G-RECALL5`: 0,856 contra 0,90. Antes de tocar un
+hiperparámetro más, el diagnóstico caso a caso — dónde está el artículo correcto en la lista:
+
+| | casos | |
+|---|---:|---:|
+| puestos 1-5 | 185 | 0,856 |
+| puestos 6-30 | 26 | 0,120 |
+| ni entre los 30 | 5 | 0,023 |
+
+**26 de los 31 fallos los tenía delante y no los subió.** Así que fui a mirar qué contestaba,
+literalmente, en ocho de ellos. Dos cosas, y ninguna es de ajuste fino:
+
+**a) No ordenaba 30. Nombraba dos, tres o cuatro y paraba.**
+
+```
+gs-0024   respuesta cruda: '6,8'        → 2 de 30 candidatos
+gs-0017   respuesta cruda: '14,11'      → 2 de 30
+gs-0002   respuesta cruda: '3,8,29'     → 3 de 30
+gs-0239   respuesta cruda: '5,9,13,23,46' → 4 de 30
+```
+
+El prompt pedía la ordenación completa y el código daba por hecho que la recibía: los no
+nombrados se añaden detrás **en su orden de fusión**. Con tres nombrados, el top-5 acababa
+siendo una mezcla — tres elegidos por el modelo y dos que él nunca miró — y esa mezcla
+**expulsa** aciertos que la fusión ya tenía dentro. `gs-0002` estaba en el puesto 4 y salió en
+el 6. `gs-0239` estaba en el 3 y salió en el 7. El reordenador estaba **perdiendo** casos.
+
+**b) El número del candidato y el número del artículo son el mismo tipo de cosa.**
+
+```
+gs-0199   respuesta cruda: '108,75,24'
+```
+
+`108` es el **artículo**, no el candidato. El texto de cada bloque abre con «Artículo 108.
+Obligación de advertir las maniobras», así que un candidato etiquetado `[3]` le ofrecía al
+modelo dos números y ninguna forma de saber cuál se le pedía. El parseo tiró 108 y 75 por fuera
+de rango y se quedó con un 24 que no significaba nada: ruido con pinta de decisión.
+
+**Los dos arreglos, y por qué son estructurales y no instrucciones.**
+
+- Se piden **exactamente cinco**, que son los mismos cinco de la cita cerrada. El top-5 pasa a
+  ser lo que el modelo decidió, y si se equivoca se le mide a él.
+- Etiquetas de **dos letras** (`AA…BD`) en vez de números. Instruir «usa el número entre
+  corchetes» habría sido pedirle que se porte bien; con letras la confusión **no se puede
+  escribir**. Es la misma idea que la cita cerrada, aplicada un piso más abajo.
+- Al modelo ya no se le enseña la `LegalRef`: el texto abre con su propio encabezado, así que
+  no añadía nada y sí añadía el número que causaba el choque.
+
+Efecto sobre los ocho casos que fui a mirar, todos ellos fallos antes:
+
+| caso | puesto en fusión | antes | ahora |
+|---|---:|---:|---:|
+| `gs-0239` | 3 | 7 | **1** |
+| `gs-0130` | 26 | 27 | **2** |
+| `gs-0188` | 11 | 12 | **2** |
+| `gs-0199` | 11 | 12 | **2** |
+| `gs-0017` | 16 | 16 | **3** |
+| `gs-0024` | 28 | 28 | **5** |
+| `gs-0018` | 20 | 21 | 20 |
+| `gs-0002` | 4 | 6 | fuera |
+
+`PROMPT_VERSION` sube a 2 y la caché de juicios se vacía: un juicio emitido con otro prompt es
+un juicio sobre otra pregunta, y reutilizarlo sería mentir sobre qué se midió.
+
+### Experimentos con resultado negativo, anotados para no repetirlos
+
+| Qué se probó | Resultado |
+|---|---|
+| Reordenador con `tope=10` | Techo 0,785. El 17 % de los casos tenía el artículo en los puestos 11-30 y **ni los miraba** |
+| Modelo de 9B en vez de 4B | Peor: rescata el 56 % contra el 63 %, y tarda el doble |
+| 1.200 caracteres por candidato en vez de 500 | Peor: 62 % contra 63 %, y el doble de tiempo |
+| RRF entre el orden de fusión y el del reordenador | 0,782 · peor que el reordenador solo |
+| Formato de instrucción de `Qwen3-Embedding` en la consulta, en inglés | 0,722 / 0,963 · peor que sin él |
+| El mismo, en castellano | 0,708 / 0,963 · peor todavía |
+
+Los dos últimos merecen una nota: el formato `Instruct: {tarea}\nQuery: {consulta}` es el que
+documenta el modelo, y aun así **empeora** aquí en las dos lenguas. Se midió, no se supuso, y se
+quitó.

@@ -17,10 +17,12 @@ from pathlib import Path
 
 from citebound.domain.legalref import parse
 from citebound.retrieval.rerank import (
+    PEDIDOS,
     PROMPT_VERSION,
     CacheJuicios,
     clave_de,
-    ordenar_por_numeros,
+    etiquetas,
+    ordenar_por_etiquetas,
 )
 from citebound.retrieval.vector import Recuperado
 
@@ -46,7 +48,7 @@ CANDIDATOS = [cand("82"), cand("85"), cand("87")]
 
 
 def test_el_orden_que_dice_el_modelo_es_el_que_se_aplica() -> None:
-    assert [str(r.ref) for r in ordenar_por_numeros("3, 1, 2", CANDIDATOS)] == [
+    assert [str(r.ref) for r in ordenar_por_etiquetas("AC, AA, AB", CANDIDATOS)] == [
         f"{NORMA}#art87",
         f"{NORMA}#art82",
         f"{NORMA}#art85",
@@ -57,37 +59,61 @@ def test_un_candidato_que_el_modelo_no_nombra_no_se_pierde() -> None:
     """**Lo que más importa de este módulo.** Si el reordenador perdiera documentos, el recall
     bajaría por su culpa y el diagnóstico apuntaría al índice o al troceado, que es donde no
     está el problema. Los que no nombra van detrás, en su orden original."""
-    ordenados = ordenar_por_numeros("2", CANDIDATOS)
+    ordenados = ordenar_por_etiquetas("AB", CANDIDATOS)
     assert len(ordenados) == 3
     assert [str(r.ref) for r in ordenados] == [f"{NORMA}#art85", f"{NORMA}#art82", f"{NORMA}#art87"]
 
 
-def test_un_numero_fuera_de_rango_se_ignora() -> None:
-    """El modelo puede escribir `[7]` con tres candidatos. Eso no puede reventar ni desplazar
+def test_una_etiqueta_fuera_de_rango_se_ignora() -> None:
+    """El modelo puede escribir `ZZ` con tres candidatos. Eso no puede reventar ni desplazar
     nada: se descarta y ya."""
-    assert len(ordenar_por_numeros("7, 99, 2", CANDIDATOS)) == 3
-    assert str(ordenar_por_numeros("7, 99, 2", CANDIDATOS)[0].ref) == f"{NORMA}#art85"
+    assert len(ordenar_por_etiquetas("ZZ, QQ, AB", CANDIDATOS)) == 3
+    assert str(ordenar_por_etiquetas("ZZ, QQ, AB", CANDIDATOS)[0].ref) == f"{NORMA}#art85"
 
 
-def test_un_numero_repetido_cuenta_una_vez() -> None:
-    assert len(ordenar_por_numeros("1, 1, 1", CANDIDATOS)) == 3
+def test_una_etiqueta_repetida_cuenta_una_vez() -> None:
+    assert len(ordenar_por_etiquetas("AA, AA, AA", CANDIDATOS)) == 3
 
 
 def test_una_respuesta_sin_numeros_deja_el_orden_como_estaba() -> None:
     """Si el modelo contesta «no lo sé», el orden de la fusión es mejor que ninguno."""
-    assert ordenar_por_numeros("no estoy seguro", CANDIDATOS) == CANDIDATOS
+    assert ordenar_por_etiquetas("no estoy seguro", CANDIDATOS) == CANDIDATOS
 
 
 def test_una_respuesta_vacia_deja_el_orden_como_estaba() -> None:
-    assert ordenar_por_numeros("", CANDIDATOS) == CANDIDATOS
+    assert ordenar_por_etiquetas("", CANDIDATOS) == CANDIDATOS
 
 
-def test_los_numeros_se_leen_aunque_vengan_con_texto_alrededor() -> None:
-    """Aunque el prompt pida solo números, un modelo instruido se explica igual. Cazar los
-    números donde estén es más barato que pelearse con el prompt."""
-    assert str(ordenar_por_numeros("El más relevante es el 3, luego el 1.", CANDIDATOS)[0].ref) == (
+def test_las_etiquetas_se_leen_aunque_vengan_con_texto_alrededor() -> None:
+    """Aunque el prompt pida solo etiquetas, un modelo instruido se explica igual. Cazarlas
+    donde estén es más barato que pelearse con el prompt."""
+    assert str(ordenar_por_etiquetas("El más relevante es AC, luego AA.", CANDIDATOS)[0].ref) == (
         f"{NORMA}#art87"
     )
+
+
+def test_un_numero_de_articulo_en_la_respuesta_ya_no_puede_confundirse_con_un_candidato() -> None:
+    """**El fallo que obligó a cambiar de números a letras** (2026-08-17).
+
+    Con candidatos numerados, `gs-0199` recibió del modelo `108,75,24`: el número del
+    **artículo**, no el del candidato. El parseo tiró 108 y 75 por fuera de rango y se quedó
+    con un 24 que no significaba nada, así que el reordenado fue ruido con pinta de decisión.
+
+    Con etiquetas de dos letras la confusión no se detecta: **no se puede escribir.**
+    """
+    assert ordenar_por_etiquetas("108, 75, 24", CANDIDATOS) == CANDIDATOS
+
+
+def test_las_etiquetas_son_estables_y_del_tamano_pedido() -> None:
+    assert etiquetas(3) == ["AA", "AB", "AC"]
+    assert etiquetas(30)[-1] == "BD"
+    assert len(set(etiquetas(30))) == 30
+
+
+def test_se_piden_los_mismos_cinco_de_la_cita_cerrada() -> None:
+    """Si `PEDIDOS` y el `n` de `[[REF:n]]` se separaran, el reordenador estaría decidiendo
+    sobre un conjunto distinto del que verá el generador."""
+    assert PEDIDOS == 5
 
 
 # --------------------------------------------------------------------------------------

@@ -56,5 +56,15 @@ del golden set, y así se declara.
 --------------------------------------------------------------------------------
 
 Se ejecutan en local y no se redistribuyen. Todos Apache-2.0:
-Qwen3.5 (generador) · Gemma 4 (juez) · BGE-M3 (embeddings) ·
-Qwen3-Reranker-0.6B (reordenador).
+
+  Qwen3-Embedding-0.6B  embeddings      1024 dimensiones
+  Qwen3.5-4B            generador       y tambien reordenador (ver abajo)
+  Gemma 4 12B           juez            fase 4
+
+No hay un modelo reordenador aparte. El reordenador ES el generador, por
+/v1/chat/completions: un solo transporte para todos los modelos del proyecto
+(decision de Samuel en Q-017, 2026-08-17; motivos y alternativas descartadas en
+docs/adr/022-reordenador-por-el-mismo-transporte.md).
+
+BAAI/bge-m3 (MIT) se uso durante las fases 0 y 1 y quedo descartado por medida:
+recall@30 de 0,954 frente a 0,977 sobre los mismos 216 casos.

@@ -35,10 +35,12 @@ from citebound.domain.legalref import LegalRef
 from citebound.ingest.boe_xml import Precepto
 
 __all__ = [
+    "CHUNKER_APARTADO_ID",
     "CHUNKER_ID",
     "Chunk",
     "ChunkingError",
     "chunk_id_de",
+    "chunk_por_apartado",
     "chunk_preceptos",
     "content_hash_de",
     "doc_id_de",
@@ -46,6 +48,7 @@ __all__ = [
 ]
 
 CHUNKER_ID = "articulo-v1"
+CHUNKER_APARTADO_ID = "apartado-v1"
 
 _ESPACIOS = re.compile(r"\s+")
 
@@ -169,3 +172,8 @@ def _contenido(precepto: Precepto) -> str:
         f"{a.numero}. {a.texto}" if a.numero is not None else a.texto for a in precepto.apartados
     )
     return f"{precepto.rotulo}. {precepto.rubrica}\n{cuerpo}"
+
+
+def chunk_por_apartado(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Sin implementar todavía: el rojo se compromete antes que el verde."""
+    return ()

@@ -33,6 +33,8 @@ import pytest
 from citebound.domain.legalref import LegalRef
 from citebound.ingest.boe_xml import Apartado, Precepto, PreceptoTipo
 from citebound.ingest.chunking import (
+    CHUNKER_APARTADO_ID,
+    chunk_por_apartado,
     CHUNKER_ID,
     Chunk,
     ChunkingError,
@@ -295,3 +297,102 @@ def test_a_chunk_is_immutable_and_hashable() -> None:
     assert len({chunk, chunk}) == 1
     with pytest.raises((AttributeError, TypeError)):
         chunk.ordinal = 99  # type: ignore[misc]
+
+
+# ======================================================================================
+# `apartado-v1` · el troceado fino, que es la palanca que no se había tocado
+# ======================================================================================
+#
+# Con `articulo-v1` un artículo entero es UN embedding para varios temas, y los fallos
+# medidos el 2026-08-17 eran justamente confusiones dentro de un grupo — los artículos 74,
+# 108, 109 y 110 hablan todos de señalizar maniobras. Un apartado dice una cosa.
+#
+# Lo que estos tests sujetan no es que el recall suba —eso lo dice `make eval-retrieval`,
+# no un test— sino que trocear más fino **no invente ni pierda** una sola referencia.
+
+
+def test_un_articulo_numerado_da_un_chunk_por_apartado() -> None:
+    chunks = chunk_por_apartado([ART3], source_uri=URI)
+    assert [str(c.ref) for c in chunks] == [f"{NORMA}#art3.1", f"{NORMA}#art3.2"]
+
+
+def test_un_articulo_sin_numerar_sigue_siendo_un_solo_chunk_sin_apartado() -> None:
+    """**El invariante que no se negocia.** `numero is None` significa que el artículo no
+    numera sus párrafos; inventar un `1` acuñaría `art34.1`, una referencia que no existe.
+    Es exactamente la alucinación que `G-HALLUC` está construido para hacer imposible, y
+    trocear más fino no puede abrir esa puerta por la puerta de atrás."""
+    chunks = chunk_por_apartado([ART34], source_uri=URI)
+    assert len(chunks) == 1
+    assert str(chunks[0].ref) == f"{NORMA}#art34"
+    assert chunks[0].ref.apartado is None
+
+
+def test_cada_chunk_lleva_su_encabezado_de_articulo() -> None:
+    """Un apartado suelto es una frase huérfana: «2. Las conductas graves.» no se distingue
+    de las otras cincuenta del corpus que también empiezan por «2.». El encabezado es lo
+    que le da al embedding de qué agarrarse, y es el mismo motivo por el que `articulo-v1`
+    ya lo ponía."""
+    for chunk in chunk_por_apartado([ART3], source_uri=URI):
+        assert chunk.content.startswith("Artículo 3. Rúbrica.")
+
+
+def test_el_texto_de_cada_apartado_esta_literal_en_su_chunk() -> None:
+    """Precondición de `G-QUOTE-LIT`: si el troceado alterara el texto, una cita verificada
+    contra el chunk dejaría de corresponder con el BOE."""
+    chunks = chunk_por_apartado([ART3], source_uri=URI)
+    assert "Se deberá conducir con diligencia." in chunks[0].content
+    assert "Las conductas graves." in chunks[1].content
+
+
+def test_no_se_pierde_ni_un_apartado() -> None:
+    """Trocear fino puede perder material en silencio, y el síntoma sería un recall peor
+    sin causa aparente — que es la familia de fallo de toda esta fase."""
+    juntos = " ".join(c.content for c in chunk_por_apartado([ART3, ART34], source_uri=URI))
+    for precepto in (ART3, ART34):
+        for apartado in precepto.apartados:
+            assert apartado.texto in juntos
+
+
+def test_dos_apartados_de_articulos_distintos_no_colisionan_aunque_digan_lo_mismo() -> None:
+    """El `chunk_id` es función del contenido, y el encabezado es lo que hace que el
+    contenido difiera. Sin él, «Se prohíbe.» en dos artículos sería el MISMO chunk y uno de
+    los dos artículos desaparecería del índice."""
+    a = _precepto("10", ("1", "Se prohíbe."))
+    b = _precepto("20", ("1", "Se prohíbe."))
+    chunks = chunk_por_apartado([a, b], source_uri=URI)
+    assert len({c.chunk_id for c in chunks}) == 2
+    assert {str(c.ref) for c in chunks} == {f"{NORMA}#art10.1", f"{NORMA}#art20.1"}
+
+
+def test_los_derogados_siguen_fuera() -> None:
+    derogado = _precepto("51", ("1", "Texto derogado."))
+    object.__setattr__(derogado, "vigente", False)
+    assert chunk_por_apartado([derogado], source_uri=URI) == ()
+
+
+def test_declara_su_propio_chunker_id() -> None:
+    """Dos troceados distintos con el mismo `chunker_id` producirían dos índices que se
+    dicen iguales, y `index_version` dejaría de identificar sobre qué se midió."""
+    assert CHUNKER_APARTADO_ID == "apartado-v1"
+    assert CHUNKER_APARTADO_ID != CHUNKER_ID
+    for chunk in chunk_por_apartado([ART3], source_uri=URI):
+        assert chunk.chunker_id == CHUNKER_APARTADO_ID
+
+
+def test_el_ordinal_es_consecutivo_y_sin_huecos() -> None:
+    """El contrato pone `UNIQUE (index_version, doc_id, ordinal)`: un hueco o un repetido
+    revienta la ingesta, y hacerlo al insertar la fila 400 es el peor momento."""
+    chunks = chunk_por_apartado([ART3, ART34], source_uri=URI)
+    assert [c.ordinal for c in chunks] == list(range(len(chunks)))
+
+
+def test_trocear_dos_veces_da_los_mismos_identificadores() -> None:
+    """Invariante A del contrato, igual que en `articulo-v1`: sin esto, reingerir duplica."""
+    primera = chunk_por_apartado([ART3, ART34], source_uri=URI)
+    segunda = chunk_por_apartado([ART3, ART34], source_uri=URI)
+    assert [c.chunk_id for c in primera] == [c.chunk_id for c in segunda]
+
+
+def test_una_source_uri_vacia_se_rechaza_igual_que_en_articulo_v1() -> None:
+    with pytest.raises(ChunkingError):
+        chunk_por_apartado([ART3], source_uri="  ")

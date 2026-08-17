@@ -210,6 +210,11 @@ source_paths = [
   # donde Samuel decide que ante dos reglas contradictorias manda la mas estricta.
   "src/citebound/evals/scoring.py",
   "src/citebound/evals/bootstrap.py",
+  # Entra al construirse en la fase 2. Estaba en [tool.gate].tdd_obligatorio de RULES §4
+  # desde el primer dia y fuera de aqui: la MISMA divergencia silenciosa que ya arreglaron
+  # las dos lineas de arriba, por tercera vez. El fichero existe, la regla lo nombra, y
+  # G-MUT medía sobre cinco de los seis que le tocan sin que nada lo dijera.
+  "src/citebound/retrieval/fusion.py",
 ]
 # mutmut copia el arbol a `mutants/` y solo lleva lo que le digas: sin esto, los
 # tests de contrato no encuentran `citebound.api` y falla al recolectar.

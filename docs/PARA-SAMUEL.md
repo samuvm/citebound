@@ -1030,3 +1030,65 @@ dispuesto a esperar quien pregunta.
 
 **Estado: PENDIENTE**
 `>> `
+
+### Q-020 · fase 2 · el hueco de `G-RECALL5` ya no es de ingeniería · reabrir Q-017 con la evidencia nueva
+
+**Qué necesito:** decidir qué se hace con `G-RECALL5`, **sabiendo que el trade-off que se te
+presentó en Q-017 ya no es el que hay.**
+
+**Por qué.** En Q-017 elegiste **B** —el reordenador es el generador, un solo transporte— frente
+a **A**, un cross-encoder en proceso. La comparación que tenías entonces decía que A era «más
+preciso y más rápido» pero costaba un segundo camino de servir modelos. Lo que se ha medido
+desde entonces cambia las dos columnas:
+
+| | lo que se dijo en Q-017 | lo que está medido hoy |
+|---|---|---|
+| Coste de B | «más lento, hay que medirlo» | **4.600 ms** contra un presupuesto de **400 ms** (`RULES` §2.1) |
+| Calidad de B | «hay que medirla, no está dada» | `G-RECALL5` **0,852** contra un umbral de 0,90 |
+| Qué queda por probar | mucho | **nada barato**: quince experimentos, nueve negativos |
+
+Y el techo no es el problema: con 80 candidatos por canal el artículo correcto aparece en **216
+de 216** casos. El corpus lo tiene y la búsqueda lo encuentra siempre. **Todo el hueco es de
+ordenación**, y el reordenador elegido no llega ni en tiempo ni en calidad.
+
+**Lo que se probó y no bastó**, cada cosa con su número en `docs/JOURNAL.md`: subir el tope del
+reordenador de 10 a 30 (esto **sí** funcionó, +8 puntos), cambiar el modelo de embeddings al
+principal del `STACK.md`, tres troceados distintos del corpus, ponderar la fusión, pedir más
+candidatos por canal, dos formatos de prompt, el reordenado por ventanas, y el formato de
+instrucción que documenta `Qwen3-Embedding`.
+
+**El hallazgo que lo explica:** con trozos afilados —troceado por apartado— el reordenador
+aporta **un** caso; con trozos gruesos aporta **veintiséis**. Su trabajo real es tapar el ruido
+del embedding, no juzgar mejor que él. Un modelo generalista de 4B no distingue entre el
+artículo 74, el 108, el 109 y el 110, que es exactamente lo que hay que distinguir aquí.
+
+**Opciones:**
+
+- **A · reabrir Q-017 y adoptar el cross-encoder** (`Qwen3-Reranker-0.6B`). *Pros:* está
+  **entrenado para ordenar**, y es la única opción que arregla **las dos** cosas a la vez — cabe
+  en los 400 ms de `RULES` §2.1 y devuelve el reordenador al camino interactivo, que es lo que
+  Q-019 acaba de descartar. *Contras:* rompe tu regla del transporte único, ~2 GB de
+  dependencias y una descarga más en el arranque en frío. Y hay que medirlo: puede no llegar a
+  0,90 tampoco, y entonces habríamos pagado eso por nada.
+- **B · aceptar 0,852 y proponer bajar el umbral.** `GOALS.yaml` lo admite
+  (`propuesta_admisible: true`) y la condición que `CLAUDE.md` pone —diagnosticar la causa real
+  antes de tocar un número— **está cumplida y escrita**. *Pros:* la fase 2 cierra hoy con lo que
+  hay. *Contras:* es bajar la vara, y aunque esté justificado conviene decirlo con esas
+  palabras en el README y en el CHANGELOG.
+- **C · dejar `G-RECALL5` roja y seguir a la fase 3.** *Pros:* el agente se puede construir; el
+  recuperador funciona (211 de 216 entre los 30). *Contras:* la fase 2 no cierra, y se construye
+  sobre un recuperador que sabemos que no llega. `PLAN.md` no lo prohíbe pero tampoco lo prevé.
+
+`[ ] A   [ ] B   [ ] C`
+
+**Si dices que no a todo:** me quedo en **C** y lo declaro así, porque es lo único que no
+requiere ni una decisión tuya ni tocar un umbral.
+
+**Recomendación:** **A**, y solo por una razón: es la única que además arregla `G-TTFT`. Si su
+medida tampoco llega a 0,90, entonces **B** con el diagnóstico completo delante — que para eso
+se ha hecho.
+
+**Tiempo tuyo:** 10 minutos. Si eliges A, la medición la hago yo: unas dos horas de máquina.
+
+**Estado: PENDIENTE**
+`>> `

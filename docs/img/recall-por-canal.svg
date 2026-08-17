@@ -26,8 +26,8 @@
 <line x1="753.2" y1="194" x2="753.2" y2="216" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
 <text x="196" y="262" font-size="13" fill="#2b2a26" text-anchor="end">Híbrido + reordenador</text>
 <rect x="210" y="236" width="560" height="18" rx="3" fill="#eeece6"/>
-<rect x="210" y="236" width="474.4" height="18" rx="3" fill="#5b7a9a"/>
-<text x="782" y="250" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,847</text>
+<rect x="210" y="236" width="477.0" height="18" rx="3" fill="#5b7a9a"/>
+<text x="782" y="250" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,852</text>
 <text x="218" y="250" font-size="11" fill="#fff">@5</text>
 <line x1="714.0" y1="234" x2="714.0" y2="256" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
 <rect x="210" y="270" width="560" height="18" rx="3" fill="#eeece6"/>

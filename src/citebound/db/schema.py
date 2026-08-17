@@ -27,6 +27,7 @@ __all__ = [
     "esquema_sql",
     "registrar_index_version",
     "upsert_chunks",
+    "vaciar_otras_versiones",
 ]
 
 CONTRATO_VERSION = 2
@@ -205,3 +206,19 @@ def _metadata(chunk: Chunk) -> str:
         ensure_ascii=False,
         sort_keys=True,
     )
+
+
+def vaciar_otras_versiones(cur: _Cursor, *, index_id: str) -> int:
+    """Deja en la tabla **una sola** versión de índice: la que se está escribiendo.
+
+    ADR-023. Con un troceador distinto los `chunk_id` son otros, así que el `ON CONFLICT`
+    no toca las filas viejas y se quedarían ahí. `chunks_active` **no filtra por versión**
+    —es la tabla entera— de modo que la búsqueda serviría los dos índices mezclados: el
+    doble de candidatos, la mitad de otro troceado, y un recall raro sin causa aparente.
+
+    A igual dimensión no hay conmutación sin parar el servicio, y eso ya se declaró en
+    ADR-023 en vez de disimularlo. Esto es la otra mitad de esa decisión: si solo puede
+    haber un índice a la vez, el que sobra se va.
+    """
+    cur.execute("DELETE FROM chunk_v1 WHERE index_version <> %s", (index_id,))
+    return int(getattr(cur, "rowcount", 0) or 0)

@@ -1020,7 +1020,7 @@ caché de juicios —por eso se puede quedar en el gate— pero la frase ya no d
   presupuesto renegociable a ~5 s. *Contras:* dos configuraciones que medir y mantener, y
   `G-RECALL5` tendría que publicar **las dos**, que es lo honesto pero es más trabajo.
 
-`[ ] A   [ ] B   [ ] C`
+`[x] A   [ ] B   [ ] C`
 
 **Si dices que no a todo:** me quedo con **A** al empezar la fase 3, porque es lo único que no
 rompe una meta ya ratificada, y lo declaro así en el README y en el CHANGELOG.

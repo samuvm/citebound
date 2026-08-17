@@ -34,11 +34,11 @@ from citebound.domain.legalref import LegalRef
 from citebound.ingest.boe_xml import Apartado, Precepto, PreceptoTipo
 from citebound.ingest.chunking import (
     CHUNKER_APARTADO_ID,
-    chunk_por_apartado,
     CHUNKER_ID,
     Chunk,
     ChunkingError,
     chunk_id_de,
+    chunk_por_apartado,
     chunk_preceptos,
     content_hash_de,
     doc_id_de,

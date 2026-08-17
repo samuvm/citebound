@@ -29,7 +29,7 @@ import hashlib
 import re
 import unicodedata
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from citebound.domain.legalref import LegalRef
 from citebound.ingest.boe_xml import Precepto
@@ -175,5 +175,72 @@ def _contenido(precepto: Precepto) -> str:
 
 
 def chunk_por_apartado(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
-    """Sin implementar todavía: el rojo se compromete antes que el verde."""
-    return ()
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)

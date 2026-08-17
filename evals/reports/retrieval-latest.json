@@ -1,39 +1,39 @@
 {
- "con_reranker": true,
- "index_version": "v1-qwen3-embedding-0.6b-1024",
+ "con_reranker": false,
+ "index_version": "v1-qwen3-embedding-0.6b-1024-apartado-v1",
  "lectura_publicada": "a_nivel_articulo (Q-016 A)",
  "metrics": [
   {
-   "a_nivel_articulo": 0.8472222222222222,
-   "estricto": 0.09259259259259259,
+   "a_nivel_articulo": 0.8009259259259259,
+   "estricto": 0.47685185185185186,
    "id": "G-RECALL5",
    "n": 216,
-   "value": 0.8472222222222222
+   "value": 0.8009259259259259
   },
   {
-   "a_nivel_articulo": 0.9768518518518519,
-   "estricto": 0.12962962962962962,
+   "a_nivel_articulo": 0.9675925925925926,
+   "estricto": 0.5833333333333334,
    "id": "G-RECALL30",
    "n": 216,
-   "value": 0.9768518518518519
+   "value": 0.9675925925925926
   }
  ],
  "n_casos": 216,
  "nota": "Dos lecturas: `estricto` compara legal_ref literalmente y `a_nivel_articulo` recorta el apartado del golden set. El troceador es articulo-v1, así que ninguna ref indexada lleva apartado y el 86 % de las del golden set sí: con la lectura estricta el recall está acotado por construcción. Cuál se publica como G-RECALL es decisión de Samuel.",
  "physical_table": "chunk_v1",
  "por_canal": {
-  "fusion_y_reordenador": {
-   "recall30": 0.9768518518518519,
-   "recall5": 0.8472222222222222
+  "fusion": {
+   "recall30": 0.9675925925925926,
+   "recall5": 0.8009259259259259
   },
   "solo_lexico": {
-   "recall30": 0.8148148148148148,
-   "recall5": 0.37037037037037035
+   "recall30": 0.7870370370370371,
+   "recall5": 0.25
   },
   "solo_vectorial": {
-   "recall30": 0.9537037037037037,
-   "recall5": 0.7916666666666666
+   "recall30": 0.9259259259259259,
+   "recall5": 0.7453703703703703
   }
  },
- "segundos": 942.8
+ "segundos": 6.4
 }

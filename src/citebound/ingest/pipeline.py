@@ -12,12 +12,25 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from citebound.db.schema import registrar_index_version, upsert_chunks
+from citebound.db.schema import registrar_index_version, upsert_chunks, vaciar_otras_versiones
 from citebound.ingest.boe_xml import parse_norma
-from citebound.ingest.chunking import CHUNKER_ID, Chunk, chunk_preceptos
+from citebound.ingest.chunking import (
+    CHUNKER_APARTADO_ID,
+    CHUNKER_ID,
+    Chunk,
+    chunk_por_apartado,
+    chunk_preceptos,
+)
 from citebound.providers.embeddings import Embedder
 
-__all__ = ["Ingesta", "escribir_refs", "ingerir", "refs_conocidas"]
+__all__ = ["TROCEADORES", "Ingesta", "escribir_refs", "ingerir", "refs_conocidas"]
+
+TROCEADORES = {CHUNKER_ID: chunk_preceptos, CHUNKER_APARTADO_ID: chunk_por_apartado}
+"""Los troceados que existen, por su `chunker_id`.
+
+Conviven a propósito: cuál se usa lo decide el número de `make eval-retrieval`, y para poder
+compararlos hace falta que los dos se puedan ejecutar. El `chunker_id` viaja hasta
+`index_version`, así que ningún informe puede confundir uno con otro."""
 
 
 class _Cursor(Protocol):
@@ -32,6 +45,7 @@ class Ingesta:
     index_id: str
     chunks: tuple[Chunk, ...]
     refs: tuple[str, ...]
+    chunker_id: str = CHUNKER_ID
 
 
 def ingerir(
@@ -43,6 +57,7 @@ def ingerir(
     embedder: Embedder,
     corpus_snapshot: str,
     index_id: str | None = None,
+    troceador: str = CHUNKER_ID,
     lote: int = 32,
 ) -> Ingesta:
     """Parse, chunk, embed and write. Idempotent by construction.
@@ -53,17 +68,30 @@ def ingerir(
     exist, and `tests/integration/test_ddl.py` proves it on the real corpus.
     """
     preceptos = parse_norma(xml, norma=norma)
-    chunks = chunk_preceptos(preceptos, source_uri=source_uri)
-    identificador = index_id or f"v1-{embedder.model.replace(':', '-')}-{embedder.dim}"
+    if troceador not in TROCEADORES:
+        raise ValueError(f"troceador desconocido: {troceador!r}. Hay {sorted(TROCEADORES)}")
+    chunks = TROCEADORES[troceador](preceptos, source_uri)
+    # **El troceador entra en el identificador**, y no es cosmética: dos índices troceados
+    # distinto son dos índices distintos, y con el mismo nombre `index_version` dejaría de
+    # decir sobre qué se midió — que es la única cosa que el contrato compartido pone en
+    # mayúsculas sobre los informes de eval.
+    sufijo = "" if troceador == CHUNKER_ID else f"-{troceador}"
+    identificador = index_id or f"v1-{embedder.model.replace(':', '-')}-{embedder.dim}{sufijo}"
 
     registrar_index_version(
         cur,
         index_id=identificador,
         embedding_model=embedder.model,
         dim=embedder.dim,
-        chunker_id=CHUNKER_ID,
+        chunker_id=troceador,
         corpus_snapshot=corpus_snapshot,
     )
+
+    # Una versión de índice por tabla física (ADR-023). Con otro troceador los `chunk_id`
+    # son otros, así que las filas viejas NO se sobrescriben: se quedarían, y `chunks_active`
+    # —que no filtra por versión— serviría los dos índices mezclados. El síntoma sería un
+    # recall raro sin causa, que es la familia de fallo de toda esta fase.
+    vaciar_otras_versiones(cur, index_id=identificador)
 
     # In batches so that a corpus larger than this one does not send a single request
     # the size of the whole document.
@@ -76,6 +104,7 @@ def ingerir(
         index_id=identificador,
         chunks=chunks,
         refs=tuple(str(c.ref) for c in chunks),
+        chunker_id=troceador,
     )
 
 
@@ -92,7 +121,7 @@ def escribir_refs(destino: Path, ingesta: Ingesta, *, norma: str, corpus_snapsho
             {
                 "norma": norma,
                 "index_version": ingesta.index_id,
-                "chunker_id": CHUNKER_ID,
+                "chunker_id": ingesta.chunker_id,
                 "corpus_snapshot": corpus_snapshot,
                 "n": len(ingesta.refs),
                 "refs": sorted(set(ingesta.refs)),

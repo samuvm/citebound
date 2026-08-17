@@ -8,11 +8,13 @@ that looks smarter than it is.
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
 from citebound.db.conexion import dsn
 from citebound.db.schema import aplicar_esquema
+from citebound.ingest.chunking import CHUNKER_ID
 from citebound.ingest.pipeline import escribir_refs, ingerir
 from citebound.providers.embeddings import embedder_por_defecto
 from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activo
@@ -42,6 +44,9 @@ def _ingest(_: argparse.Namespace) -> int:
             source_uri=URI,
             embedder=embedder_por_defecto(),
             corpus_snapshot=SNAPSHOT,
+            # Qué troceado se indexa lo decide el número de `make eval-retrieval`, no una
+            # preferencia. Por eso es una variable y no una edición.
+            troceador=os.environ.get("CITEBOUND_CHUNKER", CHUNKER_ID),
         )
         conn.commit()
     escribir_refs(REFS, ingesta, norma=NORMA, corpus_snapshot=SNAPSHOT)

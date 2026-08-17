@@ -28,6 +28,7 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
 
@@ -250,5 +251,47 @@ def chunk_por_apartado(preceptos: Sequence[Precepto], source_uri: str) -> tuple[
 
 
 def chunk_multinivel(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
-    """Sin implementar todavía: el rojo se compromete antes que el verde."""
-    return ()
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    # Los dos troceadores cuentan sus `occurrence` por separado, así que un contenido que
+    # apareciera en los dos conjuntos daría el MISMO `chunk_id` y una fila se comería a la
+    # otra en el `ON CONFLICT`, en silencio. Se comprueba en vez de confiar: perder un chunk
+    # aquí se vería aguas abajo como un recall peor sin causa.
+    if len({c.chunk_id for c in juntos}) != len(juntos):
+        raise ChunkingError(
+            "dos niveles produjeron el mismo chunk_id: la ingesta perdería una fila sin avisar"
+        )
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )

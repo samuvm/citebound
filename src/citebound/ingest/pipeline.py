@@ -17,7 +17,9 @@ from citebound.ingest.boe_xml import parse_norma
 from citebound.ingest.chunking import (
     CHUNKER_APARTADO_ID,
     CHUNKER_ID,
+    CHUNKER_MULTINIVEL_ID,
     Chunk,
+    chunk_multinivel,
     chunk_por_apartado,
     chunk_preceptos,
 )
@@ -25,7 +27,11 @@ from citebound.providers.embeddings import Embedder
 
 __all__ = ["TROCEADORES", "Ingesta", "escribir_refs", "ingerir", "refs_conocidas"]
 
-TROCEADORES = {CHUNKER_ID: chunk_preceptos, CHUNKER_APARTADO_ID: chunk_por_apartado}
+TROCEADORES = {
+    CHUNKER_ID: chunk_preceptos,
+    CHUNKER_APARTADO_ID: chunk_por_apartado,
+    CHUNKER_MULTINIVEL_ID: chunk_multinivel,
+}
 """Los troceados que existen, por su `chunker_id`.
 
 Conviven a propósito: cuál se usa lo decide el número de `make eval-retrieval`, y para poder

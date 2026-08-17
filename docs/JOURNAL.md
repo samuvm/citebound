@@ -1699,3 +1699,73 @@ importa cuando la meta bloquee desde la fase 3.
 anteriores en verde, incluida la 5 con `G-COV-LINE = 100`, que llevaba toda la fase sin poder
 leerse. Lo que queda rojo es una métrica que no llega, no fontanería — que es donde tiene que
 estar un gate rojo.
+
+---
+
+## 2026-08-17 (cont. 2) · fase 2 · la palanca que faltaba: el troceador
+
+Samuel preguntó lo que había que preguntar: *«¿no podemos reenfocarlo y mejorar esa nota, o es
+una meta no realista?»*. Y tenía razón en sospechar. **Cerré el diagnóstico antes de tiempo:**
+ocho de los nueve experimentos habían sido sobre el reordenador. El troceador seguía en
+`articulo-v1` desde la fase 0 — y es justo la pieza que el anclaje en `LegalRef` se diseñó para
+poder cambiar sin invalidar el golden set.
+
+### La meta no es irreal, y esto lo zanja
+
+| candidatos por canal | recall@30 tras fusión | **techo: está en alguno de los dos canales** |
+|---|---:|---:|
+| 30 | 0,977 | 0,981 |
+| 80 | 0,944 | **1,000** |
+| 120 | 0,977 | **1,000** |
+
+Con 80 candidatos por canal el artículo correcto aparece en **216 de 216**. El corpus lo tiene y
+la búsqueda lo encuentra siempre: **todo el hueco es de ordenación**, no de recuperación.
+
+### Lo que primero probé y está gastado: el peso de la fusión
+
+| vect:léx | recall@5 | recall@30 |
+|---|---:|---:|
+| 1:1 (actual) | 0,731 | **0,977** |
+| 4:1 | 0,782 | 0,954 |
+| 10:1 | **0,819** | 0,954 |
+| solo vectorial | 0,792 | 0,954 |
+
+El peso igual es **lo que hace pasar `G-RECALL30`**: esos cinco casos los aporta el canal léxico,
+que encuentra lo que el vectorial no ve. Subir el peso mejora el top-5 y rompe la meta que sí
+pasa. Palanca gastada — y de paso valida el diseño.
+
+### Tres troceados, y cada uno gana en algo distinto
+
+`apartado-v1` (569 trozos, mediana de 382 caracteres contra 1.040) y `multinivel-v1` (710: el
+artículo entero **y además** cada apartado). Todo sobre los mismos 216 casos:
+
+| troceado | art@5 sin reordenar | art@30 | **estricto@5** | art@5 CON reordenador |
+|---|---:|---:|---:|---:|
+| `articulo-v1` | 0,727 | **0,977** | 0,093 | **0,847** |
+| `apartado-v1` | **0,801** | 0,968 | **0,477** | 0,806 |
+| `multinivel-v1` | 0,782 | 0,963 | 0,130 | *(midiendo)* |
+
+**Dos resultados que no esperaba y que cambian cómo entiendo el sistema:**
+
+1. **Con apartados el reordenador deja de aportar.** Pasa de 0,801 a 0,806: **un caso**. Con
+   artículos pasaba de 0,727 a 0,847: **veintiséis**. Con trozos afilados la fusión ya hace casi
+   todo el trabajo y el juicio del modelo no mejora la similitud del embedding. Lo contrario de
+   lo que suponía al construirlo — pensaba que textos más cortos y sin truncar se lo pondrían
+   más fácil.
+2. **La lectura estricta se multiplica por cinco** (0,093 → 0,477). Era la que estaba «acotada
+   por construcción en el 13 %» porque ninguna ref del índice llevaba apartado y el 86 % de las
+   del golden set sí. Deja de estarlo, y eso importa para `G-CITA-PRECISION` en la fase 3 mucho
+   más que para `G-RECALL5` hoy.
+
+**Un fallo estructural que solo se ve al medir:** con apartados, **30 plazas ya no son 30
+artículos** — `art34.1`, `art34.2` y `art34.3` gastan tres sin añadir cobertura. Como lo que se
+mide y se cita es el artículo (R1), esas dos de más son plazas tiradas. Colapsar a un candidato
+por artículo sube `recall@30` de 0,940 a 0,968, y subir `K_CANAL` de 30 a 60 lo lleva de 0,958 a
+0,968.
+
+**Y una colisión que el guardián cazó en el corpus real:** `multinivel-v1` producía 94
+`chunk_id` repetidos. No era aritmética, era semántica — los 94 artículos que **no numeran** sus
+párrafos, donde el troceador fino ya devuelve el artículo entero, así que añadirlo otra vez era
+la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id` y una se habría comido a la
+otra en el `ON CONFLICT`, en silencio. El arreglo es semántico: el artículo entero solo entra
+donde el nivel fino de verdad partió algo.

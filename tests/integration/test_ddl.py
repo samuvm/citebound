@@ -21,6 +21,8 @@ import pytest
 from citebound.db.schema import aplicar_esquema, registrar_index_version, upsert_chunks
 from citebound.ingest.boe_xml import parse_norma
 from citebound.ingest.chunking import CHUNKER_ID, chunk_preceptos
+from citebound.providers.embeddings import embedder_por_defecto
+from citebound.retrieval.vector import embedder_del_indice
 
 pytestmark = pytest.mark.integration
 
@@ -216,6 +218,31 @@ def test_reindexing_with_another_model_leaves_no_row_lying_about_its_provenance(
 
     assert procedencia == {otro: len(chunks)}, "hay filas que siguen diciendo ser del índice viejo"
     assert con_vector_nuevo >= 1, "el vector no se sustituyó: el reindexado no reindexó nada"
+
+
+def test_the_query_embedder_comes_from_the_index_and_not_from_the_environment(
+    conexion: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """**El fallo más peligroso de los tres de hoy, porque no tiene síntoma.**
+
+    Los vectores del índice y el de la consulta viven en el mismo espacio o no significan
+    nada. Si no coinciden, no salta nada: las dimensiones son iguales, `<=>` calcula, la
+    búsqueda devuelve sus 30 filas y todas están mal. Solo se ve como un recall peor sin causa.
+
+    Estuvo a un `make eval-retrieval` de pasar: la base quedó con `qwen3-embedding:0.6b` y
+    `CITEBOUND_EMBEDDING_MODEL` seguía por defecto en `bge-m3`.
+
+    La regla que lo hace imposible: **el índice es el dato y la consulta lo obedece.** Quien
+    elige modelo es la ingesta; a partir de ahí el nombre viaja en `index_version`.
+    """
+    monkeypatch.setenv("CITEBOUND_EMBEDDING_MODEL", "un-modelo-que-no-construyo-este-indice")
+    with conexion.cursor() as cur:  # type: ignore[attr-defined]
+        del_indice = embedder_del_indice(cur)
+    assert del_indice.model == "bge-m3", "la consulta hizo caso al entorno en vez de al índice"
+    assert del_indice.dim == DIM
+    assert embedder_por_defecto().model == "un-modelo-que-no-construyo-este-indice", (
+        "la ingesta debe seguir eligiendo por entorno: es la que construye el índice"
+    )
 
 
 def test_every_indexed_row_carries_a_resolvable_legal_ref(conexion: object) -> None:

@@ -34,6 +34,7 @@ __all__ = [
     "OpenAICompatEmbedder",
     "RecordedEmbedder",
     "clave_de",
+    "embedder_para",
     "embedder_por_defecto",
 ]
 
@@ -151,10 +152,23 @@ def embedder_por_defecto() -> Embedder:
 
     Read here and nowhere deeper: `domain/` may not touch `os.environ` (R6), and the
     whole point of the port is that swapping runtime is a variable rather than an edit.
+
+    **Es el embedder de quien CONSTRUYE el índice**, es decir la ingesta. Quien consulta usa
+    `retrieval.vector.embedder_del_indice`, que lee el modelo de la base: si la consulta se
+    vectorizara con un modelo y el índice con otro, la búsqueda no fallaría — devolvería 30
+    filas mal ordenadas y en silencio.
+    """
+    return embedder_para(model=os.environ.get("CITEBOUND_EMBEDDING_MODEL", _MODELO_POR_DEFECTO))
+
+
+def embedder_para(*, model: str, dim: int = DIM_CONTRATO) -> Embedder:
+    """El mismo transporte, con el modelo que se le diga.
+
+    El `base_url` se resuelve aquí y en un solo sitio: dos lecturas de `OPENAI_BASE_URL` son
+    dos sitios donde apuntar a servidores distintos sin enterarse.
     """
     return OpenAICompatEmbedder(
-        base_url=os.environ.get("OPENAI_BASE_URL", _BASE_POR_DEFECTO),
-        model=os.environ.get("CITEBOUND_EMBEDDING_MODEL", _MODELO_POR_DEFECTO),
+        base_url=os.environ.get("OPENAI_BASE_URL", _BASE_POR_DEFECTO), model=model, dim=dim
     )
 
 

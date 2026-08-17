@@ -18,8 +18,8 @@ from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from citebound.db.conexion import dsn
-from citebound.providers.embeddings import EmbeddingError, embedder_por_defecto
-from citebound.retrieval.vector import buscar, indice_activo
+from citebound.providers.embeddings import EmbeddingError
+from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activo
 
 __all__ = ["Cita", "Respuesta", "crear_app"]
 
@@ -78,7 +78,7 @@ def crear_app() -> FastAPI:
         try:
             with psycopg.connect(dsn()) as conn, conn.cursor() as cur:
                 index_version, physical_table = indice_activo(cur)
-                recuperados = buscar(cur, pregunta, embedder=embedder_por_defecto(), k=k)
+                recuperados = buscar(cur, pregunta, embedder=embedder_del_indice(cur), k=k)
         except LookupError as err:
             raise HTTPException(status_code=503, detail=str(err)) from err
         except EmbeddingError as err:

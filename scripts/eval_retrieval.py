@@ -34,10 +34,9 @@ from citebound.domain.legalref import LegalRef
 from citebound.evals.schema import CasoGolden, Tipo
 from citebound.evals.scoring import recall_at_k
 from citebound.providers.chat import generador_por_defecto
-from citebound.providers.embeddings import embedder_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.rerank import CacheJuicios, ReordenadorLLM
-from citebound.retrieval.vector import indice_activo
+from citebound.retrieval.vector import embedder_del_indice, indice_activo
 
 __all__ = ["a_nivel_articulo", "main", "medir"]
 
@@ -83,7 +82,9 @@ def medir(
     positivos = [c for c in casos if c.tipo is Tipo.POSITIVO and c.refs]
     cache = CacheJuicios(CACHE_RERANK) if con_reranker else None
     reordenador = ReordenadorLLM(generador_por_defecto(), cache=cache) if con_reranker else None
-    embedder = embedder_por_defecto()
+    # Del índice, no del entorno: medir con un modelo distinto del que construyó el índice no
+    # da error, da un recall peor sin causa aparente. Ver `embedder_del_indice`.
+    embedder = embedder_del_indice(cur)  # type: ignore[arg-type]
     arranque = time.monotonic()
     vectores = embedder.embed([c.pregunta for c in positivos])
     t_embed = time.monotonic() - arranque

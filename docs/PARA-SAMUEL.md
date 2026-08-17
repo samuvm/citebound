@@ -40,7 +40,7 @@ lista de pasos — no el resumen de lo hecho.
 
 ## Decisiones transversales
 
-Estas no se deciden aquí. Están en `/Users/samuelviciana/Documents/day-300//Users/samuelviciana/Documents/day-300/_comun/PARA-SAMUEL-GLOBAL.md` y se responden **una sola vez**
+Estas no se deciden aquí. Están en `/Users/samuelviciana/Documents/day-300/_comun/PARA-SAMUEL-GLOBAL.md` y se responden **una sola vez**
 para los cinco proyectos. Este proyecto no las repite; solo declara por qué le afectan y, cuando
 lo hay, el matiz que le es propio.
 
@@ -584,7 +584,7 @@ surte efecto. Una vista mal formada lo destruye en silencio y `G-RECALL5` cae si
 
 Coincide con las 19-32 h de `docs/PLAN.md` (que incluye margen). No baja a cero con ningún agente,
 ningún modelo y ninguna herramienta: es la parte del proyecto que **es tuya**. Las horas de
-responder `/Users/samuelviciana/Documents/day-300//Users/samuelviciana/Documents/day-300/_comun/PARA-SAMUEL-GLOBAL.md` no están aquí porque se pagan una vez para los cinco.
+responder `/Users/samuelviciana/Documents/day-300/_comun/PARA-SAMUEL-GLOBAL.md` no están aquí porque se pagan una vez para los cinco.
 
 ---
 
@@ -916,3 +916,48 @@ no cabe en `G-TTFT`, entonces A con su ADR explicando por qué se aceptó el seg
 para todos los modelos del proyecto. `docs/STACK.md` §2.1 y `CLAUDE.md` invariante 6 dicen hoy
 otra cosa —cross-encoder en proceso— así que su cambio va como propuesta aparte; esta entrada
 solo fija la decisión.
+
+### Q-018 · fase 2 · NO bloquea medir · aplicar tu propia decisión de Q-017 a un fichero de solo lectura
+
+**Qué necesito:** que edites **tú** `docs/STACK.md` §2.1, porque es de solo lectura para mí.
+
+**Por qué:** en Q-017 elegiste **B** —un solo transporte, el reordenador es el generador por
+`/v1/chat/completions`— y ya está construido y medido así. Pero `docs/STACK.md` §2.1 sigue
+diciendo lo contrario, y `CLAUDE.md` remite a `STACK.md` como la fuente que manda. Mientras no
+se cambie, cualquier agente que abra este repo mañana leerá que el reordenador corre en proceso
+con `sentence-transformers` y construirá sobre eso. No es una decisión nueva: es tu decisión sin
+aplicar.
+
+**Qué escribir, literal.** En `docs/STACK.md`, punto 1 de §2.1, sustituir desde «El reranker
+corre **en proceso**…» hasta «…se estrella.» por:
+
+> El reranker **es el propio generador**, por `/v1/chat/completions` (Q-017, 2026-08-17): un
+> solo transporte para todos los modelos del proyecto. Se le pasan los candidatos numerados y
+> devuelve el orden; la resolución la hace código. `Qwen3-Reranker-0.6B` y `bge-reranker-v2-m3`
+> quedan como retadores **no adoptados**: exigían un segundo camino de servir modelos.
+
+Las filas «Reranker» y «Reranker (retador)» de la tabla se dejan como están —son la
+investigación, no el pin— añadiendo `no adoptado (Q-017)` en su columna de motivo.
+
+**Opciones:**
+
+- **A (por defecto):** lo escribes tal cual arriba. *Pros:* el repo deja de decir dos cosas.
+  *Contras:* ninguno; es transcribir tu decisión.
+- **B:** te lo repiensas y vuelves a A de Q-017 (cross-encoder en proceso). *Pros:* es más
+  rápido y más preciso. *Contras:* rompe tu regla del transporte único, son ~2 GB de
+  dependencias y hay que rehacer lo medido.
+- **C:** no tocar nada y dejar la contradicción anotada aquí. *Contras:* `STACK.md` manda sobre
+  `CLAUDE.md` por regla escrita, así que la contradicción se resuelve en contra de lo que de
+  verdad hay construido.
+
+`[ ] A   [ ] B   [ ] C`
+
+**Si dices que no a todo:** no se para nada, pero queda un documento ratificado diciendo lo
+contrario de lo que corre. Lo dejo anotado en `JOURNAL.md` y en el ADR-022 para que al menos no
+sea invisible.
+
+**Recomendación:** **A**.
+
+**Tiempo tuyo:** 3 minutos.
+**Estado: PENDIENTE**
+`>> `

@@ -13,8 +13,10 @@ The adapter is `OpenAICompatEmbedder` and **not** `OllamaEmbedder`, deliberately
 `/v1/embeddings`; one adapter covers the four and swapping runtime is an environment
 variable. Ollama 0.32 is pivoting towards a consumer product, and this is cheap insurance.
 
-The reranker does **not** live here and never will: there is no `/api/rerank`, in any
-version. It runs in-process on MPS behind its own port (R8).
+El reordenador no vive aquí, pero **tampoco corre en proceso**: es el propio generador por
+`/v1/chat/completions` (Q-017, ADR-022). No hay endpoint de rerank en ninguna versión de
+Ollama, y la salida no fue un segundo transporte sino usar el que ya había. `docs/RULES.md` R8
+todavía dice lo contrario y su cambio está pedido en Q-018.
 """
 
 from __future__ import annotations
@@ -34,6 +36,7 @@ __all__ = [
     "OpenAICompatEmbedder",
     "RecordedEmbedder",
     "clave_de",
+    "embedder_para",
     "embedder_por_defecto",
 ]
 
@@ -42,7 +45,14 @@ __all__ = [
 # a new table and a re-index (see the note in `chunks-ddl.sql`).
 DIM_CONTRATO = 1024
 
-_MODELO_POR_DEFECTO = "bge-m3"
+_MODELO_POR_DEFECTO = "qwen3-embedding:0.6b"
+"""El principal de `docs/STACK.md` §2.2, que la fase 0 nunca llegó a usar.
+
+Se indexó con `bge-m3` —el **retador**— porque ya estaba descargado, y ahí se quedó. Medido el
+2026-08-17 sobre los mismos 216 casos: `recall@30` 0,977 contra 0,954, y `recall@5` con
+reordenador 0,856 contra 0,847. Gana el que el documento ratificado ya decía, así que el
+código deja de contradecirlo. 1024 dimensiones: cabe en `vector(1024)` sin tocar el DDL.
+"""
 _BASE_POR_DEFECTO = "http://localhost:11434/v1"
 
 
@@ -151,10 +161,23 @@ def embedder_por_defecto() -> Embedder:
 
     Read here and nowhere deeper: `domain/` may not touch `os.environ` (R6), and the
     whole point of the port is that swapping runtime is a variable rather than an edit.
+
+    **Es el embedder de quien CONSTRUYE el índice**, es decir la ingesta. Quien consulta usa
+    `retrieval.vector.embedder_del_indice`, que lee el modelo de la base: si la consulta se
+    vectorizara con un modelo y el índice con otro, la búsqueda no fallaría — devolvería 30
+    filas mal ordenadas y en silencio.
+    """
+    return embedder_para(model=os.environ.get("CITEBOUND_EMBEDDING_MODEL", _MODELO_POR_DEFECTO))
+
+
+def embedder_para(*, model: str, dim: int = DIM_CONTRATO) -> Embedder:
+    """El mismo transporte, con el modelo que se le diga.
+
+    El `base_url` se resuelve aquí y en un solo sitio: dos lecturas de `OPENAI_BASE_URL` son
+    dos sitios donde apuntar a servidores distintos sin enterarse.
     """
     return OpenAICompatEmbedder(
-        base_url=os.environ.get("OPENAI_BASE_URL", _BASE_POR_DEFECTO),
-        model=os.environ.get("CITEBOUND_EMBEDDING_MODEL", _MODELO_POR_DEFECTO),
+        base_url=os.environ.get("OPENAI_BASE_URL", _BASE_POR_DEFECTO), model=model, dim=dim
     )
 
 

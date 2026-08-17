@@ -33,6 +33,7 @@ ESTADO = RAIZ / ".claude" / "state" / "gate-status.json"
 LOCK = RAIZ / "thresholds.lock"
 GOALS = RAIZ / "docs" / "GOALS.yaml"
 INVENTARIO = RAIZ / ".claude" / "state" / "test-inventory.json"
+MUTACION = RAIZ / "evals" / "reports" / "mutation-latest.json"
 TOPE_DEUDA = 10
 
 
@@ -150,6 +151,11 @@ def c5_cobertura_linea() -> Resultado:
         cubiertas += medida["summary"]["covered_lines"]
         faltan += medida["summary"]["missing_lines"]
     pct = round(100 * cubiertas / (cubiertas + faltan)) if cubiertas + faltan else -1
+    # `G-COV-LINE` nombra `coverage.json :: totals.percent_covered (filtrado a
+    # [tool.gate].testable)`. El paréntesis es la instrucción: el `totals` del fichero mide
+    # `src/citebound` entero, adaptadores incluidos, y ese no es el número de la meta. Se
+    # publica aquí el que sí lo es, y así la condición 7 lee lo mismo que enseña la 5.
+    CALCULADO[("coverage.json", "totals.percent_covered")] = pct
     return Resultado(
         5,
         "cobertura de línea",
@@ -187,6 +193,13 @@ def mutacion_caducada() -> str | None:
     return None
 
 
+def cfg_mutados() -> list[str]:
+    """Qué ficheros mutó esta corrida. Va en el informe porque un `killed_pct` sin saber sobre
+    qué se calculó es lo que dejó a `G-MUT` verde midiendo cinco de seis ficheros."""
+    datos = tomllib.loads((RAIZ / "pyproject.toml").read_text(encoding="utf-8"))
+    return list(datos["tool"]["mutmut"]["source_paths"])
+
+
 def c6_mutacion(milestone: int) -> Resultado:
     cfg = tomllib.loads((RAIZ / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["gate"]
     minimo = cfg["mutantes_muertos_min"]
@@ -196,9 +209,11 @@ def c6_mutacion(milestone: int) -> Resultado:
             6,
             "mutación",
             milestone < 3,
-            f"medida caducada: {caducada}. NO se da por buena la corrida anterior: mutmut "
-            "solo invalida al cambiar `src/`, nunca al cambiar los tests, y el gate leería "
-            "un número calculado sobre otro código",
+            f"medida caducada: {caducada}. NO se da por buena la corrida anterior — el gate "
+            "leería un número calculado sobre otro código. Cuenta **también** un cambio en "
+            "`tests/`, y a propósito: un mutante lo mata un test, así que tocar los tests "
+            "puede cambiar el recuento aunque `src/` no se mueva. mutmut por su cuenta no "
+            "invalida por eso, y ahí es donde el número se queda viejo sin que nadie lo note",
             "make clean-mutants && make mutation",
         )
     _, salida = _correr("uv run mutmut results --all true")
@@ -216,6 +231,24 @@ def c6_mutacion(milestone: int) -> Resultado:
             "uv run mutmut run",
         )
     pct = round(100 * muertos / total)
+    # `G-MUT` nombra `evals/reports/mutation-latest.json :: killed_pct` y bloquea desde la
+    # fase 3. Sin esto sería la cuarta meta muda por fontanería —tras `G-GOLDEN-VALID`,
+    # `G-COV-FUNC` y `G-COV-LINE`—, y la habría descubierto el gate de la fase 3 en vez de
+    # este. Se escribe el fichero **y** se publica en memoria: el fichero es para leerlo, y
+    # `CALCULADO` para que la condición 7 use el número de ESTA corrida y no el de la anterior.
+    informe = {
+        "killed_pct": pct,
+        "killed": muertos,
+        "total": total,
+        "supervivientes": vivos,
+        "minimo": minimo,
+        "ficheros": cfg_mutados(),
+    }
+    MUTACION.parent.mkdir(parents=True, exist_ok=True)
+    MUTACION.write_text(
+        json.dumps(informe, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    CALCULADO[("evals/reports/mutation-latest.json", "killed_pct")] = pct
     return Resultado(
         6,
         "mutación",
@@ -265,6 +298,11 @@ def c7_metas(milestone: int) -> Resultado:
 # vez de releer `gate-status.json`, que en el momento de evaluar las metas todavía es el de
 # la corrida anterior.
 MEDIDO: dict[str, object] = {}
+
+# Artefactos que produce ESTA corrida bajo la ruta con que `GOALS.yaml` los nombra, aunque en
+# disco no exista un fichero con ese nombre. La clave es `(ruta, selector)` entero: dos metas
+# pueden pedir selectores distintos del mismo fichero y no deben pisarse.
+CALCULADO: dict[tuple[str, str], object] = {}
 
 
 def _medir_secretos() -> int:
@@ -333,7 +371,13 @@ def leer_artefacto_ruta(ruta: str, selector: str) -> object:
     corre *antes* de que el estado se escriba, así que leerlo del disco daría el número de
     la corrida anterior: el gate se aprobaría con datos viejos. Es la misma familia de fallo
     que `G-MUT` leyendo la caché de mutmut, y aquí no se repite.
+
+    `CALCULADO` cubre el caso contrario: la meta nombra un artefacto que **no** existe con
+    ese nombre porque el número pedido no es el que trae el fichero. Es lo que pasa con
+    `G-COV-LINE`, y el paréntesis de su artefacto lo dice — «filtrado a `[tool.gate].testable`».
     """
+    if (ruta, selector) in CALCULADO:
+        return CALCULADO[(ruta, selector)]
     if ruta.endswith("gate-status.json"):
         if selector not in MEDIDO and selector in MEDIDORES:
             MEDIDO[selector] = MEDIDORES[selector]()

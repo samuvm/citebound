@@ -209,9 +209,11 @@ def c6_mutacion(milestone: int) -> Resultado:
             6,
             "mutación",
             milestone < 3,
-            f"medida caducada: {caducada}. NO se da por buena la corrida anterior: mutmut "
-            "solo invalida al cambiar `src/`, nunca al cambiar los tests, y el gate leería "
-            "un número calculado sobre otro código",
+            f"medida caducada: {caducada}. NO se da por buena la corrida anterior — el gate "
+            "leería un número calculado sobre otro código. Cuenta **también** un cambio en "
+            "`tests/`, y a propósito: un mutante lo mata un test, así que tocar los tests "
+            "puede cambiar el recuento aunque `src/` no se mueva. mutmut por su cuenta no "
+            "invalida por eso, y ahí es donde el número se queda viejo sin que nadie lo note",
             "make clean-mutants && make mutation",
         )
     _, salida = _correr("uv run mutmut results --all true")

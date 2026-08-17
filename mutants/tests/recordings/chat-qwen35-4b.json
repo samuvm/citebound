@@ -1,0 +1,47 @@
+{
+ "con_razonamiento": {
+  "choices": [
+   {
+    "finish_reason": "length",
+    "index": 0,
+    "message": {
+     "content": "",
+     "reasoning": "Thinking Process:\n\n1.  **Analyze the Request:**\n    *   Input: \"Ordena: [1] art82   [2] art85.\" (Order:",
+     "role": "assistant"
+    }
+   }
+  ],
+  "created": 1786923020,
+  "id": "chatcmpl-177",
+  "model": "qwen3.5:4b-mlx",
+  "object": "chat.completion",
+  "system_fingerprint": "fp_ollama",
+  "usage": {
+   "completion_tokens": 40,
+   "prompt_tokens": 40,
+   "total_tokens": 80
+  }
+ },
+ "sin_razonamiento": {
+  "choices": [
+   {
+    "finish_reason": "stop",
+    "index": 0,
+    "message": {
+     "content": "82,85",
+     "role": "assistant"
+    }
+   }
+  ],
+  "created": 1786923014,
+  "id": "chatcmpl-947",
+  "model": "qwen3.5:4b-mlx",
+  "object": "chat.completion",
+  "system_fingerprint": "fp_ollama",
+  "usage": {
+   "completion_tokens": 5,
+   "prompt_tokens": 42,
+   "total_tokens": 47
+  }
+ }
+}

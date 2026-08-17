@@ -21,6 +21,8 @@ import pytest
 from citebound.db.schema import aplicar_esquema, registrar_index_version, upsert_chunks
 from citebound.ingest.boe_xml import parse_norma
 from citebound.ingest.chunking import CHUNKER_ID, chunk_preceptos
+from citebound.providers.embeddings import embedder_por_defecto
+from citebound.retrieval.vector import embedder_del_indice
 
 pytestmark = pytest.mark.integration
 
@@ -167,6 +169,80 @@ def test_ingesting_the_whole_corpus_twice_does_not_duplicate_a_single_row(
 
     assert primera == len(chunks) == 235
     assert segunda == primera, "la segunda ingesta duplicó filas"
+
+
+def test_reindexing_with_another_model_leaves_no_row_lying_about_its_provenance(
+    conexion: object, chunks: tuple[object, ...]
+) -> None:
+    """**El fallo que este test existe para que no vuelva** (2026-08-17).
+
+    `chunk_id` no depende del modelo de embedding, así que reindexar el mismo corpus con
+    otro modelo de la misma dimensión cae en el `ON CONFLICT` y sustituye los vectores en
+    sitio. El `SET` no tocaba `index_version`, de modo que la fila se quedaba con los
+    vectores de un modelo y el nombre de otro — y el síntoma es el peor posible: ninguno.
+    `make eval-retrieval` publicaba una procedencia falsa y nada podía contradecirla.
+
+    Se comprueban las dos mitades, porque cada una sola se puede pasar mintiendo: que el
+    vector es el nuevo, y que la columna lo admite.
+    """
+    otro = "v1-otro-modelo-1024"
+    nuevos = [_vector(i + 5000) for i in range(len(chunks))]
+    with conexion.cursor() as cur:  # type: ignore[attr-defined]
+        registrar_index_version(
+            cur,
+            index_id=otro,
+            embedding_model="otro-modelo",
+            dim=DIM,
+            chunker_id=CHUNKER_ID,
+            corpus_snapshot="2026-07-31",
+        )
+        upsert_chunks(cur, chunks, nuevos, index_id=otro)  # type: ignore[arg-type]
+
+        cur.execute("SELECT index_version, count(*) FROM chunk_v1 GROUP BY 1")
+        procedencia = dict(cur.fetchall())
+        cur.execute("SELECT count(*) FROM chunk_v1 WHERE embedding = %s::vector", (str(nuevos[0]),))
+        con_vector_nuevo = cur.fetchone()[0]
+
+        # Se restaura el estado del módulo: los demás tests de este fichero comparten la
+        # conexión y dan por sentado que el índice activo es `INDEX_ID`.
+        registrar_index_version(
+            cur,
+            index_id=INDEX_ID,
+            embedding_model="bge-m3",
+            dim=DIM,
+            chunker_id=CHUNKER_ID,
+            corpus_snapshot="2026-07-31",
+        )
+        upsert_chunks(cur, chunks, [_vector(i) for i in range(len(chunks))], index_id=INDEX_ID)  # type: ignore[arg-type]
+    conexion.commit()  # type: ignore[attr-defined]
+
+    assert procedencia == {otro: len(chunks)}, "hay filas que siguen diciendo ser del índice viejo"
+    assert con_vector_nuevo >= 1, "el vector no se sustituyó: el reindexado no reindexó nada"
+
+
+def test_the_query_embedder_comes_from_the_index_and_not_from_the_environment(
+    conexion: object, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """**El fallo más peligroso de los tres de hoy, porque no tiene síntoma.**
+
+    Los vectores del índice y el de la consulta viven en el mismo espacio o no significan
+    nada. Si no coinciden, no salta nada: las dimensiones son iguales, `<=>` calcula, la
+    búsqueda devuelve sus 30 filas y todas están mal. Solo se ve como un recall peor sin causa.
+
+    Estuvo a un `make eval-retrieval` de pasar: la base quedó con `qwen3-embedding:0.6b` y
+    `CITEBOUND_EMBEDDING_MODEL` seguía por defecto en `bge-m3`.
+
+    La regla que lo hace imposible: **el índice es el dato y la consulta lo obedece.** Quien
+    elige modelo es la ingesta; a partir de ahí el nombre viaja en `index_version`.
+    """
+    monkeypatch.setenv("CITEBOUND_EMBEDDING_MODEL", "un-modelo-que-no-construyo-este-indice")
+    with conexion.cursor() as cur:  # type: ignore[attr-defined]
+        del_indice = embedder_del_indice(cur)
+    assert del_indice.model == "bge-m3", "la consulta hizo caso al entorno en vez de al índice"
+    assert del_indice.dim == DIM
+    assert embedder_por_defecto().model == "un-modelo-que-no-construyo-este-indice", (
+        "la ingesta debe seguir eligiendo por entorno: es la que construye el índice"
+    )
 
 
 def test_every_indexed_row_carries_a_resolvable_legal_ref(conexion: object) -> None:

@@ -15,7 +15,7 @@ from citebound.db.conexion import dsn
 from citebound.db.schema import aplicar_esquema
 from citebound.ingest.pipeline import escribir_refs, ingerir
 from citebound.providers.embeddings import embedder_por_defecto
-from citebound.retrieval.vector import buscar, indice_activo
+from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activo
 
 RAIZ = Path(__file__).resolve().parents[2]
 CORPUS = RAIZ / "corpus" / "raw" / "BOE-A-2003-23514.xml"
@@ -55,7 +55,9 @@ def _ask(args: argparse.Namespace) -> int:
 
     with psycopg.connect(dsn()) as conn, conn.cursor() as cur:
         index_version, physical_table = indice_activo(cur)
-        recuperados = buscar(cur, args.pregunta, embedder=embedder_por_defecto(), k=args.k)
+        # El embedder sale del índice, nunca del entorno: preguntar con un modelo distinto
+        # del que construyó el índice no da error, da respuestas malas en silencio.
+        recuperados = buscar(cur, args.pregunta, embedder=embedder_del_indice(cur), k=args.k)
 
     if not recuperados:
         print("el índice no devolvió nada", file=sys.stderr)

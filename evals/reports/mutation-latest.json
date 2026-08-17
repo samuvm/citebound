@@ -1,0 +1,19 @@
+{
+ "ficheros": [
+  "src/citebound/domain/legalref.py",
+  "src/citebound/ingest/boe_xml.py",
+  "src/citebound/ingest/chunking.py",
+  "src/citebound/evals/scoring.py",
+  "src/citebound/evals/bootstrap.py",
+  "src/citebound/retrieval/fusion.py"
+ ],
+ "killed": 927,
+ "killed_pct": 100,
+ "minimo": 70,
+ "supervivientes": [
+  "citebound.ingest.boe_xml.x_parse_norma__mutmut_68",
+  "citebound.ingest.boe_xml.x__raiz_texto__mutmut_43",
+  "citebound.evals.bootstrap.x_holm__mutmut_16"
+ ],
+ "total": 930
+}

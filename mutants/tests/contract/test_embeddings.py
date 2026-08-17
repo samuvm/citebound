@@ -103,7 +103,15 @@ def test_a_miss_raises_instead_of_inventing_a_vector(grabado: RecordedEmbedder) 
 
 
 def test_a_recording_of_the_wrong_width_is_refused() -> None:
-    doble = RecordedEmbedder(grabacion={clave_de("bge-m3", "x"): [0.1, 0.2]})
+    """El modelo se nombra aquí en vez de heredarse del defecto del paquete.
+
+    Cuando el defecto pasó de `bge-m3` a `qwen3-embedding:0.6b`, la clave dejó de casar y este
+    test empezó a fallar por «no hay grabación» — es decir, dejó de probar lo que dice probar
+    sin dejar de existir. Un test que depende de una constante que puede cambiar por otro
+    motivo mide dos cosas y no avisa de cuál se rompió.
+    """
+    modelo = "un-modelo-cualquiera"
+    doble = RecordedEmbedder(grabacion={clave_de(modelo, "x"): [0.1, 0.2]}, model=modelo)
     with pytest.raises(EmbeddingError, match="dimensiones"):
         doble.embed(["x"])
 

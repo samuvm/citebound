@@ -24,9 +24,9 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 
 from citebound.domain.legalref import LegalRef, parse
-from citebound.providers.embeddings import Embedder
+from citebound.providers.embeddings import Embedder, embedder_para
 
-__all__ = ["EF_SEARCH", "Recuperado", "buscar", "indice_activo"]
+__all__ = ["EF_SEARCH", "Recuperado", "buscar", "embedder_del_indice", "indice_activo"]
 
 # Declared, not defaulted. The contract fixes m=16 and ef_construction=64 at build time;
 # this is the search-time knob, and leaving it implicit is how two projects end up
@@ -68,6 +68,34 @@ def indice_activo(cur: _Cursor) -> tuple[str, str]:
             "Ejecuta la ingesta (`make smoke-f0` la hace) antes de consultar."
         )
     return str(fila[0]), str(fila[1])
+
+
+def embedder_del_indice(cur: _Cursor) -> Embedder:
+    """El embedder que declara el índice activo, no el que diga el entorno.
+
+    **Sin esto, el fallo es mudo y total.** Los vectores del índice y el de la consulta viven
+    en el mismo espacio o no significan nada, y nada en el camino lo comprueba: dimensiones
+    iguales, `<=>` calcula, la búsqueda devuelve 30 filas y todas están mal. No hay excepción,
+    no hay aviso, solo un recall peor sin causa aparente.
+
+    Pasó de verdad el 2026-08-17: al reindexar con `qwen3-embedding:0.6b` la base pasó a tener
+    unos vectores y `CITEBOUND_EMBEDDING_MODEL` seguía por defecto en `bge-m3`, así que
+    `make eval-retrieval` sin la variable habría medido un espacio contra otro.
+
+    La regla que lo hace imposible: **el índice es el dato y la consulta lo obedece.** Quién
+    elige modelo es la ingesta, que es la que construye el índice; a partir de ahí el nombre
+    viaja en `index_version` y se lee de ahí. La variable de entorno sigue existiendo, pero
+    solo manda donde debe.
+    """
+    index_version, _ = indice_activo(cur)
+    cur.execute("SELECT embedding_model, dim FROM index_version WHERE id = %s", (index_version,))
+    fila = cur.fetchone()
+    if fila is None:
+        raise LookupError(
+            f"el alias `active` apunta a {index_version!r}, que no está en `index_version`. "
+            "La base está inconsistente: vuelve a ingerir."
+        )
+    return embedder_para(model=str(fila[0]), dim=int(fila[1]))
 
 
 def buscar(

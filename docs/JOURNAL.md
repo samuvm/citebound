@@ -1599,7 +1599,12 @@ interactivo en la fase 3.
 con cuatro llamadas, un modelo mudo dejaba de conservar el orden de la fusión — las cabezas de
 cada ventana se adelantaban a candidatos que la fusión tenía por delante. Se arregla
 distinguiendo «no lo eligió» de «no dijo nada»: solo se adelanta lo que el modelo **nombra**.
-Con el modelo callado, la lista sale intacta. Tiene su test.
+Con el modelo callado, la lista sale intacta. Tiene su test, y ese arreglo **se queda** aunque
+las ventanas no.
+
+> **Spoiler, porque este diario se lee en orden y no quiero que nadie construya sobre esto:**
+> las ventanas se midieron y salieron **peores** (0,806). El 55,6 % de arriba medía otra cosa.
+> El detalle en el punto 8.
 
 ### 8 · El reordenado por ventanas: medido y **descartado**
 
@@ -1641,3 +1646,56 @@ ideas sin probar: es una decisión sobre qué se hace con el hueco, y esa no me 
 **Q-019**, junto con el hallazgo que la hace urgente — el reordenador cuesta 4,6 s y
 `docs/RULES.md` §2.1 le presupuesta 400 ms, así que **su sitio en el sistema es lo primero que
 hay que decidir**, antes que cuánto recall da.
+
+### 9 · La misma configuración medida dos veces da números distintos
+
+Tras revertir las ventanas, volví a medir `PROMPT_VERSION 2` para dejar el repositorio en su
+mejor estado medido. Mismo código, mismo índice, mismo golden set, misma máquina:
+
+```
+primera corrida   0,852
+segunda corrida   0,847      ← un caso de diferencia
+```
+
+`temperature` ya está en **0,0**, así que no es muestreo: es el propio motor de inferencia. En
+GPU, la reducción de coma flotante no es asociativa y el orden de las operaciones puede cambiar
+entre corridas; con dos logits casi empatados, el *greedy* elige distinto. **Temperatura cero no
+basta para reproducir.**
+
+**Tres consecuencias, y la tercera cambia lo que ya estaba escrito.**
+
+1. **El ruido de medida es de al menos un caso** (±0,005). La comparación entre
+   `PROMPT_VERSION 1` (0,856) y `2` (0,852) es **más pequeña que el ruido**: no se puede llamar
+   mejora ni empeoramiento, y el `2` se queda por los dos defectos que arregla, no por su
+   número. La diferencia de las ventanas —diez casos— sí está fuera del ruido.
+2. **`G-RECALL5` publicado lleva esa incertidumbre.** El número es el de la caché que está
+   comprometida en el repositorio, y otra corrida en frío daría uno vecino.
+3. **La caché de juicios deja de ser una optimización.** Es *la* pieza que hace alcanzable
+   `G-EVAL-DET` —dos `make eval` con informe idéntico byte a byte, umbral `== true` y sin
+   propuesta admisible—, porque sin ella el sistema **no es reproducible aunque no cambie
+   nada**. Estaba escrito como «la primera corrida paga el modelo y las siguientes son gratis y
+   deterministas»; ahora está **medido**, y el orden de los adjetivos se invierte: lo importante
+   no es que sean gratis, es que sean las mismas.
+
+### 10 · Q-015 confirmada con tres datos
+
+Tres corridas de `make mutation` sobre **el mismo código**, cada una tras `make clean-mutants`:
+
+| corrida | muertos | supervivientes |
+|---|---:|---|
+| 1 | 930/930 | — |
+| 2 | 929/930 | `boe_xml.x__desambiguar__mutmut_36` |
+| 3 | 927/930 | `boe_xml.x_parse_norma__mutmut_68`, `boe_xml.x__raiz_texto__mutmut_43`, `bootstrap.x_holm__mutmut_16` |
+
+No es solo que el recuento baile: **los supervivientes son otros cada vez**, así que no hay un
+puñado de mutantes equivalentes que se pueda declarar y descontar. Es exactamente lo que dice
+**Q-015**, ahora con tres puntos en vez de una impresión. El umbral no corre peligro —100 %
+redondeado contra un mínimo de 70— pero la **reproducibilidad** de `G-MUT` sí, y esa es la que
+importa cuando la meta bloquee desde la fase 3.
+
+### Estado del gate al cerrar la sesión
+
+`make done MILESTONE=2` está **rojo en la condición 7, y solo por `G-RECALL5`**. Las seis
+anteriores en verde, incluida la 5 con `G-COV-LINE = 100`, que llevaba toda la fase sin poder
+leerse. Lo que queda rojo es una métrica que no llega, no fontanería — que es donde tiene que
+estar un gate rojo.

@@ -35,9 +35,11 @@ from citebound.ingest.boe_xml import Apartado, Precepto, PreceptoTipo
 from citebound.ingest.chunking import (
     CHUNKER_APARTADO_ID,
     CHUNKER_ID,
+    CHUNKER_MULTINIVEL_ID,
     Chunk,
     ChunkingError,
     chunk_id_de,
+    chunk_multinivel,
     chunk_por_apartado,
     chunk_preceptos,
     content_hash_de,
@@ -396,3 +398,46 @@ def test_trocear_dos_veces_da_los_mismos_identificadores() -> None:
 def test_una_source_uri_vacia_se_rechaza_igual_que_en_articulo_v1() -> None:
     with pytest.raises(ChunkingError):
         chunk_por_apartado([ART3], source_uri="  ")
+
+
+# ======================================================================================
+# `multinivel-v1` · los dos niveles en el mismo índice
+# ======================================================================================
+#
+# Medido el 2026-08-17: `articulo-v1` gana en la lectura de artículo (0,847 con reordenador
+# contra 0,806) y `apartado-v1` gana en la estricta por goleada (0,500 contra 0,093). Cada
+# uno es mejor en una cosa distinta, así que la pregunta es si sirven los dos a la vez.
+
+
+def test_indexa_el_articulo_entero_y_ademas_cada_apartado() -> None:
+    refs = {str(c.ref) for c in chunk_multinivel([ART3], source_uri=URI)}
+    assert refs == {f"{NORMA}#art3", f"{NORMA}#art3.1", f"{NORMA}#art3.2"}
+
+
+def test_un_articulo_de_un_solo_apartado_no_se_indexa_dos_veces() -> None:
+    """Con un único apartado, el artículo **es** el apartado: los dos trozos tendrían el
+    mismo texto. Dos filas idénticas gastan plaza en el top-30 sin añadir nada, que es el
+    mismo desperdicio que el colapso por artículo existe para quitar."""
+    uno = _precepto("7", ("1", "Texto único."))
+    chunks = chunk_multinivel([uno], source_uri=URI)
+    assert len(chunks) == 1
+    assert str(chunks[0].ref) == f"{NORMA}#art7.1"
+
+
+def test_multinivel_no_acuna_un_apartado_donde_no_lo_hay() -> None:
+    """El invariante de siempre: `numero is None` no puede acuñar `art34.1`."""
+    chunks = chunk_multinivel([ART34], source_uri=URI)
+    assert len(chunks) == 1
+    assert chunks[0].ref.apartado is None
+
+
+def test_ningun_chunk_id_se_repite_aunque_dos_niveles_hablen_del_mismo_articulo() -> None:
+    chunks = chunk_multinivel([ART3, ART34], source_uri=URI)
+    assert len({c.chunk_id for c in chunks}) == len(chunks)
+    assert [c.ordinal for c in chunks] == list(range(len(chunks)))
+
+
+def test_multinivel_declara_su_propio_chunker_id() -> None:
+    assert CHUNKER_MULTINIVEL_ID == "multinivel-v1"
+    for chunk in chunk_multinivel([ART3], source_uri=URI):
+        assert chunk.chunker_id == CHUNKER_MULTINIVEL_ID

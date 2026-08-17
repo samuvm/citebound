@@ -37,9 +37,11 @@ from citebound.ingest.boe_xml import Precepto
 __all__ = [
     "CHUNKER_APARTADO_ID",
     "CHUNKER_ID",
+    "CHUNKER_MULTINIVEL_ID",
     "Chunk",
     "ChunkingError",
     "chunk_id_de",
+    "chunk_multinivel",
     "chunk_por_apartado",
     "chunk_preceptos",
     "content_hash_de",
@@ -49,6 +51,7 @@ __all__ = [
 
 CHUNKER_ID = "articulo-v1"
 CHUNKER_APARTADO_ID = "apartado-v1"
+CHUNKER_MULTINIVEL_ID = "multinivel-v1"
 
 _ESPACIOS = re.compile(r"\s+")
 
@@ -244,3 +247,8 @@ def chunk_por_apartado(preceptos: Sequence[Precepto], source_uri: str) -> tuple[
             )
 
     return tuple(chunks)
+
+
+def chunk_multinivel(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Sin implementar todavía: el rojo se compromete antes que el verde."""
+    return ()

@@ -1326,3 +1326,71 @@ Acuerdo en los 14 casos ciegos: **14 de 14**, al nivel del apartado.
 Parar. `make done` verde exige presentar números y esperar el visto bueno (CLAUDE.md regla 5).
 Samuel negó abrir la fase 2 el 2026-08-15 hasta cerrar la 1; la 1 ya está cerrada, así que la
 pregunta se le vuelve a hacer.
+
+---
+
+## 2026-08-17 · fase 2 · el híbrido construido, y tres cosas que nadie habría notado
+
+**Qué se intentó**
+
+Construir la fase 2 entera —léxico, vectorial, fusión, reordenador— y medir `G-RECALL5` y
+`G-RECALL30` contra el golden set. Es la primera vez que el proyecto produce un número de
+calidad que no es una opinión.
+
+**Qué falló**
+
+Tres cosas, y las tres fallaban **en silencio**, que es lo que las hace interesantes:
+
+1. **El canal léxico llevaba desde el principio devolviendo listas vacías.**
+   `websearch_to_tsquery` combina los términos con **AND**: la pregunta entera exigía que el
+   artículo contuviera *todas* sus palabras. «Al acercarse a un centro docente, ¿qué
+   precauciones debe tomar?» daba **cero** chunks aunque el 46.1.b diga literalmente «centros
+   docentes», porque el artículo no dice «precauciones» ni «tomar». Con OR casan 94 y el 46
+   entra en el top 5. El híbrido era vectorial a secas, y una lista vacía es indistinguible de
+   una búsqueda legítima sin resultados.
+2. **El generador es un modelo de razonamiento y nadie lo había notado.** `qwen3.5` emite su
+   cadena de pensamiento en un campo aparte y **se gasta el presupuesto de tokens antes de
+   contestar**: con `max_tokens=200`, `content` vacío, `finish_reason=length` y 1.168
+   caracteres de razonamiento. Con `reasoning_effort="none"`, de **4,0 s a 0,2 s**. No es una
+   optimización del reordenador: con el pensamiento activado **`G-TTFT ≤ 1500 ms` era
+   inalcanzable por construcción**, y se habría descubierto en la fase 3 midiendo `bench` sin
+   entender por qué. El proveedor ahora **lanza** si vuelve a llegar una respuesta vacía por
+   agotar tokens, con una grabación real que lo documenta.
+3. **Puse el tope del reordenador en 10 y con eso me cargué dos tercios del margen.** El 17 %
+   de los casos tenía el artículo correcto en los puestos 11-30 y el reordenador ni los
+   miraba: el techo con 10 era 0,785 y con 30 es 0,954. Corregir el parámetro aportó **8
+   puntos**, el doble que el reordenador entero con el tope malo. Un tope mal puesto no da un
+   error: da un número mediocre cuyo diagnóstico apunta al modelo o al prompt.
+
+**Números**
+
+| Canal | recall@5 | recall@30 |
+|---|---:|---:|
+| Solo vectorial | 0,790 | 0,941 |
+| Solo léxico | 0,365 | 0,804 |
+| Híbrido | 0,727 | 0,954 |
+| Híbrido + reordenador, sobre `v2` | **0,847** | **0,968** |
+
+Umbrales: 0,90 y 0,97. Faltan **12 casos** en el primero y **uno** en el segundo.
+`make eval-retrieval`: 1.182 s la primera corrida, **5,2 s desde caché**.
+
+**Decisiones**
+
+- **Caché de juicios versionada en el repo.** Mismo mecanismo que `GOALS.yaml` fija para el
+  juez de la fase 4 y por el mismo motivo: una meta que tarda veinte minutos se acaba sacando
+  del gate. La clave lleva pregunta, candidatos **en su orden**, modelo y versión del prompt —
+  un juicio emitido con otro prompt es un juicio sobre otra pregunta.
+- **`db/fts.sql` y `db/hnsw.sql` del plan sobran**: los índices GIN y HNSW y la configuración
+  `spanish_unaccent` ya están en el DDL del contrato. Escribirlos habría sido duplicar el
+  contrato en un sitio donde puede divergir.
+- **El reordenador nunca pierde un candidato.** Si lo hiciera, el recall bajaría por su culpa
+  y el diagnóstico apuntaría al índice. Tiene su test.
+- **Golden `v2` con tres casos fuera, no cinco** (ADR-021). El primer recuento clasificó por
+  expresión regular; al leerlos enteros, dos de los cinco **sí** se responden desde el texto.
+  Con cinco fuera `G-RECALL30` daba 0,977 y la meta cerraba; con tres da 0,968 y no llega. Se
+  queda el número honesto.
+
+**Siguiente**
+
+Medir si el hueco de `G-RECALL5` es el tamaño del modelo o cuánto texto ve, sobre los 52 casos
+rescatables. Y si ninguna configuración llega, decirlo tal cual en vez de seguir buscando.

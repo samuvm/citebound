@@ -133,6 +133,19 @@ def upsert_chunks(
     function of (document, content, occurrence), so `ON CONFLICT` on the primary key is
     all it takes: no timestamps and no counters means the second run computes the same
     identifiers as the first.
+
+    **`index_version` se actualiza, y ese es el punto delicado.** Como `chunk_id` no
+    depende del modelo de embedding, reindexar el mismo corpus con otro modelo de la
+    misma dimensión cae en este `ON CONFLICT` y **sustituye los vectores en sitio**. Sin
+    actualizar también la columna, la fila se quedaba con vectores de un modelo y el
+    nombre de otro: `make eval-retrieval` publicaría una procedencia falsa y nada la
+    contradiría. Ocurrió de verdad el 2026-08-17 al pasar de `bge-m3` a
+    `qwen3-embedding:0.6b` — ver `docs/JOURNAL.md`.
+
+    La consecuencia de fondo se declara en vez de disimularse: **a igual dimensión el
+    reindexado es destructivo en sitio**, así que la conmutación sin parar el servicio de
+    ADR-018 solo vale entre dimensiones distintas, que son las que viven en tablas
+    distintas. Con dos modelos de 1024 no hay dos índices a la vez.
     """
     if len(chunks) != len(embeddings):
         raise SchemaError(f"{len(chunks)} chunks y {len(embeddings)} embeddings")
@@ -146,9 +159,10 @@ def upsert_chunks(
              doc_id, ordinal, occurrence, metadata)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (chunk_id) DO UPDATE
-            SET content   = EXCLUDED.content,
-                embedding = EXCLUDED.embedding,
-                ordinal   = EXCLUDED.ordinal
+            SET content       = EXCLUDED.content,
+                embedding     = EXCLUDED.embedding,
+                ordinal       = EXCLUDED.ordinal,
+                index_version = EXCLUDED.index_version
         """,
         [
             (

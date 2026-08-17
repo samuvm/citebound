@@ -169,6 +169,55 @@ def test_ingesting_the_whole_corpus_twice_does_not_duplicate_a_single_row(
     assert segunda == primera, "la segunda ingesta duplicó filas"
 
 
+def test_reindexing_with_another_model_leaves_no_row_lying_about_its_provenance(
+    conexion: object, chunks: tuple[object, ...]
+) -> None:
+    """**El fallo que este test existe para que no vuelva** (2026-08-17).
+
+    `chunk_id` no depende del modelo de embedding, así que reindexar el mismo corpus con
+    otro modelo de la misma dimensión cae en el `ON CONFLICT` y sustituye los vectores en
+    sitio. El `SET` no tocaba `index_version`, de modo que la fila se quedaba con los
+    vectores de un modelo y el nombre de otro — y el síntoma es el peor posible: ninguno.
+    `make eval-retrieval` publicaba una procedencia falsa y nada podía contradecirla.
+
+    Se comprueban las dos mitades, porque cada una sola se puede pasar mintiendo: que el
+    vector es el nuevo, y que la columna lo admite.
+    """
+    otro = "v1-otro-modelo-1024"
+    nuevos = [_vector(i + 5000) for i in range(len(chunks))]
+    with conexion.cursor() as cur:  # type: ignore[attr-defined]
+        registrar_index_version(
+            cur,
+            index_id=otro,
+            embedding_model="otro-modelo",
+            dim=DIM,
+            chunker_id=CHUNKER_ID,
+            corpus_snapshot="2026-07-31",
+        )
+        upsert_chunks(cur, chunks, nuevos, index_id=otro)  # type: ignore[arg-type]
+
+        cur.execute("SELECT index_version, count(*) FROM chunk_v1 GROUP BY 1")
+        procedencia = dict(cur.fetchall())
+        cur.execute("SELECT count(*) FROM chunk_v1 WHERE embedding = %s::vector", (str(nuevos[0]),))
+        con_vector_nuevo = cur.fetchone()[0]
+
+        # Se restaura el estado del módulo: los demás tests de este fichero comparten la
+        # conexión y dan por sentado que el índice activo es `INDEX_ID`.
+        registrar_index_version(
+            cur,
+            index_id=INDEX_ID,
+            embedding_model="bge-m3",
+            dim=DIM,
+            chunker_id=CHUNKER_ID,
+            corpus_snapshot="2026-07-31",
+        )
+        upsert_chunks(cur, chunks, [_vector(i) for i in range(len(chunks))], index_id=INDEX_ID)  # type: ignore[arg-type]
+    conexion.commit()  # type: ignore[attr-defined]
+
+    assert procedencia == {otro: len(chunks)}, "hay filas que siguen diciendo ser del índice viejo"
+    assert con_vector_nuevo >= 1, "el vector no se sustituyó: el reindexado no reindexó nada"
+
+
 def test_every_indexed_row_carries_a_resolvable_legal_ref(conexion: object) -> None:
     with conexion.cursor() as cur:  # type: ignore[attr-defined]
         cur.execute("SELECT count(*) FROM chunk_v1 WHERE legal_ref IS NULL OR legal_ref = ''")

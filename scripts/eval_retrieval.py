@@ -37,6 +37,7 @@ from citebound.providers.chat import generador_por_defecto
 from citebound.providers.embeddings import embedder_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.rerank import CacheJuicios, ReordenadorLLM
+from citebound.retrieval.vector import indice_activo
 
 __all__ = ["a_nivel_articulo", "main", "medir"]
 
@@ -137,9 +138,14 @@ def main() -> int:
         "CITEBOUND_PG_URL", f"postgresql://citebound:citebound@localhost:{puerto}/citebound"
     )
 
+    con_reranker = os.environ.get("CITEBOUND_RERANK") == "1"
     arranque = time.monotonic()
     with psycopg.connect(url) as conn, conn.cursor() as cur:
-        medidas = medir(cur, casos, con_reranker=os.environ.get("CITEBOUND_RERANK") == "1")
+        # El contrato compartido lo pone en OBLIGATORIO (`chunks-ddl.sql`, sección final):
+        # todo informe registra el DESTINO FÍSICO RESUELTO, nunca el alias. Con el alias
+        # solo, dos corridas sobre datos distintos producirían informes idénticos.
+        index_version, physical_table = indice_activo(cur)
+        medidas = medir(cur, casos, con_reranker=con_reranker)
     total = time.monotonic() - arranque
 
     INFORME.parent.mkdir(parents=True, exist_ok=True)
@@ -160,7 +166,9 @@ def main() -> int:
                 ],
                 "n_casos": medidas["n_casos"],
                 "segundos": round(total, 1),
-                "sin_reranker": True,
+                "index_version": index_version,
+                "physical_table": physical_table,
+                "con_reranker": con_reranker,
                 "lectura_publicada": "a_nivel_articulo (Q-016 A)",
                 "nota": (
                     "Dos lecturas: `estricto` compara legal_ref literalmente y "

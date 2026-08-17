@@ -15,7 +15,7 @@ el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 
 - [x] **0 · Esqueleto vertical que camina** — doce condiciones en verde · [números](CHANGELOG.md)
 - [x] **1 · Scoring congelado y golden set** — el corrector se cerró **antes** de anotar el primer caso · **274 casos**, 15,3 h de revisión humana
-- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,847** contra 0,90 ✗ · nueve experimentos medidos, [seis negativos y anotados](docs/JOURNAL.md)
+- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,852** contra 0,90 ✗ · quince experimentos medidos, [nueve negativos y anotados](docs/JOURNAL.md)
 - [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
 - [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
 - [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
@@ -80,7 +80,7 @@ con `make eval-retrieval`.
 | Solo vectorial · HNSW coseno | 0,792 | 0,954 |
 | Solo léxico · `ts_rank_cd` | 0,370 | 0,815 |
 | Híbrido · fusión RRF | 0,727 | **0,977** |
-| Híbrido + reordenador | **0,847** | **0,977** |
+| Híbrido + reordenador | **0,852** | **0,977** |
 | *Umbral que exige el gate* | *≥ 0,90* | *≥ 0,97* |
 
 **El híbrido es peor que el vectorial solo en el top-5 y mejor en el top-30.** No es un accidente
@@ -90,13 +90,15 @@ que acertar a la primera.
 
 **`G-RECALL5` no llega, y el diagnóstico está cerrado.** El artículo correcto está entre los 30
 en **211 de 216** casos, así que el recuperador hace su trabajo; de esos 211, el reordenador
-coloca 184 en el top-5 — el 87,2 %, cuando haría falta el 92,4 %. Qué se hace con ese hueco es
+coloca 184 en el top-5 — el 87,2 %, cuando haría falta el 92,4 %. Con 80 candidatos por canal el
+artículo aparece en **216 de 216**: no falta información en ninguna parte, falta un ordenador
+mejor. Qué se hace con ese hueco es
 una decisión de producto y está planteada en [`docs/PARA-SAMUEL.md`](docs/PARA-SAMUEL.md) Q-019,
 junto con el dato que la hace urgente: el reordenador tarda **4,6 s** y el presupuesto de
 latencia por etapa le da **400 ms**.
 
-**Estos números tienen ruido de al menos un caso.** Medida dos veces la misma configuración
-—mismo código, mismo índice, `temperature` en 0— salió 0,852 y 0,847: en GPU la reducción de
+**Estos números tienen ruido de al menos un caso.** Medida tres veces la misma configuración
+—mismo código, mismo índice, `temperature` en 0— salió 0,852, 0,847 y 0,852: en GPU la reducción de
 coma flotante no es asociativa y el *greedy* puede elegir distinto. Por eso la caché de juicios
 del reordenador está versionada en el repositorio: no es una optimización, es lo que hace
 reproducible la medida.
@@ -113,7 +115,7 @@ poder cambiarlo sin invalidar el golden set:
 
 | troceado | trozos | recall@5 | recall@30 | recall@5 **estricto** |
 |---|---:|---:|---:|---:|
-| `articulo-v1` · uno por artículo | 235 | **0,847** | **0,977** | 0,093 |
+| `articulo-v1` · uno por artículo | 235 | **0,852** | **0,977** | 0,093 |
 | `apartado-v1` · uno por apartado | 569 | 0,806 | 0,968 | **0,477** |
 | `multinivel-v1` · los dos niveles | 710 | 0,824 | 0,963 | 0,171 |
 

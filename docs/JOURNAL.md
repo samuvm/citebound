@@ -1552,3 +1552,51 @@ un juicio sobre otra pregunta, y reutilizarlo sería mentir sobre qué se midió
 Los dos últimos merecen una nota: el formato `Instruct: {tarea}\nQuery: {consulta}` es el que
 documenta el modelo, y aun así **empeora** aquí en las dos lenguas. Se midió, no se supuso, y se
 quitó.
+
+### 6 · El prompt nuevo arregla dos defectos y **no mejora el recall**
+
+| | recall@5 | recall@30 |
+|---|---:|---:|
+| Prompt v1 (ordenación completa, números) | 0,856 | 0,977 |
+| Prompt v2 (cinco etiquetas de dos letras) | **0,852** | 0,977 |
+
+Un caso peor sobre 216. Muestreé ocho fallos, vi que seis entraban en el top-5 y esperaba un
+salto; la medición completa dice que no. **La muestra estaba sesgada por construcción**: elegí
+esos ocho *entre los fallos*, así que solo podían mejorar. Lo que el prompt nuevo gana en unos
+lo pierde en otros que la versión vieja acertaba por el camino equivocado — el top-5 mezclado
+con la cabeza de la fusión acertaba a veces, y ahora el modelo decide y a veces se equivoca.
+
+**Se queda igualmente**, y el motivo no es la métrica: la versión vieja tenía dos defectos
+reales —el modelo no contestaba lo que se le preguntaba y podía confundir el número del
+artículo con el del candidato— y arreglarlos no cuesta nada. Pero **no se puede decir que mejore
+el recall, porque no lo hace.**
+
+### 7 · ¿Es cuántos ve a la vez? Medido antes de construir nada
+
+De los **27** casos que fallan teniendo el artículo correcto entre los 30 recuperados, se le dio
+al modelo **solo la ventana de 10 que lo contiene** y se le pidieron 3:
+
+```
+acierta 15 de 27  =  55,6 %
+```
+
+No es que no sepa distinguir: es **cuántos candidatos tiene que sopesar a la vez**. 30 bloques
+de 500 caracteres son unos 4.000 tokens de contexto para un modelo de 4B, y el reordenado por
+ventanas es el remedio estándar para eso.
+
+De ahí `VENTANA = 10` y `POR_VENTANA = 3`: tres ventanas ascienden 9 finalistas y una cuarta
+llamada elige los 5. `PROMPT_VERSION` sube a 3 — cambia cuántas llamadas hay y qué ve el modelo
+en cada una, así que es otro juicio aunque la plantilla sea la misma.
+
+**Lo que cuesta, dicho antes de mirar si funciona:** cuatro llamadas por pregunta en vez de una.
+`make eval-retrieval` en frío pasa de ~16 min a ~65; desde caché sigue en **6,2 s**, que es lo
+que mantiene la meta dentro del gate. Y en el camino interactivo no cabe: `G-TTFT` tiene 1.500 ms
+de presupuesto y una sola llamada ya son ~4,6 s. El reordenador no puede vivir ahí, y eso ya lo
+anticipaba el ADR-022 — la salida no es volver al cross-encoder, es sacarlo del camino
+interactivo en la fase 3.
+
+**Un modo de fallo que apareció al construirlo y que no tenía la versión de una sola llamada:**
+con cuatro llamadas, un modelo mudo dejaba de conservar el orden de la fusión — las cabezas de
+cada ventana se adelantaban a candidatos que la fusión tenía por delante. Se arregla
+distinguiendo «no lo eligió» de «no dijo nada»: solo se adelanta lo que el modelo **nombra**.
+Con el modelo callado, la lista sale intacta. Tiene su test.

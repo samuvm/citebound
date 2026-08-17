@@ -16,10 +16,13 @@ import json
 from pathlib import Path
 
 from citebound.domain.legalref import parse
+from citebound.providers.chat import Respuesta
 from citebound.retrieval.rerank import (
     PEDIDOS,
     PROMPT_VERSION,
+    VENTANA,
     CacheJuicios,
+    ReordenadorLLM,
     clave_de,
     etiquetas,
     ordenar_por_etiquetas,
@@ -190,3 +193,79 @@ def test_la_cache_se_escribe_ordenada_y_estable(tmp_path: Path) -> None:
     cache.volcar()
     contenido = json.loads(ruta.read_text(encoding="utf-8"))
     assert list(contenido) == sorted(contenido)
+
+
+# --------------------------------------------------------------------------------------
+# El reordenado por ventanas
+# --------------------------------------------------------------------------------------
+
+
+class _Guion:
+    """Un `Generador` que contesta lo que se le diga, en orden, y cuenta las llamadas."""
+
+    model = "de-mentira"
+
+    def __init__(self, respuestas: list[str]) -> None:
+        self._respuestas = list(respuestas)
+        self.llamadas = 0
+        self.tamanos: list[int] = []
+
+    def completar(self, prompt: str, *, max_tokens: int = 0) -> Respuesta:
+        self.llamadas += 1
+        self.tamanos.append(prompt.count("\n\n[") + 1)
+        return Respuesta(self._respuestas.pop(0) if self._respuestas else "", self.model, "", 1)
+
+
+def treinta() -> list[Recuperado]:
+    return [cand(str(i)) for i in range(1, 31)]
+
+
+def test_con_treinta_candidatos_llama_una_vez_por_ventana_mas_la_final() -> None:
+    """Tres ventanas de diez y una decisión final entre los nueve finalistas.
+
+    El número de llamadas no es un detalle interno: multiplica el coste de `make eval-retrieval`
+    en frío por cuatro, y entra entero en el presupuesto de `G-TTFT`. Que esté fijado por un
+    test es lo que impide que suba sin que nadie lo note.
+    """
+    guion = _Guion(["AA, AB, AC"] * 4)
+    ReordenadorLLM(guion, tope=30).reordenar("¿por dónde?", treinta())
+    assert guion.llamadas == 4
+
+
+def test_ninguna_llamada_ve_mas_de_una_ventana_de_candidatos() -> None:
+    guion = _Guion(["AA, AB, AC"] * 4)
+    ReordenadorLLM(guion, tope=30).reordenar("q", treinta())
+    assert max(guion.tamanos) <= VENTANA
+
+
+def test_por_ventanas_no_pierde_ni_duplica_un_solo_candidato() -> None:
+    """**Lo que no puede fallar.** Con cuatro llamadas y dos fases hay cuatro sitios donde
+    perder un documento, y perderlo bajaría el recall por culpa del reordenador mientras el
+    diagnóstico apuntaría al índice. `recall@30` se mide sobre esta misma lista."""
+    candidatos = treinta()
+    salida = ReordenadorLLM(_Guion(["AB, AD, AF"] * 4), tope=30).reordenar("q", candidatos)
+    assert len(salida) == len(candidatos)
+    assert {str(r.ref) for r in salida} == {str(r.ref) for r in candidatos}
+
+
+def test_un_modelo_mudo_deja_el_orden_de_la_fusion() -> None:
+    """Si el modelo no contesta nada, el orden de la fusión es mejor que ninguno — y sobre
+    todo, no es un orden peor que el de partida."""
+    candidatos = treinta()
+    salida = ReordenadorLLM(_Guion([""] * 4), tope=30).reordenar("q", candidatos)
+    assert [str(r.ref) for r in salida] == [str(r.ref) for r in candidatos]
+
+
+def test_con_pocos_candidatos_no_se_parte_en_ventanas() -> None:
+    """Partir tres candidatos en ventanas sería pagar cuatro llamadas para nada."""
+    guion = _Guion(["AC, AA, AB"])
+    salida = ReordenadorLLM(guion, tope=30).reordenar("q", CANDIDATOS)
+    assert guion.llamadas == 1
+    assert str(salida[0].ref) == f"{NORMA}#art87"
+
+
+def test_lo_que_queda_fuera_del_tope_no_se_toca_ni_se_pierde() -> None:
+    candidatos = treinta() + [cand("99")]
+    salida = ReordenadorLLM(_Guion(["AA, AB, AC"] * 4), tope=30).reordenar("q", candidatos)
+    assert len(salida) == 31
+    assert str(salida[-1].ref) == f"{NORMA}#art99"

@@ -40,21 +40,28 @@ from citebound.retrieval.vector import Recuperado
 __all__ = [
     "CARACTERES_POR_CANDIDATO",
     "PEDIDOS",
+    "POR_VENTANA",
     "PROMPT_VERSION",
+    "VENTANA",
     "CacheJuicios",
     "ReordenadorLLM",
     "clave_de",
     "etiquetas",
+    "nombrados_por_etiquetas",
     "ordenar_por_etiquetas",
 ]
 
-PROMPT_VERSION = 2
-"""Sube cuando cambie `_PLANTILLA`. Forma parte de la clave de caché: un juicio emitido con
-otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería mentir sobre qué se midió.
+PROMPT_VERSION = 3
+"""Sube cuando cambie `_PLANTILLA` **o cómo se llama al modelo**. Forma parte de la clave de
+caché: un juicio emitido con otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería
+mentir sobre qué se midió.
 
 `2` (2026-08-17): etiquetas de dos letras en vez de números, y se piden exactamente `PEDIDOS`
 en vez de una ordenación completa. Los dos cambios salen de leer lo que el modelo contestaba,
 no de tunear — el detalle está abajo.
+
+`3` (2026-08-17): reordenado **por ventanas**. Cambia el número de llamadas y qué ve el modelo
+en cada una, así que es otro juicio aunque la plantilla sea la misma.
 """
 
 # Cuánto texto de cada artículo se le enseña al modelo. No es una constante caprichosa: con
@@ -76,6 +83,18 @@ Pidiendo cinco, el top-5 es exactamente lo que el modelo decidió. Si se equivoc
 él y se mide; antes se perdía por una discrepancia entre lo que el prompt pedía y lo que el
 código daba por hecho.
 """
+
+VENTANA = 10
+"""Cuántos candidatos sopesa el modelo de una vez.
+
+**Medido antes de elegirlo.** Sobre los 27 casos que fallaban teniendo el artículo correcto
+entre los 30 recuperados, el modelo lo mete en su top-3 en **15** cuando solo ve la ventana de
+10 que lo contiene. No es que no sepa distinguir: es cuántos tiene que sopesar a la vez.
+"""
+
+POR_VENTANA = 3
+"""Cuántos asciende cada ventana. Con `tope=30` salen 9 finalistas para elegir 5, que deja
+margen sin volver al problema que se acaba de quitar."""
 
 _ETIQUETA = re.compile(r"\b[A-Z]{2}\b")
 
@@ -114,13 +133,15 @@ Nada más: ni el número del artículo, ni explicación.
 """
 
 
-def ordenar_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
-    """`"AC, AA, AG"` → los candidatos en ese orden, y detrás los que el modelo no nombró.
+def nombrados_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
+    """Solo los que el modelo **nombró**, en su orden. Vacía si no nombró ninguno.
+
+    La distinción entre «no lo eligió» y «no dijo nada» es la que hace que el reordenado por
+    ventanas degrade bien: un modelo mudo no debe **mover** nada, porque el orden de la fusión
+    ya es una señal y sustituirlo por el azar de dónde caiga cada ventana es peor que no tocar.
 
     Defensivo a propósito: las etiquetas fuera de rango se ignoran y las repetidas cuentan una
-    vez. Lo que **nunca** ocurre es perder un candidato — el recall del sistema no puede
-    depender de que el modelo se acuerde de listarlos todos, y `recall@30` se mide sobre esta
-    misma lista.
+    sola vez.
     """
     indice = {e: i for i, e in enumerate(etiquetas(len(candidatos)))}
     elegidos: list[int] = []
@@ -128,8 +149,17 @@ def ordenar_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> l
         i = indice.get(cruda)
         if i is not None and i not in elegidos:
             elegidos.append(i)
-    elegidos.extend(i for i in range(len(candidatos)) if i not in elegidos)
     return [candidatos[i] for i in elegidos]
+
+
+def ordenar_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
+    """`"AC, AA, AG"` → los candidatos en ese orden, y detrás los que el modelo no nombró.
+
+    Lo que **nunca** ocurre es perder un candidato — el recall del sistema no puede depender
+    de que el modelo se acuerde de listarlos todos, y `recall@30` se mide sobre esta lista.
+    """
+    nombrados = nombrados_por_etiquetas(respuesta, candidatos)
+    return nombrados + [r for r in candidatos if r not in nombrados]
 
 
 def clave_de(pregunta: str, candidatos: Sequence[Recuperado], modelo: str) -> str:
@@ -214,21 +244,52 @@ class ReordenadorLLM:
             ordenada += [r for r in cabeza if r not in ordenada]
             return ordenada + cola
 
-        marcas = etiquetas(len(cabeza))
+        ordenada = self._por_ventanas(pregunta, cabeza)
+        if self._cache is not None:
+            self._cache.guardar(clave, [str(r.ref) for r in ordenada])
+        return ordenada + cola
+
+    def _por_ventanas(self, pregunta: str, cabeza: list[Recuperado]) -> list[Recuperado]:
+        """Primero cada ventana elige sus finalistas; después se eligen los cinco entre ellos.
+
+        **Medido antes de construirlo, que es el orden correcto.** De los 27 casos que fallaban
+        teniendo el artículo entre los 30, el modelo lo mete en su top-3 en **15** cuando solo
+        ve la ventana de 10 que lo contiene — el 55,6 %. Es decir: el problema no es que no
+        distinga, es cuántos candidatos tiene que sopesar a la vez.
+
+        Se conserva el orden de fusión dentro de cada ventana y entre ventanas: la fusión ya
+        es una señal, y barajarla obligaría al modelo a reconstruirla.
+        """
+        if len(cabeza) <= VENTANA:
+            elegidos = self._elegir(pregunta, cabeza, PEDIDOS)
+        else:
+            finalistas: list[Recuperado] = []
+            for i in range(0, len(cabeza), VENTANA):
+                finalistas += self._elegir(pregunta, cabeza[i : i + VENTANA], POR_VENTANA)
+            elegidos = self._elegir(pregunta, finalistas, PEDIDOS) or finalistas[:PEDIDOS]
+
+        # Solo se adelanta lo que el modelo **nombró**; lo demás conserva el orden de fusión.
+        # Con el modelo mudo, `elegidos` sale vacío y la lista queda intacta — que es lo
+        # correcto: la fusión ya es una señal, y sustituirla por el azar de en qué ventana cayó
+        # cada uno sería peor que no tocar nada. Y nadie se pierde: `recall@30` lee esta lista.
+        return elegidos + [r for r in cabeza if r not in elegidos]
+
+    def _elegir(self, pregunta: str, grupo: Sequence[Recuperado], cuantos: int) -> list[Recuperado]:
+        """Una llamada: **solo** los que el modelo nombró, como mucho `cuantos`."""
+        if len(grupo) < 2:
+            return list(grupo)
+        marcas = etiquetas(len(grupo))
         bloques = "\n\n".join(
             f"[{e}] {r.content[:CARACTERES_POR_CANDIDATO]}"
-            for e, r in zip(marcas, cabeza, strict=True)
+            for e, r in zip(marcas, grupo, strict=True)
         )
         respuesta = self._generador.completar(
             _PLANTILLA.format(
                 pregunta=pregunta,
                 bloques=bloques,
-                pedidos=PEDIDOS,
-                ejemplo=", ".join(marcas[:PEDIDOS]),
+                pedidos=cuantos,
+                ejemplo=", ".join(marcas[:cuantos]),
             ),
             max_tokens=48,
         )
-        ordenada = ordenar_por_etiquetas(respuesta.texto, cabeza)
-        if self._cache is not None:
-            self._cache.guardar(clave, [str(r.ref) for r in ordenada])
-        return ordenada + cola
+        return nombrados_por_etiquetas(respuesta.texto, grupo)[:cuantos]

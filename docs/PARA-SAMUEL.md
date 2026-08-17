@@ -974,3 +974,59 @@ y en el ADR-022 para que al menos no sea invisible.
 **Tiempo tuyo:** 5 minutos.
 **Estado: PENDIENTE**
 `>> `
+
+### Q-019 · fase 2 · BLOQUEA la fase 3 · el reordenador no cabe en el presupuesto de latencia que tú ratificaste
+
+**Qué necesito:** decidir si el reordenador entra o no en el camino interactivo, sabiendo que
+**no puede entrar sin romper `G-TTFT`**.
+
+**Por qué:** `docs/RULES.md` §2.1 reparte el presupuesto de 1.500 ms por etapas y le da al
+rerank **400 ms**. Ese número venía de un cross-encoder en proceso, que es lo que decía el
+`STACK.md` de entonces. En Q-017 elegiste **B** —el reordenador es el generador, un solo
+transporte— y ahora está medido lo que cuesta:
+
+| | medido | presupuesto de RULES §2.1 |
+|---|---:|---:|
+| Una llamada al reordenador (30 candidatos) | **~4.600 ms** | 400 ms |
+| Cuatro llamadas (reordenado por ventanas) | **~18.000 ms** | 400 ms |
+
+No es un ajuste: son 11 y 46 veces el presupuesto. Y `G-TTFT` bloquea desde la fase 3, así que
+esto no se puede dejar para más adelante sin construir la fase 3 encima de una decisión que
+habrá que deshacer.
+
+**Lo que está en juego de verdad no es la latencia, es qué significa `G-RECALL5`.** Si el
+reordenador no corre al responder, el usuario recibe el top-5 de la fusión —**0,727** medido— y
+no el número que publica la meta. La meta seguiría siendo cierta sobre el sistema construido y
+falsa sobre el producto, que es la clase de número que este proyecto existe para no publicar.
+
+Y hay un segundo desfase, menor pero del mismo origen: la nota de `G-RECALL5` en `GOALS.yaml`
+dice *«Coste ~90 s y sin LLM generador: es la única meta de calidad barata»*. Con Q-017 el
+reordenador **es** el generador, y en frío la meta cuesta ~65 min. Sigue costando 6,2 s desde la
+caché de juicios —por eso se puede quedar en el gate— pero la frase ya no describe lo que pasa.
+
+**Opciones:**
+
+- **A (recomendada):** el reordenador es **de evaluación**, no del camino interactivo. El
+  producto responde con el top-5 de la fusión. *Pros:* `G-TTFT` intacto, el arranque en frío
+  intacto, y la fase 3 se construye sobre lo que de verdad va a correr. *Contras:* el usuario
+  recibe 0,727 y no 0,9. Habría que decirlo en el README con esas palabras, y `G-RECALL5` pasa a
+  medir **el techo del recuperador**, no la experiencia.
+- **B:** el reordenador entra y se renegocia `G-TTFT` (`propuesta_admisible: true`). *Pros:* el
+  usuario recibe el mejor top-5. *Contras:* 18 s hasta el primer token no es un tutor, es un
+  proceso por lotes. Y `docs/RULES.md` §2.2 ya resolvió una vez el conflicto entre *streaming* y
+  verificación; volver a moverlo por la misma pieza empieza a ser un patrón.
+- **C:** reordenador **reducido** en el camino interactivo — una sola ventana de 10 en vez de
+  cuatro llamadas— y el completo solo en evaluación. *Pros:* algo de mejora dentro de un
+  presupuesto renegociable a ~5 s. *Contras:* dos configuraciones que medir y mantener, y
+  `G-RECALL5` tendría que publicar **las dos**, que es lo honesto pero es más trabajo.
+
+`[ ] A   [ ] B   [ ] C`
+
+**Si dices que no a todo:** me quedo con **A** al empezar la fase 3, porque es lo único que no
+rompe una meta ya ratificada, y lo declaro así en el README y en el CHANGELOG.
+
+**Tiempo tuyo:** 10 minutos. Es una decisión de producto, no de implementación: cuánto está
+dispuesto a esperar quien pregunta.
+
+**Estado: PENDIENTE**
+`>> `

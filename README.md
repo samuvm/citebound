@@ -102,10 +102,26 @@ del reordenador está versionada en el repositorio: no es una optimización, es 
 reproducible la medida.
 
 **Todo lo que se probó y salió mal está anotado**, con su número, en
-[`docs/JOURNAL.md`](docs/JOURNAL.md): un modelo de 9B que rescata menos que el de 4B, 1.200
-caracteres de contexto que van peor que 500, una fusión RRF entre el orden de fusión y el del
-reordenador, y el formato de instrucción que documenta `Qwen3-Embedding` — que **empeora** aquí,
-en inglés y en castellano.
+[`docs/JOURNAL.md`](docs/JOURNAL.md) — que es la mitad interesante de la fase. Entre otras cosas:
+1.200 caracteres de contexto van peor que 500; una fusión RRF entre el orden de fusión y el del
+reordenador da 0,782; el formato de instrucción que documenta `Qwen3-Embedding` **empeora** aquí,
+en inglés y en castellano; y el reordenado por ventanas de 10 —que un diagnóstico dirigido daba
+por bueno— sale diez casos peor.
+
+**Se probaron tres troceados del corpus**, porque anclar en `LegalRef` existe justamente para
+poder cambiarlo sin invalidar el golden set:
+
+| troceado | trozos | recall@5 | recall@30 | recall@5 **estricto** |
+|---|---:|---:|---:|---:|
+| `articulo-v1` · uno por artículo | 235 | **0,847** | **0,977** | 0,093 |
+| `apartado-v1` · uno por apartado | 569 | 0,806 | 0,968 | **0,477** |
+| `multinivel-v1` · los dos niveles | 710 | 0,824 | 0,963 | 0,171 |
+
+Gana el original en las dos metas que bloquean, y el resultado que lo explica es el contrario
+del que esperaba: **con trozos afilados el reordenador aporta un caso; con trozos gruesos aporta
+veintiséis.** Su valor es tapar el ruido del embedding, no juzgar mejor que él. La lectura
+estricta cuenta otra historia —se multiplica por cinco al trocear fino— y es la que importará
+para la precisión de cita en la fase 3.
 
 ---
 

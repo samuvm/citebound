@@ -33,6 +33,7 @@ ESTADO = RAIZ / ".claude" / "state" / "gate-status.json"
 LOCK = RAIZ / "thresholds.lock"
 GOALS = RAIZ / "docs" / "GOALS.yaml"
 INVENTARIO = RAIZ / ".claude" / "state" / "test-inventory.json"
+MUTACION = RAIZ / "evals" / "reports" / "mutation-latest.json"
 TOPE_DEUDA = 10
 
 
@@ -192,6 +193,13 @@ def mutacion_caducada() -> str | None:
     return None
 
 
+def cfg_mutados() -> list[str]:
+    """Qué ficheros mutó esta corrida. Va en el informe porque un `killed_pct` sin saber sobre
+    qué se calculó es lo que dejó a `G-MUT` verde midiendo cinco de seis ficheros."""
+    datos = tomllib.loads((RAIZ / "pyproject.toml").read_text(encoding="utf-8"))
+    return list(datos["tool"]["mutmut"]["source_paths"])
+
+
 def c6_mutacion(milestone: int) -> Resultado:
     cfg = tomllib.loads((RAIZ / "pyproject.toml").read_text(encoding="utf-8"))["tool"]["gate"]
     minimo = cfg["mutantes_muertos_min"]
@@ -221,6 +229,24 @@ def c6_mutacion(milestone: int) -> Resultado:
             "uv run mutmut run",
         )
     pct = round(100 * muertos / total)
+    # `G-MUT` nombra `evals/reports/mutation-latest.json :: killed_pct` y bloquea desde la
+    # fase 3. Sin esto sería la cuarta meta muda por fontanería —tras `G-GOLDEN-VALID`,
+    # `G-COV-FUNC` y `G-COV-LINE`—, y la habría descubierto el gate de la fase 3 en vez de
+    # este. Se escribe el fichero **y** se publica en memoria: el fichero es para leerlo, y
+    # `CALCULADO` para que la condición 7 use el número de ESTA corrida y no el de la anterior.
+    informe = {
+        "killed_pct": pct,
+        "killed": muertos,
+        "total": total,
+        "supervivientes": vivos,
+        "minimo": minimo,
+        "ficheros": cfg_mutados(),
+    }
+    MUTACION.parent.mkdir(parents=True, exist_ok=True)
+    MUTACION.write_text(
+        json.dumps(informe, ensure_ascii=False, indent=1, sort_keys=True) + "\n", encoding="utf-8"
+    )
+    CALCULADO[("evals/reports/mutation-latest.json", "killed_pct")] = pct
     return Resultado(
         6,
         "mutación",

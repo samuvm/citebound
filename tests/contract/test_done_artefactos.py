@@ -125,9 +125,11 @@ def test_el_gate_sabe_partir_el_artefacto_de_todas_las_metas_bloqueantes() -> No
     assert sin_lector == ["G-REVERSION"]
 
 
-@pytest.mark.parametrize("meta_id", ["G-GOLDEN-VALID", "G-COV-FUNC"])
+@pytest.mark.parametrize("meta_id", ["G-GOLDEN-VALID", "G-COV-FUNC", "G-COV-LINE", "G-MUT"])
 def test_las_metas_que_bloquean_en_la_fase_1_apuntan_a_algo_legible(meta_id: str) -> None:
-    """Los dos casos concretos que dejaban `make done MILESTONE=1` en rojo perpetuo."""
+    """Las cuatro que han dejado —o iban a dejar— un `make done` en rojo perpetuo por
+    fontanería: `G-GOLDEN-VALID` y `G-COV-FUNC` en la fase 1, `G-COV-LINE` en la 2, y `G-MUT`
+    que habría esperado a la 3 para descubrirse."""
     metas = yaml.safe_load((RAIZ / "docs" / "GOALS.yaml").read_text(encoding="utf-8"))["metas"]
     meta = next(m for m in metas if m["id"] == meta_id)
     partido = done.partir_artefacto(str(meta["artefacto"]))

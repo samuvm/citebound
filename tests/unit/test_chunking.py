@@ -44,6 +44,7 @@ from citebound.ingest.chunking import (
     chunk_preceptos,
     content_hash_de,
     doc_id_de,
+    exigir_ids_unicos,
     normalizar_contenido,
 )
 
@@ -441,3 +442,47 @@ def test_multinivel_declara_su_propio_chunker_id() -> None:
     assert CHUNKER_MULTINIVEL_ID == "multinivel-v1"
     for chunk in chunk_multinivel([ART3], source_uri=URI):
         assert chunk.chunker_id == CHUNKER_MULTINIVEL_ID
+
+
+def test_dos_chunks_con_el_mismo_id_revientan_en_vez_de_perderse() -> None:
+    """**El guardián que cazó un fallo real y no tenía test.**
+
+    `chunk_id` es la clave primaria, así que dos filas con el mismo id no dan un error: una se
+    come a la otra en el `ON CONFLICT` y el síntoma aparece mucho más lejos, como un recall
+    peor sin causa. Saltó el 2026-08-17 con 94 repetidos en el corpus real.
+
+    El mensaje se comprueba desde el principio a propósito: es lo que va a leer quien se lo
+    encuentre, y un gate que dice «rojo» y calla se acaba desactivando.
+    """
+    uno, *_ = chunk_por_apartado([ART3], source_uri=URI)
+    with pytest.raises(ChunkingError, match=r"^dos niveles produjeron el mismo chunk_id \(1\)"):
+        exigir_ids_unicos([uno, uno])
+
+
+def test_sin_repetidos_no_dice_nada() -> None:
+    exigir_ids_unicos(chunk_multinivel([ART3, ART34], source_uri=URI))
+
+
+def test_cada_apartado_hereda_la_jerarquia_de_su_articulo() -> None:
+    """Título, capítulo y sección viajan con el chunk, y no son adorno: son lo que permite
+    filtrar por materia y lo que da contexto a la respuesta. Trocear más fino multiplica las
+    filas, así que una de estas que se quedara en `None` afectaría a 569 y no a 235."""
+    art = _precepto("34", ("1", "Uno."), ("2", "Dos."), titulo="TÍTULO II")
+    object.__setattr__(art, "capitulo", "CAPÍTULO III")
+    object.__setattr__(art, "seccion", "Sección 2.ª")
+    for chunk in chunk_por_apartado([art], source_uri=URI):
+        assert chunk.titulo == "TÍTULO II"
+        assert chunk.capitulo == "CAPÍTULO III"
+        assert chunk.seccion == "Sección 2.ª"
+        assert chunk.id_norma_version == "BOE-A-2003-23514"
+        assert chunk.fecha_vigencia == "20040123"
+
+
+def test_dos_documentos_distintos_no_comparten_chunk_id_aunque_digan_lo_mismo() -> None:
+    """El `doc_id` entra en el identificador, y hace falta: el día que el corpus tenga dos
+    normas, un artículo con el mismo texto en las dos sería **un solo chunk** y una de las dos
+    normas desaparecería del índice sin que nada avisara."""
+    a = chunk_por_apartado([ART3], source_uri=URI)
+    b = chunk_por_apartado([ART3], source_uri=URI.replace("23514", "99999"))
+    assert {c.chunk_id for c in a}.isdisjoint({c.chunk_id for c in b})
+    assert [c.content for c in a] == [c.content for c in b]

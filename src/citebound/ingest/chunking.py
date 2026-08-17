@@ -47,6 +47,7 @@ __all__ = [
     "chunk_preceptos",
     "content_hash_de",
     "doc_id_de",
+    "exigir_ids_unicos",
     "normalizar_contenido",
 ]
 
@@ -250,6 +251,29 @@ def chunk_por_apartado(preceptos: Sequence[Precepto], source_uri: str) -> tuple[
     return tuple(chunks)
 
 
+def exigir_ids_unicos(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) > 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
 def chunk_multinivel(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
     """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
 
@@ -283,14 +307,7 @@ def chunk_multinivel(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Ch
         if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
     ]
     juntos = [*articulos, *apartados]
-    # Los dos troceadores cuentan sus `occurrence` por separado, así que un contenido que
-    # apareciera en los dos conjuntos daría el MISMO `chunk_id` y una fila se comería a la
-    # otra en el `ON CONFLICT`, en silencio. Se comprueba en vez de confiar: perder un chunk
-    # aquí se vería aguas abajo como un recall peor sin causa.
-    if len({c.chunk_id for c in juntos}) != len(juntos):
-        raise ChunkingError(
-            "dos niveles produjeron el mismo chunk_id: la ingesta perdería una fila sin avisar"
-        )
+    exigir_ids_unicos(juntos)
     return tuple(
         replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
         for i, chunk in enumerate(juntos)

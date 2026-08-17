@@ -28,24 +28,32 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from collections import Counter
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from citebound.domain.legalref import LegalRef
 from citebound.ingest.boe_xml import Precepto
 
 __all__ = [
+    "CHUNKER_APARTADO_ID",
     "CHUNKER_ID",
+    "CHUNKER_MULTINIVEL_ID",
     "Chunk",
     "ChunkingError",
     "chunk_id_de",
+    "chunk_multinivel",
+    "chunk_por_apartado",
     "chunk_preceptos",
     "content_hash_de",
     "doc_id_de",
+    "exigir_ids_unicos",
     "normalizar_contenido",
 ]
 
 CHUNKER_ID = "articulo-v1"
+CHUNKER_APARTADO_ID = "apartado-v1"
+CHUNKER_MULTINIVEL_ID = "multinivel-v1"
 
 _ESPACIOS = re.compile(r"\s+")
 
@@ -3552,3 +3560,6283 @@ mutants_x__contenido__mutmut['x__contenido__mutmut_1'] = x__contenido__mutmut_1 
 mutants_x__contenido__mutmut['x__contenido__mutmut_2'] = x__contenido__mutmut_2 # type: ignore # mutmut generated
 mutants_x__contenido__mutmut['x__contenido__mutmut_3'] = x__contenido__mutmut_3 # type: ignore # mutmut generated
 mutants_x__contenido__mutmut['x__contenido__mutmut_4'] = x__contenido__mutmut_4 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut: MutantDict = {}  # type: ignore
+
+
+@_mutmut_mutated(mutants_x_chunk_por_apartado__mutmut)
+def chunk_por_apartado(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_orig(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_1(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_2(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_3(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError(None)
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_4(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("XXsource_uri vacío: todos los documentos compartirían doc_idXX")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_5(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("SOURCE_URI VACÍO: TODOS LOS DOCUMENTOS COMPARTIRÍAN DOC_ID")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_6(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = None
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_7(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(None)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_8(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = None
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_9(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = None
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_10(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_11(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            break
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_12(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_13(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(None)
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_14(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = None
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_15(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_16(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = None
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_17(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(None, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_18(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=None),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_19(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_20(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, ),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_21(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) != len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_22(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(None))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_23(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = None
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_24(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(None)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_25(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = None
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_26(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(None, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_27(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, None)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_28(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_29(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, )
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_30(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 1)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_31(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = None
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_32(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence - 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_33(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 2
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_34(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                None
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_35(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=None,
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_36(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=None,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_37(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=None,
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_38(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=None,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_39(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=None,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_40(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=None,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_41(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=None,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_42(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=None,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_43(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=None,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_44(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=None,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_45(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=None,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_46(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=None,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_47(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=None,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_48(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_49(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_50(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_51(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_52(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_53(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_54(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_55(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_56(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_57(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_58(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_59(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_60(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_61(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(None, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_62(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, None, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_63(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, None),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_64(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_65(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_66(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, ),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(chunks)
+
+
+def x_chunk_por_apartado__mutmut_67(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """Un chunk por apartado, y uno por artículo cuando el artículo no numera sus párrafos.
+
+    **Por qué existe, medido.** Con `articulo-v1` el artículo entero es un solo embedding
+    para varios temas, y los fallos de recall del 2026-08-17 eran confusiones dentro de un
+    grupo: los artículos 74, 108, 109 y 110 hablan todos de señalizar maniobras y el
+    recuperador elegía mal entre ellos. Un apartado dice una cosa sola.
+
+    **La regla que no se negocia** está en el `if` de abajo: si el apartado no tiene número,
+    el chunk se queda a nivel de artículo. Inventar un `1` acuñaría `art34.1`, una referencia
+    que **no existe** — la alucinación que `G-HALLUC` está construido para hacer imposible,
+    entrando por la puerta de atrás del troceador.
+
+    Cuál de los dos troceados se usa lo decide el número de `make eval-retrieval`, no esta
+    docstring; los dos conviven y `chunker_id` dice cuál produjo cada índice.
+    """
+    if not preceptos:
+        return ()
+    if not source_uri.strip():
+        raise ChunkingError("source_uri vacío: todos los documentos compartirían doc_id")
+
+    doc_id = doc_id_de(source_uri)
+    vistos: dict[str, int] = {}
+    chunks: list[Chunk] = []
+
+    for precepto in preceptos:
+        if not precepto.vigente:
+            continue
+        if not precepto.apartados:
+            raise ChunkingError(f"{precepto.ref} no tiene texto que indexar")
+
+        numerados = [a for a in precepto.apartados if a.numero is not None]
+        # Todo o nada por artículo: mezclar un chunk por apartado con otro para los párrafos
+        # sueltos partiría el texto de un mismo artículo entre dos referencias distintas, y
+        # `G-QUOTE-LIT` verifica cada cita contra UN chunk.
+        piezas: list[tuple[LegalRef, str]] = (
+            [
+                (
+                    replace(precepto.ref, apartado=a.numero),
+                    f"{precepto.rotulo}. {precepto.rubrica}\n{a.numero}. {a.texto}",
+                )
+                for a in numerados
+            ]
+            if len(numerados) == len(precepto.apartados)
+            else [(precepto.ref, _contenido(precepto))]
+        )
+
+        for ref, content in piezas:
+            content_hash = content_hash_de(content)
+            occurrence = vistos.get(content_hash, 0)
+            vistos[content_hash] = occurrence + 1
+            chunks.append(
+                Chunk(
+                    chunk_id=chunk_id_de(doc_id, content_hash, occurrence),
+                    doc_id=doc_id,
+                    ordinal=len(chunks),
+                    occurrence=occurrence,
+                    content=content,
+                    content_hash=content_hash,
+                    ref=ref,
+                    chunker_id=CHUNKER_APARTADO_ID,
+                    titulo=precepto.titulo,
+                    capitulo=precepto.capitulo,
+                    seccion=precepto.seccion,
+                    id_norma_version=precepto.id_norma_version,
+                    fecha_vigencia=precepto.fecha_vigencia,
+                )
+            )
+
+    return tuple(None)
+
+mutants_x_chunk_por_apartado__mutmut['_mutmut_orig'] = x_chunk_por_apartado__mutmut_orig # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_1'] = x_chunk_por_apartado__mutmut_1 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_2'] = x_chunk_por_apartado__mutmut_2 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_3'] = x_chunk_por_apartado__mutmut_3 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_4'] = x_chunk_por_apartado__mutmut_4 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_5'] = x_chunk_por_apartado__mutmut_5 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_6'] = x_chunk_por_apartado__mutmut_6 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_7'] = x_chunk_por_apartado__mutmut_7 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_8'] = x_chunk_por_apartado__mutmut_8 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_9'] = x_chunk_por_apartado__mutmut_9 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_10'] = x_chunk_por_apartado__mutmut_10 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_11'] = x_chunk_por_apartado__mutmut_11 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_12'] = x_chunk_por_apartado__mutmut_12 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_13'] = x_chunk_por_apartado__mutmut_13 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_14'] = x_chunk_por_apartado__mutmut_14 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_15'] = x_chunk_por_apartado__mutmut_15 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_16'] = x_chunk_por_apartado__mutmut_16 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_17'] = x_chunk_por_apartado__mutmut_17 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_18'] = x_chunk_por_apartado__mutmut_18 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_19'] = x_chunk_por_apartado__mutmut_19 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_20'] = x_chunk_por_apartado__mutmut_20 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_21'] = x_chunk_por_apartado__mutmut_21 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_22'] = x_chunk_por_apartado__mutmut_22 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_23'] = x_chunk_por_apartado__mutmut_23 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_24'] = x_chunk_por_apartado__mutmut_24 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_25'] = x_chunk_por_apartado__mutmut_25 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_26'] = x_chunk_por_apartado__mutmut_26 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_27'] = x_chunk_por_apartado__mutmut_27 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_28'] = x_chunk_por_apartado__mutmut_28 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_29'] = x_chunk_por_apartado__mutmut_29 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_30'] = x_chunk_por_apartado__mutmut_30 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_31'] = x_chunk_por_apartado__mutmut_31 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_32'] = x_chunk_por_apartado__mutmut_32 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_33'] = x_chunk_por_apartado__mutmut_33 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_34'] = x_chunk_por_apartado__mutmut_34 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_35'] = x_chunk_por_apartado__mutmut_35 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_36'] = x_chunk_por_apartado__mutmut_36 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_37'] = x_chunk_por_apartado__mutmut_37 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_38'] = x_chunk_por_apartado__mutmut_38 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_39'] = x_chunk_por_apartado__mutmut_39 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_40'] = x_chunk_por_apartado__mutmut_40 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_41'] = x_chunk_por_apartado__mutmut_41 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_42'] = x_chunk_por_apartado__mutmut_42 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_43'] = x_chunk_por_apartado__mutmut_43 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_44'] = x_chunk_por_apartado__mutmut_44 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_45'] = x_chunk_por_apartado__mutmut_45 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_46'] = x_chunk_por_apartado__mutmut_46 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_47'] = x_chunk_por_apartado__mutmut_47 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_48'] = x_chunk_por_apartado__mutmut_48 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_49'] = x_chunk_por_apartado__mutmut_49 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_50'] = x_chunk_por_apartado__mutmut_50 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_51'] = x_chunk_por_apartado__mutmut_51 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_52'] = x_chunk_por_apartado__mutmut_52 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_53'] = x_chunk_por_apartado__mutmut_53 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_54'] = x_chunk_por_apartado__mutmut_54 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_55'] = x_chunk_por_apartado__mutmut_55 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_56'] = x_chunk_por_apartado__mutmut_56 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_57'] = x_chunk_por_apartado__mutmut_57 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_58'] = x_chunk_por_apartado__mutmut_58 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_59'] = x_chunk_por_apartado__mutmut_59 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_60'] = x_chunk_por_apartado__mutmut_60 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_61'] = x_chunk_por_apartado__mutmut_61 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_62'] = x_chunk_por_apartado__mutmut_62 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_63'] = x_chunk_por_apartado__mutmut_63 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_64'] = x_chunk_por_apartado__mutmut_64 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_65'] = x_chunk_por_apartado__mutmut_65 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_66'] = x_chunk_por_apartado__mutmut_66 # type: ignore # mutmut generated
+mutants_x_chunk_por_apartado__mutmut['x_chunk_por_apartado__mutmut_67'] = x_chunk_por_apartado__mutmut_67 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut: MutantDict = {}  # type: ignore
+
+
+@_mutmut_mutated(mutants_x_exigir_ids_unicos__mutmut)
+def exigir_ids_unicos(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) > 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_orig(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) > 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_1(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = None
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_2(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        None
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_3(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(None) > 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_4(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) >= 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_5(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) > 2}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[0]}"
+        )
+
+
+def x_exigir_ids_unicos__mutmut_6(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) > 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            None
+        )
+
+
+def x_exigir_ids_unicos__mutmut_7(chunks: Sequence[Chunk]) -> None:
+    """Revienta si dos chunks comparten `chunk_id`. Se comprueba en vez de confiar.
+
+    Cada troceador cuenta sus `occurrence` por su cuenta, así que al juntar dos niveles un
+    contenido repetido da el **mismo** identificador — y `chunk_id` es la clave primaria, de
+    modo que una fila se comería a la otra en el `ON CONFLICT` **sin decir nada**. El síntoma
+    aparecería mucho más lejos, como un recall peor sin causa aparente.
+
+    Saltó de verdad el 2026-08-17 con 94 repetidos en el corpus real, y la causa era semántica
+    y no aritmética: los 94 artículos que no numeran sus párrafos, donde el nivel fino ya
+    devuelve el artículo entero. El arreglo fue no añadirlo dos veces; esto se queda como
+    red, porque comprobar cuesta una línea.
+    """
+    repetidos = sorted(
+        {c.chunk_id for c in chunks if [x.chunk_id for x in chunks].count(c.chunk_id) > 1}
+    )
+    if repetidos:
+        raise ChunkingError(
+            f"dos niveles produjeron el mismo chunk_id ({len(repetidos)}): "
+            f"la ingesta perdería una fila sin avisar. Primero: {repetidos[1]}"
+        )
+
+mutants_x_exigir_ids_unicos__mutmut['_mutmut_orig'] = x_exigir_ids_unicos__mutmut_orig # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_1'] = x_exigir_ids_unicos__mutmut_1 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_2'] = x_exigir_ids_unicos__mutmut_2 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_3'] = x_exigir_ids_unicos__mutmut_3 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_4'] = x_exigir_ids_unicos__mutmut_4 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_5'] = x_exigir_ids_unicos__mutmut_5 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_6'] = x_exigir_ids_unicos__mutmut_6 # type: ignore # mutmut generated
+mutants_x_exigir_ids_unicos__mutmut['x_exigir_ids_unicos__mutmut_7'] = x_exigir_ids_unicos__mutmut_7 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut: MutantDict = {}  # type: ignore
+
+
+@_mutmut_mutated(mutants_x_chunk_multinivel__mutmut)
+def chunk_multinivel(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_orig(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_1(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = None
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_2(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(None, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_3(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, None)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_4(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_5(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, )
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_6(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = None
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_7(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(None)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_8(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = None
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_9(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(None, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_10(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, None)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_11(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_12(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, )
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_13(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] >= 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_14(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 2
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_15(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = None
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_16(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(None)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_17(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        None
+    )
+
+
+def x_chunk_multinivel__mutmut_18(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(None, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_19(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=None, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_20(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=None)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_21(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_22(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_23(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, )
+        for i, chunk in enumerate(juntos)
+    )
+
+
+def x_chunk_multinivel__mutmut_24(preceptos: Sequence[Precepto], source_uri: str) -> tuple[Chunk, ...]:
+    """El artículo entero **y además** cada uno de sus apartados, en el mismo índice.
+
+    **Por qué existen los tres troceados y no uno.** Medido el 2026-08-17 sobre los mismos
+    216 casos, cada uno gana en una cosa distinta:
+
+    | troceado | recall@5 de artículo, con reordenador | recall@5 estricto |
+    |---|---:|---:|
+    | `articulo-v1` | **0,847** | 0,093 |
+    | `apartado-v1` | 0,806 | **0,500** |
+
+    El artículo entero recupera mejor —su embedding tiene contexto— y el apartado cita mejor
+    —su referencia es la que pide el golden set—. Indexar los dos da al recuperador dos formas
+    de encontrar el mismo artículo, y al colapso por artículo de `retrieval.pipeline` le toca
+    quedarse con la que mejor haya salido.
+
+    **Un artículo de un solo apartado no se indexa dos veces**: ahí el artículo *es* el
+    apartado, los dos trozos tendrían el mismo texto, y dos filas idénticas gastan plaza en
+    el top-30 sin añadir nada. Es el mismo desperdicio que el colapso existe para quitar.
+    """
+    apartados = chunk_por_apartado(preceptos, source_uri)
+    # Cuántos trozos produjo el nivel fino para cada artículo. Solo se añade el artículo
+    # entero cuando ahí hubo de verdad una partición: si el artículo no numera sus párrafos
+    # —94 del corpus— el nivel fino ya devolvió el artículo completo, y añadirlo otra vez
+    # sería la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id`, así que una
+    # se comería a la otra en el `ON CONFLICT` sin decir nada.
+    troceados = Counter(f"{c.ref.norma}#art{c.ref.articulo}" for c in apartados)
+    articulos = [
+        c
+        for c in chunk_preceptos(preceptos, source_uri)
+        if troceados[f"{c.ref.norma}#art{c.ref.articulo}"] > 1
+    ]
+    juntos = [*articulos, *apartados]
+    exigir_ids_unicos(juntos)
+    return tuple(
+        replace(chunk, ordinal=i, chunker_id=CHUNKER_MULTINIVEL_ID)
+        for i, chunk in enumerate(None)
+    )
+
+mutants_x_chunk_multinivel__mutmut['_mutmut_orig'] = x_chunk_multinivel__mutmut_orig # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_1'] = x_chunk_multinivel__mutmut_1 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_2'] = x_chunk_multinivel__mutmut_2 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_3'] = x_chunk_multinivel__mutmut_3 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_4'] = x_chunk_multinivel__mutmut_4 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_5'] = x_chunk_multinivel__mutmut_5 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_6'] = x_chunk_multinivel__mutmut_6 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_7'] = x_chunk_multinivel__mutmut_7 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_8'] = x_chunk_multinivel__mutmut_8 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_9'] = x_chunk_multinivel__mutmut_9 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_10'] = x_chunk_multinivel__mutmut_10 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_11'] = x_chunk_multinivel__mutmut_11 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_12'] = x_chunk_multinivel__mutmut_12 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_13'] = x_chunk_multinivel__mutmut_13 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_14'] = x_chunk_multinivel__mutmut_14 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_15'] = x_chunk_multinivel__mutmut_15 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_16'] = x_chunk_multinivel__mutmut_16 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_17'] = x_chunk_multinivel__mutmut_17 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_18'] = x_chunk_multinivel__mutmut_18 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_19'] = x_chunk_multinivel__mutmut_19 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_20'] = x_chunk_multinivel__mutmut_20 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_21'] = x_chunk_multinivel__mutmut_21 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_22'] = x_chunk_multinivel__mutmut_22 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_23'] = x_chunk_multinivel__mutmut_23 # type: ignore # mutmut generated
+mutants_x_chunk_multinivel__mutmut['x_chunk_multinivel__mutmut_24'] = x_chunk_multinivel__mutmut_24 # type: ignore # mutmut generated

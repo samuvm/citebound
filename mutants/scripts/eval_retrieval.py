@@ -77,7 +77,11 @@ class _Precalculado:
 
 
 def medir(
-    cur: object, casos: Sequence[CasoGolden], *, k_canal: int = 30, con_reranker: bool = False
+    cur: object,
+    casos: Sequence[CasoGolden],
+    *,
+    k_canal: int = pipeline.K_CANAL,
+    con_reranker: bool = False,
 ) -> dict[str, object]:
     """Recupera para cada caso positivo y devuelve las dos lecturas del recall."""
     positivos = [c for c in casos if c.tipo is Tipo.POSITIVO and c.refs]
@@ -99,7 +103,7 @@ def medir(
             cur,  # type: ignore[arg-type]
             caso.pregunta,
             embedder=precalculado,
-            k=k_canal,
+            k=K_MEDIDOS[-1],
             k_canal=k_canal,
             reordenador=reordenador,
         )
@@ -108,16 +112,25 @@ def medir(
         # de un script aparte que puede quedarse viejo sin que nada lo note. No cuestan LLM.
         solo_vector[caso.id] = [
             r.ref
-            for r in vector_mod.buscar(cur, caso.pregunta, embedder=precalculado, k=k_canal)  # type: ignore[arg-type]
+            for r in vector_mod.buscar(cur, caso.pregunta, embedder=precalculado, k=K_MEDIDOS[-1])  # type: ignore[arg-type]
         ]
-        solo_lexico[caso.id] = [r.ref for r in lexical.buscar(cur, caso.pregunta, k=k_canal)]  # type: ignore[arg-type]
+        solo_lexico[caso.id] = [
+            r.ref
+            for r in lexical.buscar(cur, caso.pregunta, k=K_MEDIDOS[-1])  # type: ignore[arg-type]
+        ]
 
-    # Lectura a nivel de artículo: se recorta el golden set, no lo recuperado. Recortar lo
-    # recuperado sería lo mismo aquí (el índice ya viene sin apartado) pero dejaría de serlo
-    # el día que el troceado baje al apartado, y entonces la métrica cambiaría en silencio.
+    # Lectura a nivel de artículo: se recortan **los dos lados**. El comentario que ocupaba
+    # este sitio decía que recortar solo el golden set daba igual «porque el índice ya viene
+    # sin apartado», y avisaba de que dejaría de dar igual el día que el troceado bajara al
+    # apartado. Ese día fue el 2026-08-17: con `apartado-v1` lo recuperado trae `art34.1` y
+    # el golden set recortado trae `art34`, así que la intersección sería vacía y `G-RECALL5`
+    # se habría desplomado sin que nada dijera por qué. La métrica NO cambia en silencio.
     por_articulo = [
         c.model_copy(update={"refs": [a_nivel_articulo(r) for r in c.refs]}) for c in positivos
     ]
+    recuperado_articulo = {
+        ident: [a_nivel_articulo(r) for r in refs] for ident, refs in recuperado.items()
+    }
 
     if cache is not None:
         cache.volcar()
@@ -128,14 +141,21 @@ def medir(
     }
     for k in K_MEDIDOS:
         estricto = recall_at_k(positivos, recuperado, k)
-        articulo = recall_at_k(por_articulo, recuperado, k)
+        articulo = recall_at_k(por_articulo, recuperado_articulo, k)
         medidas[f"G-RECALL{k}"] = {
             "estricto": estricto.valor,
             "a_nivel_articulo": articulo.valor,
             "n": estricto.n,
         }
     medidas["por_canal"] = {
-        nombre: {f"recall{k}": recall_at_k(por_articulo, traido, k).valor for k in K_MEDIDOS}
+        nombre: {
+            f"recall{k}": recall_at_k(
+                por_articulo,
+                {i: [a_nivel_articulo(r) for r in refs] for i, refs in traido.items()},
+                k,
+            ).valor
+            for k in K_MEDIDOS
+        }
         for nombre, traido in (
             ("solo_vectorial", solo_vector),
             ("solo_lexico", solo_lexico),
@@ -165,6 +185,10 @@ def main() -> int:
     # diagnosticar —separar culpa del recuperador y del reordenador— y entonces el informe lo
     # dice en `con_reranker`.
     con_reranker = os.environ.get("CITEBOUND_RERANK", "1") != "0"
+    # Qué modelo reordenó, en el informe. Sin esto, dos corridas con reordenadores distintos
+    # producen informes indistinguibles — y el 2026-08-17 lancé el 9B con una variable de
+    # entorno que no existe: habría medido el 4B otra vez y publicado «9B» al lado.
+    modelo_reordenador = generador_por_defecto().model if con_reranker else None
     arranque = time.monotonic()
     with psycopg.connect(url) as conn, conn.cursor() as cur:
         # El contrato compartido lo pone en OBLIGATORIO (`chunks-ddl.sql`, sección final):
@@ -195,6 +219,7 @@ def main() -> int:
                 "index_version": index_version,
                 "physical_table": physical_table,
                 "con_reranker": con_reranker,
+                "modelo_reordenador": modelo_reordenador,
                 "por_canal": medidas["por_canal"],
                 "lectura_publicada": "a_nivel_articulo (Q-016 A)",
                 "nota": (

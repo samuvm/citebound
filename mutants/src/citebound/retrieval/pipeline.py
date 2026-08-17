@@ -25,10 +25,15 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = ["K_CANAL", "Reordenador", "recuperar"]
 
-K_CANAL = 30
-"""Candidatos por canal. Es el mismo 30 de `G-RECALL30` y no una casualidad: esa meta existe
-para saber si un `G-RECALL5` bajo es culpa del recuperador o del reordenador, y solo lo
-distingue si el recuperador trae exactamente lo que ella mide."""
+K_CANAL = 60
+"""Candidatos que pide **cada canal**, antes de fusionar y de colapsar por artículo.
+
+Era 30 —el mismo 30 de `G-RECALL30`— mientras el troceado era por artículo y 30 chunks eran
+30 artículos. Con `apartado-v1` dejan de serlo: varios apartados del mismo artículo ocupan
+plaza sin añadir cobertura. Medido el 2026-08-17 sobre los 216 casos, ya colapsando:
+`recall@30` sube de 0,958 con 30 por canal a **0,968** con 60. Lo que mide `G-RECALL30` sigue
+siendo el top-30 **después** de fusionar y colapsar; esto es cuánto material se pide para
+poder llenarlo."""
 
 
 class _Cursor(Protocol):
@@ -76,9 +81,32 @@ def recuperar(
 
     orden = fusionar(
         [[str(r.ref) for r in lexicos], [str(r.ref) for r in vectoriales]],
-        tope=None if reordenador else k,
+        tope=None,
     )
-    candidatos = [por_ref[ref] for ref in orden]
+    candidatos = _uno_por_articulo([por_ref[ref] for ref in orden])
     if reordenador is None:
-        return tuple(candidatos)
+        return tuple(candidatos[:k])
     return tuple(reordenador.reordenar(pregunta, candidatos)[:k])
+
+
+def _uno_por_articulo(candidatos: list[Recuperado]) -> list[Recuperado]:
+    """Deja el mejor colocado de cada artículo y descarta sus hermanos.
+
+    **Solo hace algo con troceado fino**, y ahí hace mucho. Con `apartado-v1`, `art34.1`,
+    `art34.2` y `art34.3` gastan tres plazas de las 30 sin añadir un artículo nuevo, y como
+    lo que se mide y se cita es el artículo (R1), esas dos de más son plazas tiradas. Medido
+    el 2026-08-17 sobre los 216 casos: sin colapsar `recall@30` cae a 0,940 y colapsando
+    sube a 0,968.
+
+    Se conserva el apartado del que sobrevive, no se recorta: la referencia más precisa que
+    el recuperador ha sabido encontrar es información, y tirarla aquí obligaría al generador
+    a redescubrirla.
+    """
+    salida: list[Recuperado] = []
+    vistos: set[str] = set()
+    for candidato in candidatos:
+        articulo = f"{candidato.ref.norma}#art{candidato.ref.articulo}"
+        if articulo not in vistos:
+            vistos.add(articulo)
+            salida.append(candidato)
+    return salida

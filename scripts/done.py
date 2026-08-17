@@ -150,6 +150,11 @@ def c5_cobertura_linea() -> Resultado:
         cubiertas += medida["summary"]["covered_lines"]
         faltan += medida["summary"]["missing_lines"]
     pct = round(100 * cubiertas / (cubiertas + faltan)) if cubiertas + faltan else -1
+    # `G-COV-LINE` nombra `coverage.json :: totals.percent_covered (filtrado a
+    # [tool.gate].testable)`. El paréntesis es la instrucción: el `totals` del fichero mide
+    # `src/citebound` entero, adaptadores incluidos, y ese no es el número de la meta. Se
+    # publica aquí el que sí lo es, y así la condición 7 lee lo mismo que enseña la 5.
+    CALCULADO[("coverage.json", "totals.percent_covered")] = pct
     return Resultado(
         5,
         "cobertura de línea",
@@ -266,6 +271,11 @@ def c7_metas(milestone: int) -> Resultado:
 # la corrida anterior.
 MEDIDO: dict[str, object] = {}
 
+# Artefactos que produce ESTA corrida bajo la ruta con que `GOALS.yaml` los nombra, aunque en
+# disco no exista un fichero con ese nombre. La clave es `(ruta, selector)` entero: dos metas
+# pueden pedir selectores distintos del mismo fichero y no deben pisarse.
+CALCULADO: dict[tuple[str, str], object] = {}
+
 
 def _medir_secretos() -> int:
     codigo, salida = _correr(
@@ -333,7 +343,13 @@ def leer_artefacto_ruta(ruta: str, selector: str) -> object:
     corre *antes* de que el estado se escriba, así que leerlo del disco daría el número de
     la corrida anterior: el gate se aprobaría con datos viejos. Es la misma familia de fallo
     que `G-MUT` leyendo la caché de mutmut, y aquí no se repite.
+
+    `CALCULADO` cubre el caso contrario: la meta nombra un artefacto que **no** existe con
+    ese nombre porque el número pedido no es el que trae el fichero. Es lo que pasa con
+    `G-COV-LINE`, y el paréntesis de su artefacto lo dice — «filtrado a `[tool.gate].testable`».
     """
+    if (ruta, selector) in CALCULADO:
+        return CALCULADO[(ruta, selector)]
     if ruta.endswith("gate-status.json"):
         if selector not in MEDIDO and selector in MEDIDORES:
             MEDIDO[selector] = MEDIDORES[selector]()

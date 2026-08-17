@@ -146,6 +146,37 @@ def test_un_fichero_que_no_existe_es_none_no_una_excepcion() -> None:
     assert done.leer_artefacto_ruta("evals/reports/no-existe.json", "lo.que.sea") is None
 
 
+def test_un_artefacto_que_calcula_esta_corrida_gana_al_disco() -> None:
+    """`G-COV-LINE` dejaba `make done MILESTONE=2` en rojo perpetuo por fontanería, igual que
+    antes `G-GOLDEN-VALID` y `G-COV-FUNC`.
+
+    Su artefacto es `coverage.json :: totals.percent_covered (filtrado a [tool.gate].testable)`,
+    y el paréntesis es la instrucción, no un adorno: el `totals` del fichero mide
+    `src/citebound` entero —`api/`, `db/` y `providers/` incluidos, que están excluidos a
+    propósito— así que **el número del fichero no es el de la meta**. La condición 5 calcula el
+    bueno; esto es lo que hace que la 7 lea ese y no otro.
+    """
+    done.CALCULADO.clear()
+    try:
+        assert done.leer_artefacto_ruta("coverage.json", "totals.percent_covered") is None
+        done.CALCULADO[("coverage.json", "totals.percent_covered")] = 100
+        assert done.leer_artefacto_ruta("coverage.json", "totals.percent_covered") == 100
+    finally:
+        done.CALCULADO.clear()
+
+
+def test_la_meta_de_cobertura_de_linea_apunta_a_algo_que_el_gate_sabe_leer() -> None:
+    """El otro lado del mismo fallo: que la clave con la que la condición 5 publica sea
+    exactamente la que `GOALS.yaml` nombra. Si una de las dos se moviera, el gate volvería a
+    quedarse sin número y `G-COV-LINE` sería roja para siempre sin que nada dijera por qué."""
+    metas = yaml.safe_load((RAIZ / "docs" / "GOALS.yaml").read_text(encoding="utf-8"))["metas"]
+    meta = next(m for m in metas if m["id"] == "G-COV-LINE")
+    assert done.partir_artefacto(str(meta["artefacto"])) == (
+        "coverage.json",
+        "totals.percent_covered",
+    )
+
+
 # --------------------------------------------------------------------------------------
 # G-MUT: una medida caducada no se da por buena
 # --------------------------------------------------------------------------------------

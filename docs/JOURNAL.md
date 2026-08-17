@@ -1743,7 +1743,7 @@ artículo entero **y además** cada apartado). Todo sobre los mismos 216 casos:
 |---|---:|---:|---:|---:|
 | `articulo-v1` | 0,727 | **0,977** | 0,093 | **0,847** |
 | `apartado-v1` | **0,801** | 0,968 | **0,477** | 0,806 |
-| `multinivel-v1` | 0,782 | 0,963 | 0,130 | *(midiendo)* |
+| `multinivel-v1` | 0,782 | 0,963 | 0,171 | 0,824 |
 
 **Dos resultados que no esperaba y que cambian cómo entiendo el sistema:**
 
@@ -1769,3 +1769,34 @@ párrafos, donde el troceador fino ya devuelve el artículo entero, así que añ
 la misma fila dos veces. Con el mismo texto sale el mismo `chunk_id` y una se habría comido a la
 otra en el `ON CONFLICT`, en silencio. El arreglo es semántico: el artículo entero solo entra
 donde el nivel fino de verdad partió algo.
+
+### El veredicto del troceado: gana el original, y no por poco
+
+| troceado | recall@5 con reordenador | recall@30 |
+|---|---:|---:|
+| **`articulo-v1`** | **0,847** | **0,977** |
+| `apartado-v1` | 0,806 | 0,968 |
+| `multinivel-v1` | 0,824 | 0,963 |
+
+`articulo-v1` gana en **las dos metas que bloquean**, así que el índice vuelve a él. Los tres
+troceadores se quedan en el código con su `chunker_id`, porque la elección está medida y la
+medida hay que poder repetirla — y porque `apartado-v1` es el que la fase 3 va a querer para
+`G-CITA-PRECISION`, donde la referencia con apartado sí es el objetivo.
+
+**Lo que esto reubica.** El cuello no es cuánto texto ve el reordenador ni cómo está troceado:
+es que un modelo de 4B **no distingue mejor que el embedding** entre el artículo 74, el 108, el
+109 y el 110. Con trozos afilados, donde el embedding ya acierta, el reordenador aporta un caso;
+con trozos gruesos, donde el embedding se pierde, aporta veintiséis. Su valor es tapar el ruido
+del embedding, no juzgar mejor que él.
+
+Queda **una** palanca viva, y es honesto decir que la había descartado con datos caducados:
+probé un modelo de 9B y salió peor, **pero fue con el prompt `1` y sobre el índice de
+`bge-m3`**. Las dos cosas han cambiado. Se repite.
+
+### Un fallo mío que el propio informe habría tapado
+
+Lancé el 9B con `CITEBOUND_CHAT_MODEL`. La variable es `CITEBOUND_MODELO`. Habría medido el 4B
+otra vez y publicado «9B» al lado, sin que nada lo contradijera — la misma familia que el
+informe sin índice y que la consulta vectorizada con otro modelo. **Una configuración que no se
+registra es una configuración sobre la que se puede mentir sin querer.** El informe registra
+ahora `modelo_reordenador`.

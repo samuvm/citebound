@@ -7,51 +7,25 @@
 
 ---
 
-> ### Fase 0 cerrada. **Ninguno de los umbrales de calidad está medido todavía**
->
-> `make done MILESTONE=0` devuelve 0 con las doce condiciones en verde, y los números de esa
-> puerta están en el [CHANGELOG](CHANGELOG.md): 295 tests, 100 % de cobertura en los paquetes
-> con TDD obligatorio, 587 de 588 mutantes muertos.
->
-> **Los umbrales de la tabla de abajo siguen sin medir**, y `G-HALLUC = 0` hoy vale poco: en la
-> fase 0 **no hay generador**, así que no hay nada que pueda alucinar. El cero de verdad —el que
-> viene de la cita cerrada— llega en la fase 3. Cuando haya resultados se publicarán con su `n`,
-> su intervalo de confianza y el artefacto del que salen, salgan como salgan.
-
-## Dónde está
+## Dónde está, y con qué números
 
 Una fase **solo** se marca hecha cuando `make done MILESTONE=N` devuelve 0. No hay «casi hecho»:
 el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 [`docs/PLAN.md`](docs/PLAN.md).
 
-- [x] **0 · Esqueleto vertical que camina** — `make done MILESTONE=0` → exit 0 · [números en el CHANGELOG](CHANGELOG.md)
-- [ ] **1 · Scoring congelado y golden set** — el corrector se cierra **antes** de anotar el primer caso
-- [ ] **2 · Retrieval híbrido** — cada cambio se acepta o se tira con el número de recall, no con la sensación
+- [x] **0 · Esqueleto vertical que camina** — doce condiciones en verde · [números](CHANGELOG.md)
+- [x] **1 · Scoring congelado y golden set** — el corrector se cerró **antes** de anotar el primer caso · **274 casos**, 15,3 h de revisión humana
+- [~] **2 · Retrieval híbrido** — medido: `G-RECALL30` **0,977** ✓ · `G-RECALL5` en curso
 - [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
 - [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
 - [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
 - [ ] **5 · Endurecimiento y publicación** — suite adversarial, observabilidad, arranque en frío
 - [ ] 6 · Personalización — **ampliación**. No hacerla no es un fallo, y se dice así
 
-<details>
-<summary><b>Fase 0, tarea a tarea</b></summary>
-
-- [x] `0.1` corpus congelado desde el BOE, con su `sha256` en `corpus/MANIFEST.yaml`
-- [x] `0.2` `domain/legalref.py` — el tipo del que depende todo lo demás
-- [x] `0.3` `ingest/boe_xml.py` — 236 preceptos, 0 referencias duplicadas
-- [x] `0.4` `ingest/chunking.py` — 235 chunks, identificadores deterministas
-- [x] `0.5` `db/ddl.sql` — verificado contra PG18 real, ingerir dos veces no duplica
-- [x] `0.6` `providers/embeddings.py` — grabado contra el modelo real
-- [x] `0.7` `retrieval` + `api` + `cli` + `compose.yaml` + `Makefile`
-- [x] salida: `make up && make warm && make smoke-f0` → exit 0, en 10,0 s
-
-Hecho además: contrato `chunks-ddl.sql` subido a v2 y **verificado ejecutándolo** contra PG18 +
-pgvector; `pyproject.toml` con versiones exactas; y cuatro ADR.
-El detalle vivo está en [`docs/JOURNAL.md`](docs/JOURNAL.md), incluidos los cuatro fallos que
-encontró medir contra el corpus en vez de razonar sobre él. Los números de cada puerta van, fase
-a fase, en [`CHANGELOG.md`](CHANGELOG.md).
-
-</details>
+Las metas de generación —`G-HALLUC`, `G-QUOTE-LIT`, `G-CITA-PRECISION`, `G-ABST-*`— **no están
+medidas**: hasta la fase 3 no hay generador, y un cero sin generador es un cero trivial. Cuando
+haya resultados se publicarán con su `n`, su intervalo de confianza y el artefacto del que salen,
+salgan como salgan.
 
 ---
 
@@ -72,24 +46,7 @@ El generador **tiene prohibido escribir referencias**. Escribe huecos numerados 
 `n ∈ {1..5}`— sobre los fragmentos que la búsqueda sí recuperó. La traducción de `n` a
 `RD-1428/2003#art34.1` la hace **código**, nunca el modelo.
 
-```
-                     ┌─────────────────────────────────────────┐
-  pregunta ─────────►│  recuperar 30  →  reordenar  →  top 5   │
-                     └────────────────────┬────────────────────┘
-                                          ▼
-                     ┌─────────────────────────────────────────┐
-                     │  el modelo redacta con  [[REF:n]]       │
-                     └────────────────────┬────────────────────┘
-                                          ▼
-                     ┌─────────────────────────────────────────┐
-                     │  código:  n → LegalRef                  │
-                     │  código:  ¿el fragmento está literal?   │
-                     └───┬──────────────┬──────────────────┬───┘
-                         ▼              ▼                  ▼
-                    responder      retractar          abstenerse
-                    con la cita    y reintentar       con motivo
-                                   (máx. 2)
-```
+![Cita cerrada: recuperar, redactar con huecos, y resolver y verificar en código](docs/img/cita-cerrada.svg)
 
 Cuatro consecuencias, y ninguna depende de que un modelo se porte bien:
 
@@ -102,28 +59,42 @@ Cuatro consecuencias, y ninguna depende de que un modelo se porte bien:
 
 **Lo que esto cuesta, dicho en voz alta:** si la búsqueda falla, el sistema no «se acuerda» del
 artículo — se abstiene o cita peor. La calidad del retrieval deja de ser un detalle y pasa a ser
-el techo del sistema. Por eso se mide por separado antes y después de reordenar.
+**el techo del sistema**. Por eso la fase 2 existe, y por eso se mide por separado antes y después
+de reordenar.
 
 Y hay una capa que **no** queda garantizada, solo medida: que la *interpretación* del artículo sea
 correcta. Se hace determinista todo lo que puede serlo, y el residuo se acota y se publica.
 
-## Umbrales que la puerta exigirá
+---
 
-**Ninguno medido todavía**, y el único que ya tiene número —`G-HALLUC = 0`— vale poco: en la
-fase 0 no hay generador. Cada meta lleva el comando exacto que la produce en
-[`docs/GOALS.yaml`](docs/GOALS.yaml); una meta sin comando no es una meta.
+## Retrieval, medido
 
-| Meta | Qué significa | Umbral |
-|---|---|---:|
-| `G-HALLUC` | Referencias emitidas que no existen en el corpus | `= 0` |
-| `G-QUOTE-LIT` | Fragmentos citados que están literalmente en su artículo | `= 1,00` |
-| `G-RECALL30` / `G-RECALL5` | El artículo correcto entre los 30 candidatos / entre los 5 finales | `≥ 0,97` / `≥ 0,90` |
-| `G-CITA-PRECISION` + `G-COBERTURA` | Precisión de cita **y** fracción respondida. **Pareja atómica** | `≥ 0,85` + `≥ 0,90` |
-| `G-ABST-FP` + `G-ABST-FN` | Se calló habiendo respuesta / respondió sin haberla. **Pareja atómica** | `≤ 0,05` + `≤ 0,10` |
-| `G-TTFT` | p95 hasta el primer token, con presupuesto repartido por etapa | `≤ 1500 ms` |
+216 preguntas positivas del golden set `v2`, `recall@k` como intersección de conjuntos de
+`LegalRef` a nivel de artículo ([por qué a nivel de artículo](docs/PARA-SAMUEL.md)). Reproducible
+con `make eval-retrieval`.
 
-Las parejas son atómicas porque, medidas por separado, la forma óptima de aprobar es hacer trampa:
-con solo `G-CITA-PRECISION`, abstenerse siempre da 1,00.
+![Recall por canal](docs/img/recall-por-canal.svg)
+
+| Canal | recall@5 | recall@30 |
+|---|---:|---:|
+| Solo vectorial · HNSW coseno | 0,792 | 0,954 |
+| Solo léxico · `ts_rank_cd` | 0,370 | 0,815 |
+| Híbrido · fusión RRF | 0,727 | **0,977** |
+| Híbrido + reordenador | **RECALL5_FINAL** | **0,977** |
+| *Umbral que exige el gate* | *≥ 0,90* | *≥ 0,97* |
+
+**El híbrido es peor que el vectorial solo en el top-5 y mejor en el top-30.** No es un accidente
+ni un defecto: la fusión mete candidatos léxicos que ensucian la cabeza de la lista y a cambio
+ensancha la red. Justo por eso hay un reordenador — buscar más y ordenar después es más barato
+que acertar a la primera.
+
+**Todo lo que se probó y salió mal está anotado**, con su número, en
+[`docs/JOURNAL.md`](docs/JOURNAL.md): un modelo de 9B que rescata menos que el de 4B, 1.200
+caracteres de contexto que van peor que 500, una fusión RRF entre el orden de fusión y el del
+reordenador, y el formato de instrucción que documenta `Qwen3-Embedding` — que **empeora** aquí,
+en inglés y en castellano.
+
+---
 
 ## Corpus
 
@@ -141,17 +112,53 @@ No PDF, no *scraping*: la fuente ya publica la jerarquía exacta y sin pérdida
 
 La unidad de verdad es la **`LegalRef`** (`norma#artNN.apartado`), nunca el `chunk_id`. Eso es lo
 que permite cambiar el troceado, el modelo de embeddings o el reordenador sin invalidar el
-conjunto de evaluación.
+conjunto de evaluación — y es exactamente lo que se hizo en la fase 2 sin tocar un solo caso.
+
+## Golden set
+
+**274 casos · 216 positivos · 58 negativos · 8 materias.** Sellado por `sha256` en
+[`evals/golden/CHECKSUMS`](evals/golden/CHECKSUMS), append-only por versión: corregir crea una
+`v2` con su ADR, nunca un `sed` sobre la `v1`.
+
+Lo que lo distingue no es el tamaño, es la procedencia. **Cada caso lo revisó Samuel a mano, uno
+a uno, a lo largo de 15,3 horas**, y ningún caso entra sin revisor y sin fecha — es la regla dura
+nº 3 del contrato compartido: generación asistida por LLM sí, aprobación automática no. La
+trazabilidad completa está en [`evals/golden/cola/PROCEDENCIA.md`](evals/golden/cola/PROCEDENCIA.md).
+
+Los **negativos** son la mitad interesante: preguntas que el corpus **no** responde. Sin ellos,
+abstenerse siempre sería la estrategia óptima y `G-CITA-PRECISION` daría 1,00 a un sistema mudo.
+Seis de ellos resultaron ser respondibles al revisarlos y cambian de bando en el montaje: si
+entraran como negativos, la métrica premiaría callarse justo donde hay que hablar.
+
+Tres casos salieron en la `v2` ([ADR-021](docs/adr/021-golden-v2-tres-casos-sin-texto.md)) con un
+criterio escrito y aplicable por otro: *sale un caso si su enunciado, sin la imagen, no identifica
+el supuesto de hecho.* Un primer recuento decía cinco; al leerlos enteros eran tres, y quedarse
+con el número honesto costó que la meta no cerrara ese día.
+
+---
 
 ## Stack
 
 Python 3.12 · FastAPI + SSE · PostgreSQL 18 + pgvector 0.8.6 · LangGraph como máquina de estados
-(sin LangChain) · Ollama en el host con backend MLX · reranker en proceso sobre MPS.
-Versiones exactas con `==` y motivo en [`docs/STACK.md`](docs/STACK.md).
+(sin LangChain) · Ollama en el host. Versiones exactas con `==` y motivo en
+[`docs/STACK.md`](docs/STACK.md).
 
-Dos precisiones que suelen darse por supuestas y aquí no lo son: la búsqueda léxica es
-`ts_rank_cd` con configuración `spanish_unaccent`, **y no se llama BM25 porque no lo es**; y el
-reranker **no pasa por Ollama**, que no tiene endpoint de rerank.
+| Pieza | Modelo | Licencia |
+|---|---|---|
+| Embeddings | `Qwen3-Embedding-0.6B` · 1024 dim | Apache-2.0 |
+| Generador **y reordenador** | `Qwen3.5-4B` (MLX) | Apache-2.0 |
+| Juez (fase 4) | `Gemma 4 12B` | — |
+
+Tres precisiones que suelen darse por supuestas y aquí no lo son:
+
+- La búsqueda léxica es `ts_rank_cd` con configuración `spanish_unaccent`, **y no se llama BM25
+  porque no lo es** mientras no haya una extensión BM25 de verdad instalada.
+- **Un solo transporte.** El reordenador no es un modelo aparte: es el propio generador por
+  `/v1/chat/completions`. Ollama no tiene endpoint de rerank, y montar un segundo camino de
+  servir modelos costaba ~2 GB de dependencias y una descarga más en el arranque en frío
+  ([ADR-022](docs/adr/022-reordenador-por-el-mismo-transporte.md)).
+- **Nada exige un Mac.** Los modelos van por Ollama o cualquier proveedor compatible con la API
+  de OpenAI; el backend MLX es una elección de la máquina de desarrollo, no un requisito.
 
 ## Cómo está gobernado
 
@@ -172,6 +179,44 @@ Dos reglas que gobiernan de verdad: **el agente puede cambiar cómo llega al nú
 número** — los umbrales están firmados con un hash y bajarlos exige una propuesta escrita. Y
 **lo verificable deterministamente no se delega a un LLM**: el juez es el último recurso y solo
 vale con su κ publicado.
+
+## Empezar
+
+```bash
+make up                  # Postgres + pgvector, fijado por digest
+make warm                # residencia de los modelos. NUNCA dentro de `up`: rompe el cronómetro
+uv run citebound ingest  # 235 chunks desde el XML congelado
+make smoke-f0            # ingesta + 3 preguntas + al menos una ref presente en refs.json
+make eval-retrieval      # G-RECALL5 y G-RECALL30 contra el golden set
+make done MILESTONE=2    # la única definición de «hecho»: exit 0 o 1
+```
+
+Requiere [Ollama](https://ollama.com) **en el host** (no en compose) y Docker. `make check-ollama`
+lo comprueba y dice qué falta.
+
+---
+
+## Fuentes
+
+**Normativa.** Real Decreto 1428/2003, de 21 de noviembre, Reglamento General de Circulación.
+Agencia Estatal Boletín Oficial del Estado, [datos abiertos](https://www.boe.es/datosabiertos/),
+identificador `BOE-A-2003-23514`, consolidación 2026-07-31. Información del sector público,
+reutilizable conforme a la normativa española. El texto se reproduce sin modificar.
+
+**Banco de preguntas.** Banco de preguntas tipo test de circulación de terceros, de acceso público.
+**No se redistribuye** en este repositorio en ninguna de sus versiones: lo que se publica es el
+golden set derivado, con la revisión humana que lo valida. Las imágenes asociadas no se descargan,
+no se procesan y no se publican.
+
+**Modelos.** [`Qwen3-Embedding-0.6B`](https://huggingface.co/Qwen/Qwen3-Embedding-0.6B) y
+[`Qwen3.5`](https://huggingface.co/Qwen), Apache-2.0, ejecutados en local vía Ollama. No se
+redistribuyen.
+
+**Método.** La fusión de canales es *Reciprocal Rank Fusion* con `k=60` — Cormack, Clarke y
+Buettcher, [«Reciprocal Rank Fusion outperforms Condorcet and individual Rank Learning
+Methods»](https://dl.acm.org/doi/10.1145/1571941.1572114), SIGIR 2009. El detalle completo, con
+lo que no se copió y por qué, en [`docs/adr/`](docs/adr/) y
+[`docs/CONTRACTS/`](docs/CONTRACTS/).
 
 ## Aviso
 

@@ -16,6 +16,7 @@ OLLAMA_MIN := 0.32.6
 .PHONY: help up down warm lint typecheck test-fast test test-int smoke-f0 \
         gate-fast gate-full done eval mutation cov-func secrets clean \
         check-ollama check-r1 openapi ingest golden-sample golden-validate golden-review golden-build eval-retrieval \
+        grafico-recall \
         clean-mutants
 
 help:  ## esta ayuda
@@ -98,6 +99,9 @@ golden-review:  ## 1c · LA COLA DE SAMUEL. Una tecla por caso, se reanuda sola
 
 eval-retrieval:  ## fase 2 · G-RECALL5 y G-RECALL30 contra el golden set. Sin LLM, < 90 s
 	$(UV) python -m scripts.eval_retrieval
+
+grafico-recall:  ## redibuja docs/img/recall-por-canal.svg desde el informe medido
+	$(UV) python -m scripts.grafico_recall
 
 golden-build:  ## 1d · monta v1.jsonl desde la revision de Samuel, con su sha256
 	$(UV) python -m scripts.golden_build

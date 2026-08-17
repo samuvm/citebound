@@ -34,7 +34,8 @@ from citebound.domain.legalref import LegalRef
 from citebound.evals.schema import CasoGolden, Tipo
 from citebound.evals.scoring import recall_at_k
 from citebound.providers.chat import generador_por_defecto
-from citebound.retrieval import pipeline
+from citebound.retrieval import lexical, pipeline
+from citebound.retrieval import vector as vector_mod
 from citebound.retrieval.rerank import CacheJuicios, ReordenadorLLM
 from citebound.retrieval.vector import embedder_del_indice, indice_activo
 
@@ -90,16 +91,26 @@ def medir(
     t_embed = time.monotonic() - arranque
 
     recuperado: dict[str, list[LegalRef]] = {}
+    solo_vector: dict[str, list[LegalRef]] = {}
+    solo_lexico: dict[str, list[LegalRef]] = {}
     for caso, vector in zip(positivos, vectores, strict=True):
+        precalculado = _Precalculado(vector, embedder.model, embedder.dim)
         traidos = pipeline.recuperar(
             cur,  # type: ignore[arg-type]
             caso.pregunta,
-            embedder=_Precalculado(vector, embedder.model, embedder.dim),
+            embedder=precalculado,
             k=k_canal,
             k_canal=k_canal,
             reordenador=reordenador,
         )
         recuperado[caso.id] = [r.ref for r in traidos]
+        # Los canales sueltos, para que la tabla del README salga del artefacto medido y no
+        # de un script aparte que puede quedarse viejo sin que nada lo note. No cuestan LLM.
+        solo_vector[caso.id] = [
+            r.ref
+            for r in vector_mod.buscar(cur, caso.pregunta, embedder=precalculado, k=k_canal)  # type: ignore[arg-type]
+        ]
+        solo_lexico[caso.id] = [r.ref for r in lexical.buscar(cur, caso.pregunta, k=k_canal)]  # type: ignore[arg-type]
 
     # Lectura a nivel de artículo: se recorta el golden set, no lo recuperado. Recortar lo
     # recuperado sería lo mismo aquí (el índice ya viene sin apartado) pero dejaría de serlo
@@ -123,6 +134,14 @@ def medir(
             "a_nivel_articulo": articulo.valor,
             "n": estricto.n,
         }
+    medidas["por_canal"] = {
+        nombre: {f"recall{k}": recall_at_k(por_articulo, traido, k).valor for k in K_MEDIDOS}
+        for nombre, traido in (
+            ("solo_vectorial", solo_vector),
+            ("solo_lexico", solo_lexico),
+            ("fusion" + ("_y_reordenador" if con_reranker else ""), recuperado),
+        )
+    }
     return medidas
 
 
@@ -170,6 +189,7 @@ def main() -> int:
                 "index_version": index_version,
                 "physical_table": physical_table,
                 "con_reranker": con_reranker,
+                "por_canal": medidas["por_canal"],
                 "lectura_publicada": "a_nivel_articulo (Q-016 A)",
                 "nota": (
                     "Dos lecturas: `estricto` compara legal_ref literalmente y "

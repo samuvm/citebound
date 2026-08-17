@@ -7,13 +7,18 @@
   "src/citebound/evals/bootstrap.py",
   "src/citebound/retrieval/fusion.py"
  ],
- "killed": 927,
- "killed_pct": 100,
+ "killed": 1020,
+ "killed_pct": 99,
  "minimo": 70,
  "supervivientes": [
-  "citebound.ingest.boe_xml.x_parse_norma__mutmut_68",
-  "citebound.ingest.boe_xml.x__raiz_texto__mutmut_43",
-  "citebound.evals.bootstrap.x_holm__mutmut_16"
+  "citebound.ingest.boe_xml.x_parse_norma__mutmut_62",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_3",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_30",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_32",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_36",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_40",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_63",
+  "citebound.retrieval.fusion.x_fusionar__mutmut_20"
  ],
- "total": 930
+ "total": 1028
 }

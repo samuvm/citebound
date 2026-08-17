@@ -486,3 +486,16 @@ def test_dos_documentos_distintos_no_comparten_chunk_id_aunque_digan_lo_mismo() 
     b = chunk_por_apartado([ART3], source_uri=URI.replace("23514", "99999"))
     assert {c.chunk_id for c in a}.isdisjoint({c.chunk_id for c in b})
     assert [c.content for c in a] == [c.content for c in b]
+
+
+def test_una_lista_vacia_de_preceptos_no_da_chunks_ni_revienta() -> None:
+    assert chunk_por_apartado([], source_uri=URI) == ()
+    assert chunk_multinivel([], source_uri=URI) == ()
+
+
+def test_un_precepto_sin_texto_se_rechaza_en_vez_de_indexarse_vacio() -> None:
+    """Un chunk sin contenido produce un embedding sin significado que compite igual por una
+    plaza del top-30. Reventar aquí lo deja donde se puede diagnosticar."""
+    hueco = _precepto("99")
+    with pytest.raises(ChunkingError, match="no tiene texto"):
+        chunk_por_apartado([hueco], source_uri=URI)

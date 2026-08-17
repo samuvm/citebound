@@ -25,15 +25,23 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = ["K_CANAL", "Reordenador", "recuperar"]
 
-K_CANAL = 60
+K_CANAL = 30
 """Candidatos que pide **cada canal**, antes de fusionar y de colapsar por artículo.
 
-Era 30 —el mismo 30 de `G-RECALL30`— mientras el troceado era por artículo y 30 chunks eran
-30 artículos. Con `apartado-v1` dejan de serlo: varios apartados del mismo artículo ocupan
-plaza sin añadir cobertura. Medido el 2026-08-17 sobre los 216 casos, ya colapsando:
-`recall@30` sube de 0,958 con 30 por canal a **0,968** con 60. Lo que mide `G-RECALL30` sigue
-siendo el top-30 **después** de fusionar y colapsar; esto es cuánto material se pide para
-poder llenarlo."""
+**Depende del troceado, y no es intuitivo.** Medido el 2026-08-17 sobre los mismos 216 casos:
+
+| troceado | 30 por canal | 60 por canal |
+|---|---:|---:|
+| `articulo-v1` (el que se sirve) | **0,977** | 0,949 |
+| `apartado-v1` | 0,958 | **0,968** |
+
+Con artículos, 30 chunks **son** 30 artículos y pedir más solo mete ruido léxico en la
+fusión. Con apartados dejan de serlo —varios del mismo artículo ocupan plaza sin añadir
+cobertura— y hace falta pedir más para llenar el top-30 de artículos distintos.
+
+Se subió a 60 al medir `apartado-v1` y **se quedó puesto al revertir el índice**: `G-RECALL30`
+cayó de 0,977 a 0,949 y el número parecía del reordenador. Un ajuste de un experimento que
+sobrevive al experimento es una regresión con coartada."""
 
 
 class _Cursor(Protocol):

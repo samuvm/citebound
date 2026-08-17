@@ -158,7 +158,13 @@ def main() -> int:
         "CITEBOUND_PG_URL", f"postgresql://citebound:citebound@localhost:{puerto}/citebound"
     )
 
-    con_reranker = os.environ.get("CITEBOUND_RERANK") == "1"
+    # Con reordenador **por defecto**, y desactivarlo es lo que hay que pedir. `G-RECALL5` se
+    # llama literalmente «Recall de articulo en top-5 tras rerank» y su valor lo lee el gate de
+    # este informe: con el reordenador detrás de una variable, un `make eval-retrieval` a secas
+    # escribía el número de antes de reordenar y el gate lo daba por bueno. `=0` queda para
+    # diagnosticar —separar culpa del recuperador y del reordenador— y entonces el informe lo
+    # dice en `con_reranker`.
+    con_reranker = os.environ.get("CITEBOUND_RERANK", "1") != "0"
     arranque = time.monotonic()
     with psycopg.connect(url) as conn, conn.cursor() as cur:
         # El contrato compartido lo pone en OBLIGATORIO (`chunks-ddl.sql`, sección final):

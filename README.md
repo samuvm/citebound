@@ -187,7 +187,7 @@ make up                  # Postgres + pgvector, fijado por digest
 make warm                # residencia de los modelos. NUNCA dentro de `up`: rompe el cronómetro
 uv run citebound ingest  # 235 chunks desde el XML congelado
 make smoke-f0            # ingesta + 3 preguntas + al menos una ref presente en refs.json
-make eval-retrieval      # G-RECALL5 y G-RECALL30 contra el golden set
+make eval-retrieval      # G-RECALL5 y G-RECALL30 contra el golden set (6 s desde cache)
 make done MILESTONE=2    # la única definición de «hecho»: exit 0 o 1
 ```
 

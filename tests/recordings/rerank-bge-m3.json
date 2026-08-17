@@ -1,0 +1,17 @@
+{
+ "modelo": "BAAI/bge-reranker-v2-m3",
+ "grabado_en": "2026-08-17",
+ "dispositivo": "mps",
+ "nota": "Puntuaciones reales. RULES 3.1: providers/ se graba primero y se testea contra la grabacion.",
+ "pregunta": "¿Encender el intermitente da preferencia siempre para hacer maniobras?",
+ "documentos": [
+  "Artículo 74. Normas generales.\n1. El conductor de un vehículo que pretenda girar a la derecha o a la izquierda para utilizar una vía distinta.",
+  "Artículo 109. Advertencias ópticas.\n1. El conductor debe advertir mediante señales ópticas cualquier maniobra.",
+  "Artículo 3. Normas generales de conductores.\n1. Se deberá conducir con la diligencia y precaución necesarias."
+ ],
+ "puntos": [
+  0.00012197528849355876,
+  0.0021827423479408026,
+  5.373740350478329e-05
+ ]
+}

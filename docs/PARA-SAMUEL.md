@@ -972,8 +972,15 @@ y en el ADR-022 para que al menos no sea invisible.
 **Recomendación:** **A**, y R8 antes que `STACK.md` si solo vas a hacer una.
 
 **Tiempo tuyo:** 5 minutos.
-**Estado: PENDIENTE**
-`>> `
+**Estado: SIN OBJETO · 2026-08-17 · la responde Q-020**
+`>> ` **No hay nada que escribir.** Q-020 eligió **A** y devuelve el proyecto al cross-encoder en
+proceso, así que `docs/RULES.md` R8 y `docs/STACK.md` §2.1 —que nunca se llegaron a cambiar—
+vuelven a describir lo que hay. Esta entrada se queda como registro de que hubo un tramo en el
+que el código y los documentos ratificados decían cosas distintas, y de cuánto duró.
+
+**Queda una cosa pequeña**: la segunda comprobación de R8, `grep -r "api/rerank" src/` vacío, da
+falso positivo — las dos apariciones son comentarios que explican por qué ese endpoint no existe.
+No bloquea nada y se anota aquí para que no se descubra midiendo.
 
 ### Q-019 · fase 2 · BLOQUEA la fase 3 · el reordenador no cabe en el presupuesto de latencia que tú ratificaste
 
@@ -1084,7 +1091,7 @@ artículo 74, el 108, el 109 y el 110, que es exactamente lo que hay que disting
   recuperador funciona (211 de 216 entre los 30). *Contras:* la fase 2 no cierra, y se construye
   sobre un recuperador que sabemos que no llega. `PLAN.md` no lo prohíbe pero tampoco lo prevé.
 
-`[ ] A   [ ] B   [ ] C`
+`[x] A   [ ] B   [ ] C`
 
 **Si dices que no a todo:** me quedo en **C** y lo declaro así, porque es lo único que no
 requiere ni una decisión tuya ni tocar un umbral.
@@ -1095,5 +1102,11 @@ se ha hecho.
 
 **Tiempo tuyo:** 10 minutos. Si eliges A, la medición la hago yo: unas dos horas de máquina.
 
-**Estado: PENDIENTE**
-`>> `
+<!-- Marca [x] puesta por Samuel el 2026-08-17. Cierre formalizado por el agente en el mismo
+     turno, con su permiso explícito ("ya esta elegido podemos seguir"), igual que en Q-004. -->
+**Estado: RESPONDIDA · 2026-08-17**
+`>> ` **A**. Se reabre Q-017: el reordenador pasa a ser un **cross-encoder en proceso**
+(`Qwen3-Reranker-0.6B`, `sentence-transformers`), que es lo que `docs/STACK.md` §2.1 y
+`docs/RULES.md` R8 decían desde el principio. Se acepta el segundo camino de servir modelos
+porque es la única opción que arregla a la vez la calidad y `G-TTFT`, y porque lo que se midió
+del generador-como-reordenador —4.600 ms y 0,852— no es lo que se sopesó en Q-017.

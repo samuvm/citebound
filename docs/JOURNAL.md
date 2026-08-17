@@ -1826,3 +1826,61 @@ su número aquí. Los que funcionaron fueron tres: subir el tope del reordenador
 puntos), cambiar al modelo de embeddings que el `STACK.md` ya tenía ratificado (+1), y arreglar
 la semántica `AND` del canal léxico. Los otros diez enseñan dónde **no** está el problema, que es
 para lo que sirve anotarlos.
+
+---
+
+## 2026-08-17 (cont. 3) · fase 2 · Q-020 = A · el reordenador vuelve a ser un cross-encoder
+
+Samuel eligió **A**: reabrir Q-017 y adoptar el cross-encoder en proceso. Y elegir A **dejó a
+Q-018 sin objeto** — pedía cambiar `docs/RULES.md` R8 y `docs/STACK.md` §2.1 para que dijeran
+«el reordenador es el generador», y con esta decisión los dos vuelven a describir lo que hay sin
+tocarlos. Se queda como registro de que hubo un tramo en que el código y los documentos
+ratificados decían cosas distintas.
+
+**No hizo falta `uv add`:** `sentence-transformers==5.7.0` estaba pinado en `pyproject.toml`
+desde la fase 0, según `STACK.md`, y nunca se había usado.
+
+### El principal de `STACK.md` pierde contra su propio retador
+
+| modelo | `G-RECALL5` | p95 de reordenar 30 |
+|---|---:|---:|
+| `BAAI/bge-reranker-v2-m3` (**retador**) | **0,801** | **400 ms** |
+| `Qwen/Qwen3-Reranker-0.6B` (principal) | 0,787 | 886 ms |
+| `Qwen3-Reranker` + instrucción de dominio | 0,773 | 886 ms |
+
+`STACK.md` eligió el principal por ser *instruction-aware*: *«le puedes dar "relevancia = el
+artículo que tipifica la conducta, no el que la menciona"»*. Al cargarlo vi que
+`sentence-transformers` le pasa su instrucción genérica —*«Given a web search query…»*— así que
+esa capacidad estaba sin usar. Le puse la del dominio, comprobé sobre un par de ejemplo que la
+distancia entre el artículo correcto y su vecino pasaba de **2,0 a 5,5**… y sobre los 216 casos
+**empeoró**: 0,773 contra 0,787.
+
+**Tercera vez en esta fase que una medida dirigida sobrepredice**, y ya son suficientes para
+sacar la regla: un ejemplo elegido a mano solo puede confirmar. Las tres veces la corrida
+completa dijo lo contrario, y las tres están anotadas.
+
+### Lo que se pierde y lo que se gana, sin adornos
+
+**Se pierden 5 puntos**: `G-RECALL5` baja de 0,852 a **0,801**. La mitad del argumento de la
+opción A era que un modelo entrenado para ordenar ordenaría mejor. **No lo hace.**
+
+| | generador puesto a ordenar | cross-encoder |
+|---|---:|---:|
+| `G-RECALL5` | **0,852** | 0,801 |
+| p95 de reordenar 30 | 4.600 ms | **400 ms** — clavado en el presupuesto |
+| `make eval-retrieval` en frío | 1.030 s | **96,5 s** |
+| ¿necesita caché de juicios? | sí | **no** |
+| ¿dos corridas dan lo mismo? | **no**: 0,852 · 0,847 · 0,852 | **sí, byte a byte** |
+| ¿cabe al responder? | no | **sí** |
+
+**`G-EVAL-DET` pasa de problema a propiedad.** Su umbral es `== true` y no admite propuesta. Con
+el generador la reproducibilidad dependía de una caché comprometida en el repositorio; el
+cross-encoder es determinista por construcción — comprobado con dos corridas en frío idénticas.
+
+**Y Q-019 se reabre de hecho.** Se eligió A —reordenador solo de evaluación— *porque* costaba
+4,6 s. A 400 ms esa razón desaparece, y con ella el problema que yo mismo planteé allí: publicar
+un `G-RECALL5` medido con un componente que el producto no ejecuta. Ahora **el número publicado
+es el que recibe quien pregunta**, que es lo que este proyecto dice querer.
+
+**Balance de la fase 2: veinte experimentos medidos, doce negativos.** El número publicado es
+0,801 contra un umbral de 0,90, y sigue siendo lo único rojo del gate.

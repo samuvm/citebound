@@ -15,7 +15,7 @@ el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 
 - [x] **0 · Esqueleto vertical que camina** — doce condiciones en verde · [números](CHANGELOG.md)
 - [x] **1 · Scoring congelado y golden set** — el corrector se cerró **antes** de anotar el primer caso · **274 casos**, 15,3 h de revisión humana
-- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,852** contra 0,90 ✗ · dieciséis experimentos medidos, [diez negativos y anotados](docs/JOURNAL.md)
+- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,801** contra 0,90 ✗ · veinte experimentos medidos, [doce negativos y anotados](docs/JOURNAL.md)
 - [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
 - [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
 - [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
@@ -80,7 +80,7 @@ con `make eval-retrieval`.
 | Solo vectorial · HNSW coseno | 0,792 | 0,954 |
 | Solo léxico · `ts_rank_cd` | 0,370 | 0,815 |
 | Híbrido · fusión RRF | 0,727 | **0,977** |
-| Híbrido + reordenador | **0,852** | **0,977** |
+| Híbrido + reordenador | **0,801** | **0,977** |
 | *Umbral que exige el gate* | *≥ 0,90* | *≥ 0,97* |
 
 **El híbrido es peor que el vectorial solo en el top-5 y mejor en el top-30.** No es un accidente
@@ -98,11 +98,11 @@ una decisión de producto y está planteada en [`docs/PARA-SAMUEL.md`](docs/PARA
 junto con el dato que la hace urgente: el reordenador tarda **4,6 s** y el presupuesto de
 latencia por etapa le da **400 ms**.
 
-**Estos números tienen ruido de al menos un caso.** Medida tres veces la misma configuración
-—mismo código, mismo índice, `temperature` en 0— salió 0,852, 0,847 y 0,852: en GPU la reducción de
-coma flotante no es asociativa y el *greedy* puede elegir distinto. Por eso la caché de juicios
-del reordenador está versionada en el repositorio: no es una optimización, es lo que hace
-reproducible la medida.
+**Estos números son reproducibles byte a byte**, y no siempre lo fueron. Con el generador
+puesto a ordenar, tres corridas de la misma configuración —mismo código, mismo índice,
+`temperature` en 0— daban 0,852, 0,847 y 0,852: en GPU la reducción de coma flotante no es
+asociativa y el *greedy* elige distinto. El cross-encoder es determinista por construcción, y
+eso convierte `G-EVAL-DET` —umbral `== true`, sin propuesta admisible— de problema en propiedad.
 
 **Todo lo que se probó y salió mal está anotado**, con su número, en
 [`docs/JOURNAL.md`](docs/JOURNAL.md) — que es la mitad interesante de la fase. Entre otras cosas:
@@ -116,7 +116,7 @@ poder cambiarlo sin invalidar el golden set:
 
 | troceado | trozos | recall@5 | recall@30 | recall@5 **estricto** |
 |---|---:|---:|---:|---:|
-| `articulo-v1` · uno por artículo | 235 | **0,852** | **0,977** | 0,093 |
+| `articulo-v1` · uno por artículo | 235 | 0,852 | **0,977** | 0,093 |
 | `apartado-v1` · uno por apartado | 569 | 0,806 | 0,968 | **0,477** |
 | `multinivel-v1` · los dos niveles | 710 | 0,824 | 0,963 | 0,171 |
 
@@ -181,17 +181,19 @@ Python 3.12 · FastAPI + SSE · PostgreSQL 18 + pgvector 0.8.6 · LangGraph como
 | Pieza | Modelo | Licencia |
 |---|---|---|
 | Embeddings | `Qwen3-Embedding-0.6B` · 1024 dim | Apache-2.0 |
-| Generador **y reordenador** | `Qwen3.5-4B` (MLX) | Apache-2.0 |
+| Generador | `Qwen3.5-4B` (MLX) | Apache-2.0 |
+| Reordenador | `bge-reranker-v2-m3` · cross-encoder en proceso | MIT |
 | Juez (fase 4) | `Gemma 4 12B` | — |
 
 Tres precisiones que suelen darse por supuestas y aquí no lo son:
 
 - La búsqueda léxica es `ts_rank_cd` con configuración `spanish_unaccent`, **y no se llama BM25
   porque no lo es** mientras no haya una extensión BM25 de verdad instalada.
-- **Un solo transporte.** El reordenador no es un modelo aparte: es el propio generador por
-  `/v1/chat/completions`. Ollama no tiene endpoint de rerank, y montar un segundo camino de
-  servir modelos costaba ~2 GB de dependencias y una descarga más en el arranque en frío
-  ([ADR-022](docs/adr/022-reordenador-por-el-mismo-transporte.md)).
+- **El reordenador no pasa por Ollama**, que no tiene endpoint de rerank: corre en proceso con
+  `sentence-transformers`. Se probó primero el camino contrario —el generador puesto a
+  ordenar— y da **5 puntos más de recall** (0,852) a cambio de **once veces** el presupuesto de
+  latencia, de no ser reproducible entre corridas y de no poder ejecutarse al responder. La
+  comparación entera, con sus números, en [ADR-024](docs/adr/024-el-reordenador-vuelve-a-ser-un-cross-encoder.md).
 - **Nada exige un Mac.** Los modelos van por Ollama o cualquier proveedor compatible con la API
   de OpenAI; el backend MLX es una elección de la máquina de desarrollo, no un requisito.
 

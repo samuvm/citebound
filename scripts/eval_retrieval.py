@@ -34,6 +34,7 @@ from citebound.domain.legalref import LegalRef
 from citebound.evals.schema import CasoGolden, Tipo
 from citebound.evals.scoring import recall_at_k
 from citebound.providers.chat import generador_por_defecto
+from citebound.providers.reranker import reordenador_por_defecto
 from citebound.retrieval import lexical, pipeline
 from citebound.retrieval import vector as vector_mod
 from citebound.retrieval.rerank import CacheJuicios, ReordenadorLLM
@@ -85,8 +86,19 @@ def medir(
 ) -> dict[str, object]:
     """Recupera para cada caso positivo y devuelve las dos lecturas del recall."""
     positivos = [c for c in casos if c.tipo is Tipo.POSITIVO and c.refs]
-    cache = CacheJuicios(CACHE_RERANK) if con_reranker else None
-    reordenador = ReordenadorLLM(generador_por_defecto(), cache=cache) if con_reranker else None
+    # Q-020 (A): el reordenador es un cross-encoder en proceso. El del generador se queda en
+    # `retrieval/rerank.py` con su medida, porque comparar exige poder repetir las dos.
+    con_llm = os.environ.get("CITEBOUND_RERANK_LLM") == "1"
+    cache = CacheJuicios(CACHE_RERANK) if con_reranker and con_llm else None
+    reordenador = (
+        (
+            ReordenadorLLM(generador_por_defecto(), cache=cache)
+            if con_llm
+            else reordenador_por_defecto()
+        )
+        if con_reranker
+        else None
+    )
     # Del índice, no del entorno: medir con un modelo distinto del que construyó el índice no
     # da error, da un recall peor sin causa aparente. Ver `embedder_del_indice`.
     embedder = embedder_del_indice(cur)  # type: ignore[arg-type]
@@ -188,7 +200,15 @@ def main() -> int:
     # Qué modelo reordenó, en el informe. Sin esto, dos corridas con reordenadores distintos
     # producen informes indistinguibles — y el 2026-08-17 lancé el 9B con una variable de
     # entorno que no existe: habría medido el 4B otra vez y publicado «9B» al lado.
-    modelo_reordenador = generador_por_defecto().model if con_reranker else None
+    modelo_reordenador = (
+        (
+            generador_por_defecto().model
+            if os.environ.get("CITEBOUND_RERANK_LLM") == "1"
+            else reordenador_por_defecto().modelo
+        )
+        if con_reranker
+        else None
+    )
     arranque = time.monotonic()
     with psycopg.connect(url) as conn, conn.cursor() as cur:
         # El contrato compartido lo pone en OBLIGATORIO (`chunks-ddl.sql`, sección final):

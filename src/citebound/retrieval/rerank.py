@@ -40,9 +40,7 @@ from citebound.retrieval.vector import Recuperado
 __all__ = [
     "CARACTERES_POR_CANDIDATO",
     "PEDIDOS",
-    "POR_VENTANA",
     "PROMPT_VERSION",
-    "VENTANA",
     "CacheJuicios",
     "ReordenadorLLM",
     "clave_de",
@@ -51,17 +49,18 @@ __all__ = [
     "ordenar_por_etiquetas",
 ]
 
-PROMPT_VERSION = 3
+PROMPT_VERSION = 2
 """Sube cuando cambie `_PLANTILLA` **o cómo se llama al modelo**. Forma parte de la clave de
 caché: un juicio emitido con otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería
 mentir sobre qué se midió.
 
-`2` (2026-08-17): etiquetas de dos letras en vez de números, y se piden exactamente `PEDIDOS`
-en vez de una ordenación completa. Los dos cambios salen de leer lo que el modelo contestaba,
-no de tunear — el detalle está abajo.
-
-`3` (2026-08-17): reordenado **por ventanas**. Cambia el número de llamadas y qué ve el modelo
-en cada una, así que es otro juicio aunque la plantilla sea la misma.
+- `1`: ordenación completa de los 30, candidatos numerados. **0,856.**
+- `2` (2026-08-17): etiquetas de dos letras y se piden exactamente `PEDIDOS`. **0,852.** Un
+  caso peor, y se queda igualmente: arregla dos defectos reales —el modelo nombraba 2 o 3 de
+  30, y podía confundir el número del artículo con el del candidato— que no dependen de la
+  métrica. Pero **no mejora el recall**, y así se dice.
+- `3` (2026-08-17): reordenado por ventanas de 10. **0,806 · medido y descartado.** Vuelve al
+  `2`, que por eso recupera su número: es exactamente la misma configuración.
 """
 
 # Cuánto texto de cada artículo se le enseña al modelo. No es una constante caprichosa: con
@@ -83,18 +82,6 @@ Pidiendo cinco, el top-5 es exactamente lo que el modelo decidió. Si se equivoc
 él y se mide; antes se perdía por una discrepancia entre lo que el prompt pedía y lo que el
 código daba por hecho.
 """
-
-VENTANA = 10
-"""Cuántos candidatos sopesa el modelo de una vez.
-
-**Medido antes de elegirlo.** Sobre los 27 casos que fallaban teniendo el artículo correcto
-entre los 30 recuperados, el modelo lo mete en su top-3 en **15** cuando solo ve la ventana de
-10 que lo contiene. No es que no sepa distinguir: es cuántos tiene que sopesar a la vez.
-"""
-
-POR_VENTANA = 3
-"""Cuántos asciende cada ventana. Con `tope=30` salen 9 finalistas para elegir 5, que deja
-margen sin volver al problema que se acaba de quitar."""
 
 _ETIQUETA = re.compile(r"\b[A-Z]{2}\b")
 
@@ -136,9 +123,9 @@ Nada más: ni el número del artículo, ni explicación.
 def nombrados_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
     """Solo los que el modelo **nombró**, en su orden. Vacía si no nombró ninguno.
 
-    La distinción entre «no lo eligió» y «no dijo nada» es la que hace que el reordenado por
-    ventanas degrade bien: un modelo mudo no debe **mover** nada, porque el orden de la fusión
-    ya es una señal y sustituirlo por el azar de dónde caiga cada ventana es peor que no tocar.
+    La distinción entre «no lo eligió» y «no dijo nada» es lo que hace que el reordenador
+    degrade bien: un modelo mudo no debe **mover** nada, porque el orden de la fusión ya es una
+    señal y sustituirlo por otro cualquiera es peor que no tocar.
 
     Defensivo a propósito: las etiquetas fuera de rango se ignoran y las repetidas cuentan una
     sola vez.
@@ -244,34 +231,26 @@ class ReordenadorLLM:
             ordenada += [r for r in cabeza if r not in ordenada]
             return ordenada + cola
 
-        ordenada = self._por_ventanas(pregunta, cabeza)
+        ordenada = self._juzgar(pregunta, cabeza)
         if self._cache is not None:
             self._cache.guardar(clave, [str(r.ref) for r in ordenada])
         return ordenada + cola
 
-    def _por_ventanas(self, pregunta: str, cabeza: list[Recuperado]) -> list[Recuperado]:
-        """Primero cada ventana elige sus finalistas; después se eligen los cinco entre ellos.
+    def _juzgar(self, pregunta: str, cabeza: list[Recuperado]) -> list[Recuperado]:
+        """Una sola llamada con los 30 delante. **El reordenado por ventanas se midió y es
+        peor**: 0,806 contra 0,852 sobre los mismos 216 casos (`docs/JOURNAL.md`, 2026-08-17).
 
-        **Medido antes de construirlo, que es el orden correcto.** De los 27 casos que fallaban
-        teniendo el artículo entre los 30, el modelo lo mete en su top-3 en **15** cuando solo
-        ve la ventana de 10 que lo contiene — el 55,6 %. Es decir: el problema no es que no
-        distinga, es cuántos candidatos tiene que sopesar a la vez.
+        Y el diagnóstico que lo hizo parecer buena idea era engañoso, lo cual merece quedar
+        escrito. Medí «dándole la ventana de 10 que **contiene** la respuesta, ¿la elige?» y
+        salió que sí en el 55,6 % de los fallos. Pero eso no es la tubería: las otras dos
+        ventanas también ascienden tres candidatos cada una, sin la respuesta dentro, y esos
+        seis compiten en la final. La pregunta que medí no era la pregunta que importaba.
 
-        Se conserva el orden de fusión dentro de cada ventana y entre ventanas: la fusión ya
-        es una señal, y barajarla obligaría al modelo a reconstruirla.
+        Solo se adelanta lo que el modelo **nombra**; el resto conserva el orden de fusión. Con
+        el modelo mudo la lista sale intacta, que es lo correcto: la fusión ya es una señal.
+        Y nadie se pierde — `recall@30` se mide sobre esta misma lista.
         """
-        if len(cabeza) <= VENTANA:
-            elegidos = self._elegir(pregunta, cabeza, PEDIDOS)
-        else:
-            finalistas: list[Recuperado] = []
-            for i in range(0, len(cabeza), VENTANA):
-                finalistas += self._elegir(pregunta, cabeza[i : i + VENTANA], POR_VENTANA)
-            elegidos = self._elegir(pregunta, finalistas, PEDIDOS) or finalistas[:PEDIDOS]
-
-        # Solo se adelanta lo que el modelo **nombró**; lo demás conserva el orden de fusión.
-        # Con el modelo mudo, `elegidos` sale vacío y la lista queda intacta — que es lo
-        # correcto: la fusión ya es una señal, y sustituirla por el azar de en qué ventana cayó
-        # cada uno sería peor que no tocar nada. Y nadie se pierde: `recall@30` lee esta lista.
+        elegidos = self._elegir(pregunta, cabeza, PEDIDOS)
         return elegidos + [r for r in cabeza if r not in elegidos]
 
     def _elegir(self, pregunta: str, grupo: Sequence[Recuperado], cuantos: int) -> list[Recuperado]:

@@ -1600,3 +1600,44 @@ con cuatro llamadas, un modelo mudo dejaba de conservar el orden de la fusión �
 cada ventana se adelantaban a candidatos que la fusión tenía por delante. Se arregla
 distinguiendo «no lo eligió» de «no dijo nada»: solo se adelanta lo que el modelo **nombra**.
 Con el modelo callado, la lista sale intacta. Tiene su test.
+
+### 8 · El reordenado por ventanas: medido y **descartado**
+
+| configuración | recall@5 | llamadas por pregunta | coste en frío |
+|---|---:|---:|---:|
+| Una llamada con los 30 (`PROMPT_VERSION 2`) | **0,852** | 1 | ~16 min |
+| Ventanas de 10 (`PROMPT_VERSION 3`) | 0,806 | 4 | ~24 min |
+
+Peor, y no por poco: diez casos.
+
+**Y el diagnóstico que lo hizo parecer buena idea era engañoso, que es lo que de verdad merece
+quedar escrito.** Medí «dándole la ventana de 10 que **contiene** la respuesta, ¿la elige?» y
+salió que sí en el 55,6 % de los fallos. Pero esa no es la tubería: las otras dos ventanas
+también ascienden tres candidatos cada una, **sin la respuesta dentro**, y esos seis compiten en
+la llamada final. La pregunta que medí no era la pregunta que importaba.
+
+Es la **segunda vez hoy** que una medida dirigida sobrepredice. La primera fue muestrear ocho
+fallos y ver que seis mejoraban con el prompt nuevo: mejoraron porque los elegí entre los
+fallos. Las dos veces la corrida completa dijo lo contrario. La lección no es «medir más», es
+**medir sobre el conjunto entero antes de creerse un diagnóstico**, porque una submuestra
+elegida por su resultado no puede empeorar.
+
+Se vuelve a `PROMPT_VERSION = 2`, que recupera su número porque es exactamente la misma
+configuración. La versión 3 no vuelve.
+
+### Dónde queda la fase 2
+
+| Meta | Umbral | Medido | |
+|---|---:|---:|:--|
+| `G-RECALL30` | ≥ 0,97 | **0,977** | ✅ |
+| `G-RECALL5` | ≥ 0,90 | **0,852** | ❌ faltan 11 casos |
+
+**`G-RECALL5` no se alcanza, y el diagnóstico está completo.** El artículo correcto está entre
+los 30 recuperados en 211 de 216 casos: el recuperador hace su trabajo. De esos 211, el
+reordenador coloca 184 en el top-5 — el 87,2 %. Para llegar a 0,90 necesitaría el 92,4 %.
+
+Nueve experimentos medidos, seis con resultado negativo y todos anotados. Lo que queda no son
+ideas sin probar: es una decisión sobre qué se hace con el hueco, y esa no me toca a mí. Va en
+**Q-019**, junto con el hallazgo que la hace urgente — el reordenador cuesta 4,6 s y
+`docs/RULES.md` §2.1 le presupuesta 400 ms, así que **su sitio en el sistema es lo primero que
+hay que decidir**, antes que cuánto recall da.

@@ -116,7 +116,10 @@ conjunto de evaluación — y es exactamente lo que se hizo en la fase 2 sin toc
 
 ## Golden set
 
-**274 casos · 216 positivos · 58 negativos · 8 materias.** Sellado por `sha256` en
+**274 casos · 216 positivos · 58 negativos.** Once materias, de las cuales **ocho llegan a 20
+casos o más** — las otras tres tienen 3, 2 y 1, y por eso el desglose por materia se publica
+entero en [`evals/golden/STRATA.md`](evals/golden/STRATA.md) en vez de resumirse en un número.
+Sellado por `sha256` en
 [`evals/golden/CHECKSUMS`](evals/golden/CHECKSUMS), append-only por versión: corregir crea una
 `v2` con su ADR, nunca un `sed` sobre la `v1`.
 

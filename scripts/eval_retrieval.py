@@ -185,6 +185,10 @@ def main() -> int:
     # diagnosticar —separar culpa del recuperador y del reordenador— y entonces el informe lo
     # dice en `con_reranker`.
     con_reranker = os.environ.get("CITEBOUND_RERANK", "1") != "0"
+    # Qué modelo reordenó, en el informe. Sin esto, dos corridas con reordenadores distintos
+    # producen informes indistinguibles — y el 2026-08-17 lancé el 9B con una variable de
+    # entorno que no existe: habría medido el 4B otra vez y publicado «9B» al lado.
+    modelo_reordenador = generador_por_defecto().model if con_reranker else None
     arranque = time.monotonic()
     with psycopg.connect(url) as conn, conn.cursor() as cur:
         # El contrato compartido lo pone en OBLIGATORIO (`chunks-ddl.sql`, sección final):
@@ -215,6 +219,7 @@ def main() -> int:
                 "index_version": index_version,
                 "physical_table": physical_table,
                 "con_reranker": con_reranker,
+                "modelo_reordenador": modelo_reordenador,
                 "por_canal": medidas["por_canal"],
                 "lectura_publicada": "a_nivel_articulo (Q-016 A)",
                 "nota": (

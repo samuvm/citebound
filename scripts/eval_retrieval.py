@@ -146,13 +146,22 @@ def main() -> int:
     INFORME.write_text(
         json.dumps(
             {
+                # `value` es la lectura **a nivel de artículo**, que es la que decidió Samuel
+                # en Q-016 (A) y la que lee el gate. Las dos siguen publicadas al lado: la
+                # honestidad no está en elegir el número bueno, está en enseñar los dos y
+                # decir cuál se publica y por qué.
                 "metrics": [
-                    {"id": f"G-RECALL{k}", **medidas[f"G-RECALL{k}"]}  # type: ignore[dict-item]
+                    {
+                        "id": f"G-RECALL{k}",
+                        "value": medidas[f"G-RECALL{k}"]["a_nivel_articulo"],  # type: ignore[index,call-overload]
+                        **medidas[f"G-RECALL{k}"],  # type: ignore[dict-item]
+                    }
                     for k in K_MEDIDOS
                 ],
                 "n_casos": medidas["n_casos"],
                 "segundos": round(total, 1),
                 "sin_reranker": True,
+                "lectura_publicada": "a_nivel_articulo (Q-016 A)",
                 "nota": (
                     "Dos lecturas: `estricto` compara legal_ref literalmente y "
                     "`a_nivel_articulo` recorta el apartado del golden set. El troceador es "

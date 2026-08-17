@@ -1800,3 +1800,29 @@ otra vez y publicado «9B» al lado, sin que nada lo contradijera — la misma f
 informe sin índice y que la consulta vectorizada con otro modelo. **Una configuración que no se
 registra es una configuración sobre la que se puede mentir sin querer.** El informe registra
 ahora `modelo_reordenador`.
+
+### El 9B, repetido con datos válidos: tampoco
+
+La única palanca que quedaba viva. La había descartado con el prompt `1` y sobre el índice de
+`bge-m3`, así que esa medida no valía. Repetida con el prompt de ahora y el índice que se sirve:
+
+| reordenador | recall@5 | segundos de la corrida |
+|---|---:|---:|
+| `qwen3.5:4b-mlx` | **0,852** | 1.030 |
+| `qwen3.5:9b-mlx` | 0,843 | 1.609 |
+
+**Un modelo 2,25 veces mayor no ordena mejor**, y tarda un 56 % más. Con el ruido de medida de
+±1 caso, los dos son indistinguibles.
+
+Eso cierra el diagnóstico y cambia cuál es la conclusión. Hasta aquí se podía pensar que faltaba
+capacidad; lo que dicen los números es que **no es el tamaño del modelo, es el tipo**. Un
+generalista puesto a ordenar no distingue entre el artículo 74, el 108, el 109 y el 110 por
+mucho que crezca — y un cross-encoder está entrenado exactamente para eso. Es el argumento que
+va en **Q-020**, y la decisión no es mía porque el motivo por el que se descartó en Q-017 fue una
+regla de Samuel sobre el transporte, no un número.
+
+**Balance de la fase 2: dieciséis experimentos medidos, diez con resultado negativo.** Todos con
+su número aquí. Los que funcionaron fueron tres: subir el tope del reordenador de 10 a 30 (+8
+puntos), cambiar al modelo de embeddings que el `STACK.md` ya tenía ratificado (+1), y arreglar
+la semántica `AND` del canal léxico. Los otros diez enseñan dónde **no** está el problema, que es
+para lo que sirve anotarlos.

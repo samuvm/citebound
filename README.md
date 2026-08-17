@@ -15,7 +15,7 @@ el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 
 - [x] **0 · Esqueleto vertical que camina** — doce condiciones en verde · [números](CHANGELOG.md)
 - [x] **1 · Scoring congelado y golden set** — el corrector se cerró **antes** de anotar el primer caso · **274 casos**, 15,3 h de revisión humana
-- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,852** contra 0,90 ✗ · quince experimentos medidos, [nueve negativos y anotados](docs/JOURNAL.md)
+- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,852** contra 0,90 ✗ · dieciséis experimentos medidos, [diez negativos y anotados](docs/JOURNAL.md)
 - [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
 - [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
 - [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
@@ -92,7 +92,8 @@ que acertar a la primera.
 en **211 de 216** casos, así que el recuperador hace su trabajo; de esos 211, el reordenador
 coloca 184 en el top-5 — el 87,2 %, cuando haría falta el 92,4 %. Con 80 candidatos por canal el
 artículo aparece en **216 de 216**: no falta información en ninguna parte, falta un ordenador
-mejor. Qué se hace con ese hueco es
+mejor. Y no es cuestión de tamaño — un modelo de 9B ordena **igual o peor** que el de 4B (0,843
+contra 0,852) tardando un 56 % más. Qué se hace con ese hueco es
 una decisión de producto y está planteada en [`docs/PARA-SAMUEL.md`](docs/PARA-SAMUEL.md) Q-019,
 junto con el dato que la hace urgente: el reordenador tarda **4,6 s** y el presupuesto de
 latencia por etapa le da **400 ms**.

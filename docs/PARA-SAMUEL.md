@@ -1045,7 +1045,7 @@ desde entonces cambia las dos columnas:
 |---|---|---|
 | Coste de B | «más lento, hay que medirlo» | **4.600 ms** contra un presupuesto de **400 ms** (`RULES` §2.1) |
 | Calidad de B | «hay que medirla, no está dada» | `G-RECALL5` **0,852** contra un umbral de 0,90 |
-| Qué queda por probar | mucho | **nada barato**: quince experimentos, nueve negativos |
+| Qué queda por probar | mucho | **nada**: dieciséis experimentos, diez negativos |
 
 Y el techo no es el problema: con 80 candidatos por canal el artículo correcto aparece en **216
 de 216** casos. El corpus lo tiene y la búsqueda lo encuentra siempre. **Todo el hueco es de
@@ -1056,6 +1056,11 @@ reordenador de 10 a 30 (esto **sí** funcionó, +8 puntos), cambiar el modelo de
 principal del `STACK.md`, tres troceados distintos del corpus, ponderar la fusión, pedir más
 candidatos por canal, dos formatos de prompt, el reordenado por ventanas, y el formato de
 instrucción que documenta `Qwen3-Embedding`.
+
+**Y no es cuestión de tamaño.** Repetido el 9B con el prompt de ahora y el índice que se sirve
+—la medida anterior era de otro prompt y otro índice, y no valía—: **0,843** contra los 0,852 del
+4B, tardando un 56 % más. Un modelo 2,25 veces mayor no ordena mejor. **No es el tamaño del
+modelo, es el tipo**, y un cross-encoder está entrenado exactamente para esto.
 
 **El hallazgo que lo explica:** con trozos afilados —troceado por apartado— el reordenador
 aporta **un** caso; con trozos gruesos aporta **veintiséis**. Su trabajo real es tapar el ruido

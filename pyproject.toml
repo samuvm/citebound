@@ -223,9 +223,11 @@ source_paths = [
 # de no escribir los numeros en el codigo, y es barata.
 # `evals/golden/` entra desde 1d: los tests de contrato de la cola y del montaje leen la
 # cola real y el golden set, y sin ellos la corrida de mutacion ni siquiera arranca.
+# `docs/RULES.md` entra por el mismo motivo desde que test_listas_del_gate.py compara las dos
+# listas del gate: lee la del Markdown, que es la que manda, en vez de hacer una cuarta copia.
 also_copy = [
   "src/", "tests/", "scripts/", "corpus/", "docs/CONTRACTS/", "docs/GOALS.yaml",
-  "evals/golden/", "compose.yaml"
+  "docs/RULES.md", "evals/golden/", "compose.yaml"
 ]
 # La suite de mutacion corre sin integracion: levantar Postgres por cada mutante
 # multiplicaria minutos por cientos y el gate se acabaria desactivando.

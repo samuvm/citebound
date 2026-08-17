@@ -41,7 +41,7 @@ from citebound.retrieval.rerank import CacheJuicios, ReordenadorLLM
 __all__ = ["a_nivel_articulo", "main", "medir"]
 
 RAIZ = Path(__file__).resolve().parents[1]
-GOLDEN = RAIZ / "evals" / "golden" / "v1.jsonl"
+GOLDEN = max((RAIZ / "evals" / "golden").glob("v*.jsonl"))
 INFORME = RAIZ / "evals" / "reports" / "retrieval-latest.json"
 CACHE_RERANK = RAIZ / "evals" / "cache" / "rerank.json"
 K_MEDIDOS = (5, 30)

@@ -43,7 +43,9 @@ from citebound.providers.embeddings import embedder_por_defecto
 __all__ = ["Umbrales", "cargar", "informe", "main", "umbrales_de_goals", "validar"]
 
 RAIZ = Path(__file__).resolve().parents[1]
-GOLDEN = RAIZ / "evals" / "golden" / "v1.jsonl"
+# La versión más reciente, no una fija: el golden set es append-only por versión (R12) y
+# `v2` existe desde ADR-021. Clavar `v1` aquí validaría un conjunto que ya no es el que se mide.
+GOLDEN = max((RAIZ / "evals" / "golden").glob("v*.jsonl"), default=RAIZ / "evals/golden/v1.jsonl")
 INDICE = RAIZ / "corpus" / "index" / "refs.json"
 DESTINO = RAIZ / "evals" / "golden" / "VALIDATION.json"
 GOALS = RAIZ / "docs" / "GOALS.yaml"

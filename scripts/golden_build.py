@@ -32,7 +32,13 @@ RAIZ = Path(__file__).resolve().parents[1]
 COLA = RAIZ / "evals" / "golden" / "cola" / "candidatos.jsonl"
 VEREDICTOS = RAIZ / "evals" / "golden" / "cola" / "veredictos.jsonl"
 PROPUESTAS = RAIZ / "evals" / "golden" / "propuestas"
-DESTINO = RAIZ / "evals" / "golden" / "v1.jsonl"
+VERSION = 2
+DESTINO = RAIZ / "evals" / "golden" / f"v{VERSION}.jsonl"
+
+# ADR-021: fuera del conjunto de evaluación, no del banco. Su enunciado no identifica el
+# supuesto de hecho sin la imagen, así que ningún sistema puede responderlos y su presencia
+# acota `G-RECALL30` por debajo de su umbral por una razón ajena al sistema.
+SIN_TEXTO_SUFICIENTE = frozenset({"gs-0036", "gs-0061", "gs-0127"})
 CHECKSUMS = RAIZ / "evals" / "golden" / "CHECKSUMS"
 STRATA = RAIZ / "evals" / "golden" / "STRATA.md"
 
@@ -79,6 +85,8 @@ def montar(
         veredicto = dictamen.get(ident)
         if veredicto is None or veredicto["veredicto"] in ("descartar", "saltar"):
             continue
+        if ident in SIN_TEXTO_SUFICIENTE:
+            continue
 
         propuesta = propuestas.get(ident, {})
         era_negativo = bruto["tipo"] == "negativo"
@@ -91,7 +99,7 @@ def montar(
         casos.append(
             CasoGolden(
                 id=ident,
-                version=1,
+                version=VERSION,
                 pregunta=str(bruto["pregunta"]),
                 respuesta_referencia=str(bruto["respuesta_correcta"]) if es_positivo else None,
                 refs=[str(ref)] if es_positivo and ref else [],
@@ -155,9 +163,9 @@ def main() -> int:
     sello = escribir(casos, DESTINO)
     desglose = estratos(casos)
 
-    CHECKSUMS.write_text(f"{sello}  v1.jsonl\n", encoding="utf-8")
+    CHECKSUMS.write_text(f"{sello}  v{VERSION}.jsonl\n", encoding="utf-8")
     STRATA.write_text(
-        "# Estratos de `evals/golden/v1.jsonl`\n\n"
+        f"# Estratos de `evals/golden/v{VERSION}.jsonl`\n\n"
         "Generado por `make golden-build`. Procedencia de la revisión en\n"
         "`evals/golden/cola/PROCEDENCIA.md`.\n\n"
         f"- **{desglose['n']} casos** · {desglose['positivos']} positivos · "

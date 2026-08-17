@@ -13,8 +13,10 @@ The adapter is `OpenAICompatEmbedder` and **not** `OllamaEmbedder`, deliberately
 `/v1/embeddings`; one adapter covers the four and swapping runtime is an environment
 variable. Ollama 0.32 is pivoting towards a consumer product, and this is cheap insurance.
 
-The reranker does **not** live here and never will: there is no `/api/rerank`, in any
-version. It runs in-process on MPS behind its own port (R8).
+El reordenador no vive aquí, pero **tampoco corre en proceso**: es el propio generador por
+`/v1/chat/completions` (Q-017, ADR-022). No hay endpoint de rerank en ninguna versión de
+Ollama, y la salida no fue un segundo transporte sino usar el que ya había. `docs/RULES.md` R8
+todavía dice lo contrario y su cambio está pedido en Q-018.
 """
 
 from __future__ import annotations

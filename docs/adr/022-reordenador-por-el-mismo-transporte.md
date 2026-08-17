@@ -7,7 +7,11 @@
 
 ## Contexto
 
-Medido sobre los 216 casos positivos del golden set `v2`, sin reordenar:
+Medido sobre los 216 casos positivos del golden set `v2`, sin reordenar, **sobre el índice
+`v1-bge-m3-1024`**, que era el activo el día de la decisión. El índice se declara porque sin él
+la tabla no se puede reproducir — es la misma exigencia que el contrato compartido pone a todo
+informe de eval. Al pasar a `qwen3-embedding:0.6b` estos números mejoran y las conclusiones no
+cambian: el cuello sigue estando en el orden, no en la búsqueda.
 
 | Canal | recall@5 | recall@30 |
 |---|---:|---:|

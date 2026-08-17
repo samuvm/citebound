@@ -917,16 +917,28 @@ para todos los modelos del proyecto. `docs/STACK.md` §2.1 y `CLAUDE.md` invaria
 otra cosa —cross-encoder en proceso— así que su cambio va como propuesta aparte; esta entrada
 solo fija la decisión.
 
-### Q-018 · fase 2 · NO bloquea medir · aplicar tu propia decisión de Q-017 a un fichero de solo lectura
+### Q-018 · fase 2 · BLOQUEA cerrar la fase 3 · aplicar tu propia decisión de Q-017 a dos ficheros de solo lectura
 
-**Qué necesito:** que edites **tú** `docs/STACK.md` §2.1, porque es de solo lectura para mí.
+**Qué necesito:** que edites **tú** `docs/STACK.md` §2.1 **y `docs/RULES.md` R8**, porque los dos
+son de solo lectura para mí.
 
 **Por qué:** en Q-017 elegiste **B** —un solo transporte, el reordenador es el generador por
-`/v1/chat/completions`— y ya está construido y medido así. Pero `docs/STACK.md` §2.1 sigue
-diciendo lo contrario, y `CLAUDE.md` remite a `STACK.md` como la fuente que manda. Mientras no
-se cambie, cualquier agente que abra este repo mañana leerá que el reordenador corre en proceso
-con `sentence-transformers` y construirá sobre eso. No es una decisión nueva: es tu decisión sin
-aplicar.
+`/v1/chat/completions`— y ya está construido y medido así. Pero los dos documentos siguen
+diciendo lo contrario, y `CLAUDE.md` remite a ellos como la fuente que manda. No es una decisión
+nueva: es tu decisión sin aplicar.
+
+**R8 es el urgente de los dos**, porque no es descriptivo: es una regla **con comando de
+verificación**. Dice literalmente *«El reranker no pasa por Ollama. Corre en proceso,
+`sentence-transformers`, backend MPS»*, y manda comprobarlo con un
+`tests/contract/test_reranker_port.py` que asegure **negativamente** que
+`OpenAICompatProvider` **no** implementa `Reranker`. Ese test no existe todavía; si alguien lo
+escribiera tal como está redactada la regla, fallaría — y fallaría por estar el código bien. Su
+otra comprobación, `grep -r "api/rerank" src/` vacío, **ya da falso positivo**: las dos veces que
+aparece son comentarios que explican por qué ese endpoint no existe.
+
+**Qué escribir en `docs/RULES.md`, literal.** Sustituir la fila **R8** entera por:
+
+> | **R8** | **Un solo transporte: todo modelo pasa por Ollama o proveedor compatible.** El reordenador **es** el generador por `/v1/chat/completions` (Q-017). No existe `/api/rerank` ni un segundo camino de servir modelos | `grep -r "sentence_transformers\|CrossEncoder" src/ pyproject.toml` vacío + `tests/unit/test_rerank.py` | B |
 
 **Qué escribir, literal.** En `docs/STACK.md`, punto 1 de §2.1, sustituir desde «El reranker
 corre **en proceso**…» hasta «…se estrella.» por:
@@ -946,18 +958,19 @@ investigación, no el pin— añadiendo `no adoptado (Q-017)` en su columna de m
 - **B:** te lo repiensas y vuelves a A de Q-017 (cross-encoder en proceso). *Pros:* es más
   rápido y más preciso. *Contras:* rompe tu regla del transporte único, son ~2 GB de
   dependencias y hay que rehacer lo medido.
-- **C:** no tocar nada y dejar la contradicción anotada aquí. *Contras:* `STACK.md` manda sobre
-  `CLAUDE.md` por regla escrita, así que la contradicción se resuelve en contra de lo que de
-  verdad hay construido.
+- **C:** no tocar nada y dejar la contradicción anotada aquí. *Contras:* `STACK.md` y `RULES.md`
+  mandan sobre `CLAUDE.md` por regla escrita, así que la contradicción se resuelve en contra de
+  lo que de verdad hay construido. Y R8 quedaría como una regla que, cumplida al pie de la letra,
+  rompe el sistema.
 
 `[ ] A   [ ] B   [ ] C`
 
-**Si dices que no a todo:** no se para nada, pero queda un documento ratificado diciendo lo
-contrario de lo que corre. Lo dejo anotado en `JOURNAL.md` y en el ADR-022 para que al menos no
-sea invisible.
+**Si dices que no a todo:** la fase 2 no se para, pero la 3 sí acaba parándose: R8 es una regla
+de nivel **B** y su comprobación pertenece al gate. Mientras tanto queda anotado en `JOURNAL.md`
+y en el ADR-022 para que al menos no sea invisible.
 
-**Recomendación:** **A**.
+**Recomendación:** **A**, y R8 antes que `STACK.md` si solo vas a hacer una.
 
-**Tiempo tuyo:** 3 minutos.
+**Tiempo tuyo:** 5 minutos.
 **Estado: PENDIENTE**
 `>> `

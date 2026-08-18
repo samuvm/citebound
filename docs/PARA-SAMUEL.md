@@ -1110,3 +1110,56 @@ se ha hecho.
 `docs/RULES.md` R8 decían desde el principio. Se acepta el segundo camino de servir modelos
 porque es la única opción que arregla a la vez la calidad y `G-TTFT`, y porque lo que se midió
 del generador-como-reordenador —4.600 ms y 0,852— no es lo que se sopesó en Q-017.
+
+---
+
+## PROPUESTA P-002 · 2026-08-18 · fase 2
+
+**Tipo:** `bajar-umbral`
+**Afecta a:** `docs/GOALS.yaml :: G-RECALL5` (valor actual **0.90**)
+
+**Qué pido.** Bajar `G-RECALL5` a **0.80**, que es el máximo alcanzado y medido. `G-RECALL30`
+**no se toca**: pasa su umbral con 0,977 contra 0,97.
+
+**Por qué.** Veinte configuraciones medidas sobre los mismos 216 casos positivos del golden set
+`v2`, doce con resultado negativo, todas con su número en `docs/JOURNAL.md` (2026-08-17, tres
+entradas). El diagnóstico está cerrado y dice tres cosas:
+
+1. **No falta información.** Con 80 candidatos por canal el artículo correcto aparece en
+   **216 de 216** casos. El corpus lo tiene y la búsqueda lo encuentra siempre.
+2. **No falta recuperador.** `G-RECALL30` da 0,977: el artículo está entre los 30 en 211 de 216.
+3. **Falta un ordenador mejor, y no existe entre lo probado.** Ningún reordenador llega a 0,90:
+
+| reordenador | `G-RECALL5` | p95 |
+|---|---:|---:|
+| ninguno | 0,727 | — |
+| `bge-reranker-v2-m3` ← el que se sirve | **0,801** | 400 ms |
+| `Qwen3-Reranker-0.6B` | 0,787 | 886 ms |
+| generador `qwen3.5:4b` | 0,852 | 4.600 ms |
+| generador `qwen3.5:9b` | 0,843 | ~7.100 ms |
+
+**Qué he descartado, con su coste medido y no supuesto.** Tope del reordenador en 10 (techo
+0,785) · modelo de 9B (0,843, +56 % de tiempo) · 1.200 caracteres de contexto (peor que 500,
+doble de tiempo) · RRF entre el orden de fusión y el del reordenador (0,782) · formato de
+instrucción de `Qwen3-Embedding` en inglés (0,722) y en castellano (0,708) · reordenado por
+ventanas de 10 (0,806) · ponderar la fusión 10:1 a favor del vectorial (sube el top-5 a 0,819
+pero **rompe `G-RECALL30`**, que baja a 0,954) · troceado por apartado (0,806) · troceado
+multinivel (0,824) · instrucción de dominio en el cross-encoder (0,773).
+
+**Por qué 0.80 y no 0.85.** Porque 0,85 solo lo alcanza el generador puesto a ordenar, y ese
+número **el producto no lo entrega**: cuesta 4.600 ms contra un presupuesto de 400 ms
+(`RULES` §2.1), no es reproducible entre corridas y Q-019 lo sacó del camino interactivo. 0,801
+es lo que recibe quien pregunta. Ver **ADR-024**.
+
+**Lo que se pierde, dicho claro.** 0.80 deja **cero margen**: el valor medido es 0,8009. Es
+sostenible solo porque el cross-encoder es determinista byte a byte —comprobado con dos corridas
+en frío idénticas— así que la meta pasa a ser **un suelo del que no se puede bajar**, no una
+aspiración. Cualquier cambio de índice, troceado o reordenador que empeore un solo caso la pone
+en rojo, que es exactamente lo que debe hacer.
+
+**Alternativa si dices que no.** Seguir a la fase 3 con `G-RECALL5` en rojo y `make done
+MILESTONE=2` sin cerrar. El agente se puede construir igual —el material está en el top-30 en el
+97,7 % de los casos— pero la fase 2 queda abierta y el gate de la 3 arrastra una meta roja que no
+tiene nada que ver con la 3.
+
+**Estado: PENDIENTE**

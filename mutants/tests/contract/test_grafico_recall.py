@@ -53,9 +53,20 @@ def test_el_valor_se_escribe_con_coma_como_todo_el_repositorio() -> None:
 
 
 def test_marca_las_metas_que_pasan_y_no_las_que_no() -> None:
-    svg = barras(POR_CANAL, 216, "v1-x")
-    assert "0,977  ✓" in svg, "recall30 pasa su umbral y el gráfico debería decirlo"
-    assert "0,856  ✓" not in svg, "recall5 no llega a 0,90 y el gráfico no puede sugerir que sí"
+    """La expectativa se deriva del umbral vigente, no se escribe a mano.
+
+    Escrita a mano decía «0,856 no llega a 0,90», y el 2026-08-19 —cuando Samuel aprobó P-002 y
+    el umbral bajó a 0,80— pasó a afirmar lo contrario de la verdad. Un test con un número
+    copiado envejece igual que el código que vigila."""
+    justo_debajo = round(UMBRAL["recall5"] - 0.01, 3)
+    justo_encima = round(UMBRAL["recall5"] + 0.01, 3)
+    svg = barras(
+        {"solo_vectorial": {"recall5": justo_debajo}, "solo_lexico": {"recall5": justo_encima}},
+        216,
+        "v1-x",
+    )
+    assert f"{justo_encima:.3f}".replace(".", ",") + "  ✓" in svg
+    assert f"{justo_debajo:.3f}".replace(".", ",") + "  ✓" not in svg
 
 
 def test_el_grafico_declara_sobre_que_indice_se_midio() -> None:

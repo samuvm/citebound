@@ -14,7 +14,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-__all__ = ["barras", "main"]
+import yaml
+
+__all__ = ["barras", "main", "umbrales"]
 
 RAIZ = Path(__file__).resolve().parents[1]
 INFORME = RAIZ / "evals" / "reports" / "retrieval-latest.json"
@@ -26,7 +28,25 @@ ETIQUETAS = {
     "fusion": "Híbrido (RRF)",
     "fusion_y_reordenador": "Híbrido + reordenador",
 }
-UMBRAL = {"recall5": 0.90, "recall30": 0.97}
+
+
+def umbrales() -> dict[str, float]:
+    """Los umbrales que exige `docs/GOALS.yaml`, leídos de ahí y no copiados aquí.
+
+    Estaban escritos a mano y el 2026-08-19 se quedaron viejos en cuanto Samuel aprobó P-002 y
+    bajó `G-RECALL5` de 0,90 a 0,80: el gráfico habría dibujado la barra por debajo de una línea
+    que ya no existía. Lo cazó su test —que compara las dos cosas— y la lección es la de siempre
+    en este repositorio: **una copia de un número es un número que se queda viejo.**
+    """
+    metas = yaml.safe_load((RAIZ / "docs" / "GOALS.yaml").read_text(encoding="utf-8"))["metas"]
+    return {
+        f"recall{m['id'].removeprefix('G-RECALL')}": float(m["umbral"]["valor"])
+        for m in metas
+        if m["id"] in ("G-RECALL5", "G-RECALL30")
+    }
+
+
+UMBRAL = umbrales()
 
 ANCHO, FILA, IZQUIERDA, BARRA = 900, 34, 210, 560
 
@@ -85,8 +105,11 @@ def barras(por_canal: dict[str, dict[str, float]], n: int, indice: str) -> str:
 
     p += [
         f'<text x="{IZQUIERDA}" y="{alto - 18}" font-size="11" fill="#8a8578">'
-        "La línea roja es el umbral que exige el gate: 0,90 en @5 y 0,97 en @30. "
-        "Ninguna barra se dibuja a mano.</text>",
+        "La línea roja es el umbral que exige el gate: "
+        + f"{UMBRAL['recall5']:.2f}".replace(".", ",")
+        + " en @5 y "
+        + f"{UMBRAL['recall30']:.2f}".replace(".", ",")
+        + " en @30. Ni la barra ni la línea se dibujan a mano.</text>",
         "</svg>",
     ]
     return "\n".join(p) + "\n"

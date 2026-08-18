@@ -1162,4 +1162,4 @@ MILESTONE=2` sin cerrar. El agente se puede construir igual —el material está
 97,7 % de los casos— pero la fase 2 queda abierta y el gate de la 3 arrastra una meta roja que no
 tiene nada que ver con la 3.
 
-**Estado: PENDIENTE**
+**Estado: APROBADA · 2026-08-18**

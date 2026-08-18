@@ -126,6 +126,100 @@ aquí, espejo de Q-002 y Q-003 allí. Razonamiento y coste en
 
 ---
 
+## [fase-1] · 2026-08-16 · Scoring congelado y golden set
+
+`make done MILESTONE=1` → **exit 0**, doce de doce. Etiqueta `fase-1`.
+
+> **Entrada escrita a posteriori el 2026-08-19**, al cerrar la fase 2: la fase 1 se cerró sin su
+> entrada y la regla de este fichero es una por fase cerrada. Se anota el desfase en vez de
+> disimularlo, y los números salen de los artefactos etiquetados en `fase-1`.
+
+### Números medidos
+
+| Meta | Umbral | Valor |
+|---|---:|---:|
+| `G-GOLDEN-VALID` | = 0 errores | **0** |
+| `G-COV-FUNC` | = 0 sin test | **0** |
+| `G-SECRETS` | = 0 | **0** |
+
+**Golden set `v1`: 277 casos** · 219 positivos · 58 negativos (20,9 %) · 8 materias con 20 casos
+o más · sha256 `0f757e2446f4a8142e8f6ec5455c1f5266a5cb01527e294ddcbfe4dcc3d02936`.
+
+**Lo que lo distingue no es el tamaño, es la procedencia.** Los 304 candidatos los revisó Samuel
+uno a uno a lo largo de **15,3 horas**, y ningún caso entra sin revisor y sin fecha — regla dura
+nº 3 del contrato compartido: generación asistida por LLM sí, aprobación automática no.
+Trazabilidad en `evals/golden/cola/PROCEDENCIA.md`.
+
+**El corrector se congeló antes de anotar el primer caso.** `scoring` y `bootstrap` se
+escribieron y cerraron con su rojo comprometido en git antes de que existiera un solo veredicto,
+que es lo que impide ajustar la métrica a los datos.
+
+---
+
+## [fase-2] · 2026-08-19 · Retrieval híbrido
+
+`make done MILESTONE=2` → **exit 0**, las doce condiciones en verde. Punto de retorno: commit
+etiquetado `fase-2`.
+
+### Números medidos
+
+216 preguntas positivas del golden set `v2`. Índice `v1-qwen3-embedding-0.6b-1024`, reordenador
+`BAAI/bge-reranker-v2-m3`. Reproducible con `make eval-retrieval` en 96 s, **sin caché y byte a
+byte idéntico entre corridas**.
+
+| Meta | Umbral | Valor | Artefacto |
+|---|---:|---:|---|
+| `G-RECALL5` | ≥ 0,80 | **0,8009** | `evals/reports/retrieval-latest.json` |
+| `G-RECALL30` | ≥ 0,97 | **0,9769** | idem |
+| `G-COV-LINE` | ≥ 85 | **100 %** | `[tool.gate].testable` |
+| `G-COV-FUNC` | = 0 | **0** sin test | `scripts/check_function_coverage.py` |
+| `G-MUT` | ≥ 70 | **1027/1028 (100 %)** | `evals/reports/mutation-latest.json` |
+| `G-SECRETS` | = 0 | **0** | `detect-secrets` |
+| Suite completa | — | **622 tests** | integración incluida |
+
+Recall por canal, todo sobre los mismos 216 casos:
+
+| Canal | recall@5 | recall@30 |
+|---|---:|---:|
+| Solo vectorial · HNSW coseno | 0,792 | 0,954 |
+| Solo léxico · `ts_rank_cd` | 0,370 | 0,815 |
+| Híbrido + reordenador | **0,801** | **0,977** |
+
+### `G-RECALL5` bajó de 0,90 a 0,80, y así se decidió
+
+**Propuesta P-002, aprobada por Samuel el 2026-08-18.** La condición que la constitución exige
+—≥ 2 intentos medidos y anotados— se cumplió con **veinte configuraciones**, doce con resultado
+negativo, todas con su número en `docs/JOURNAL.md`. El diagnóstico dice que no falta información
+—con 80 candidatos por canal el artículo correcto aparece en **216 de 216** casos— ni recuperador
+—`G-RECALL30` da 0,977— sino un ordenador mejor, y ninguno de los cinco probados llega a 0,90.
+
+Se eligió 0,80 y no 0,85 porque 0,85 solo lo alcanzaba el generador puesto a ordenar, y **ese
+número el producto no lo entrega**: 4.600 ms contra un presupuesto de 400 ms. Con 0,80 la meta
+pasa a ser un **suelo del que no se puede bajar**, sin margen: el valor medido es 0,8009 y solo
+es sostenible porque el reordenador es determinista.
+
+### Decisiones con ADR
+
+- **ADR-022** · el reordenador es el generador, por un solo transporte (Q-017). **Superado.**
+- **ADR-023** · una versión de índice por tabla física. A igual dimensión el reindexado es
+  destructivo en sitio, así que la conmutación sin parar el servicio solo vale entre dimensiones.
+- **ADR-024** · el reordenador vuelve a ser un cross-encoder en proceso (Q-020). Cuesta 5 puntos
+  de recall y gana latencia, reproducibilidad y poder ejecutarse al responder.
+
+### Siete defectos que no daban ningún error
+
+Todos encontrados midiendo, ninguno visible desde fuera: filas que declaraban un índice y
+llevaban los vectores de otro · el informe de eval sin declarar sobre qué índice ni con qué
+modelo se midió · la consulta vectorizándose con un modelo distinto del que construyó el índice
+· `G-COV-LINE` y `G-MUT` apuntando a artefactos que nadie escribía · `retrieval/fusion.py`
+exigiendo TDD sin que la mutación lo midiera · un `K_CANAL` de un experimento que sobrevivió al
+experimento y tiró `G-RECALL30` de 0,977 a 0,949.
+
+### Lo que queda dicho para la fase 3
+
+El troceado por apartado multiplica por cinco la lectura estricta del recall —de 0,093 a 0,477—
+aunque pierda en la de artículo. `G-CITA-PRECISION` la va a querer.
+
 <!--
 Plantilla de una fase cerrada. Copiar tal cual y rellenar.
 

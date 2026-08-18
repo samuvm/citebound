@@ -7,7 +7,7 @@
 <rect x="210" y="88" width="443.3" height="18" rx="3" fill="#5b7a9a"/>
 <text x="782" y="102" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,792</text>
 <text x="218" y="102" font-size="11" fill="#fff">@5</text>
-<line x1="714.0" y1="86" x2="714.0" y2="108" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
+<line x1="658.0" y1="86" x2="658.0" y2="108" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
 <rect x="210" y="122" width="560" height="18" rx="3" fill="#eeece6"/>
 <rect x="210" y="122" width="534.1" height="18" rx="3" fill="#9ab0c2"/>
 <text x="782" y="136" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,954</text>
@@ -18,7 +18,7 @@
 <rect x="210" y="162" width="207.4" height="18" rx="3" fill="#5b7a9a"/>
 <text x="782" y="176" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,370</text>
 <text x="218" y="176" font-size="11" fill="#fff">@5</text>
-<line x1="714.0" y1="160" x2="714.0" y2="182" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
+<line x1="658.0" y1="160" x2="658.0" y2="182" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
 <rect x="210" y="196" width="560" height="18" rx="3" fill="#eeece6"/>
 <rect x="210" y="196" width="456.3" height="18" rx="3" fill="#9ab0c2"/>
 <text x="782" y="210" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,815</text>
@@ -27,13 +27,13 @@
 <text x="196" y="262" font-size="13" fill="#2b2a26" text-anchor="end">Híbrido + reordenador</text>
 <rect x="210" y="236" width="560" height="18" rx="3" fill="#eeece6"/>
 <rect x="210" y="236" width="448.5" height="18" rx="3" fill="#5b7a9a"/>
-<text x="782" y="250" font-size="13" fill="#2b2a26" font-weight="400" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,801</text>
+<text x="782" y="250" font-size="13" fill="#3f5738" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,801  ✓</text>
 <text x="218" y="250" font-size="11" fill="#fff">@5</text>
-<line x1="714.0" y1="234" x2="714.0" y2="256" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
+<line x1="658.0" y1="234" x2="658.0" y2="256" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
 <rect x="210" y="270" width="560" height="18" rx="3" fill="#eeece6"/>
 <rect x="210" y="270" width="547.0" height="18" rx="3" fill="#9ab0c2"/>
 <text x="782" y="284" font-size="13" fill="#3f5738" font-weight="600" font-family="ui-monospace, SFMono-Regular, Menlo, monospace">0,977  ✓</text>
 <text x="218" y="284" font-size="11" fill="#fff">@30</text>
 <line x1="753.2" y1="268" x2="753.2" y2="290" stroke="#b4553f" stroke-width="1.5" stroke-dasharray="3 2"/>
-<text x="210" y="322" font-size="11" fill="#8a8578">La línea roja es el umbral que exige el gate: 0,90 en @5 y 0,97 en @30. Ninguna barra se dibuja a mano.</text>
+<text x="210" y="322" font-size="11" fill="#8a8578">La línea roja es el umbral que exige el gate: 0,80 en @5 y 0,97 en @30. Ni la barra ni la línea se dibujan a mano.</text>
 </svg>

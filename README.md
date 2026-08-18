@@ -15,8 +15,8 @@ el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 
 - [x] **0 · Esqueleto vertical que camina** — doce condiciones en verde · [números](CHANGELOG.md)
 - [x] **1 · Scoring congelado y golden set** — el corrector se cerró **antes** de anotar el primer caso · **274 casos**, 15,3 h de revisión humana
-- [~] **2 · Retrieval híbrido** — `G-RECALL30` **0,977** ✓ · `G-RECALL5` **0,801** contra 0,90 ✗ · veinte experimentos medidos, [doce negativos y anotados](docs/JOURNAL.md)
-- [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado
+- [x] **2 · Retrieval híbrido** — `make done MILESTONE=2` → exit 0, doce de doce · `G-RECALL5` **0,801** · `G-RECALL30` **0,977** · [números en el CHANGELOG](CHANGELOG.md)
+- [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado ← **siguiente**
 - [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
 - [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
 - [ ] **5 · Endurecimiento y publicación** — suite adversarial, observabilidad, arranque en frío
@@ -81,22 +81,30 @@ con `make eval-retrieval`.
 | Solo léxico · `ts_rank_cd` | 0,370 | 0,815 |
 | Híbrido · fusión RRF | 0,727 | **0,977** |
 | Híbrido + reordenador | **0,801** | **0,977** |
-| *Umbral que exige el gate* | *≥ 0,90* | *≥ 0,97* |
+| *Umbral que exige el gate* | *≥ 0,80* | *≥ 0,97* |
 
 **El híbrido es peor que el vectorial solo en el top-5 y mejor en el top-30.** No es un accidente
 ni un defecto: la fusión mete candidatos léxicos que ensucian la cabeza de la lista y a cambio
 ensancha la red. Justo por eso hay un reordenador — buscar más y ordenar después es más barato
 que acertar a la primera.
 
-**`G-RECALL5` no llega, y el diagnóstico está cerrado.** El artículo correcto está entre los 30
+**`G-RECALL5` bajó de 0,90 a 0,80, y conviene saber por qué.** El artículo correcto está entre los 30
 en **211 de 216** casos, así que el recuperador hace su trabajo; de esos 211, el reordenador
 coloca 184 en el top-5 — el 87,2 %, cuando haría falta el 92,4 %. Con 80 candidatos por canal el
 artículo aparece en **216 de 216**: no falta información en ninguna parte, falta un ordenador
 mejor. Y no es cuestión de tamaño — un modelo de 9B ordena **igual o peor** que el de 4B (0,843
-contra 0,852) tardando un 56 % más. Qué se hace con ese hueco es
-una decisión de producto y está planteada en [`docs/PARA-SAMUEL.md`](docs/PARA-SAMUEL.md) Q-019,
-junto con el dato que la hace urgente: el reordenador tarda **4,6 s** y el presupuesto de
-latencia por etapa le da **400 ms**.
+contra 0,852) tardando un 56 % más.
+
+Ninguno de los cinco reordenadores probados llegó a 0,90, así que el umbral se bajó a **0,80**
+por la vía que el proyecto exige para eso: una propuesta escrita —**P-002**, en
+[`docs/PARA-SAMUEL.md`](docs/PARA-SAMUEL.md)— con las veinte configuraciones medidas delante, y
+la aprobación de una persona que además es la única que puede regenerar el candado de umbrales.
+El agente no puede bajar un número por su cuenta ni aunque tenga razón, y esa fricción es
+deliberada.
+
+**0,80 deja cero margen sobre un medido de 0,8009**, y eso lo convierte en un **suelo del que no
+se puede bajar** en vez de una aspiración: cualquier cambio futuro que empeore un solo caso lo
+pone en rojo. Solo es sostenible porque el reordenador es determinista.
 
 **Estos números son reproducibles byte a byte**, y no siempre lo fueron. Con el generador
 puesto a ordenar, tres corridas de la misma configuración —mismo código, mismo índice,

@@ -20,6 +20,7 @@ import pytest
 
 from citebound.domain.citation import (
     MAX_FUENTES,
+    MIN_CARACTERES_QUOTE,
     Cita,
     CitaError,
     Fuente,
@@ -197,6 +198,25 @@ def test_un_quote_demasiado_corto_no_pasa() -> None:
     """«de» está literalmente en el artículo y no cita nada: un fragmento tan corto aparece en
     cualquier texto y convierte `G-QUOTE-LIT` en un 1,00 que no significa nada."""
     v = verificar([Cita(n=1, quote="de")], FUENTES)
+    assert v.ok is False
+    assert v.motivo is Motivo.QUOTE_DEMASIADO_CORTO
+
+
+def test_el_borde_exacto_del_minimo_pasa_y_uno_menos_no() -> None:
+    """El borde, que es donde viven los off-by-one. Un `<=` en vez de `<` rechazaría una cita
+    de longitud exactamente mínima, y ningún otro test lo notaría: la diferencia es un carácter
+    y el mensaje de error sería el mismo.
+
+    El fragmento se toma **del texto de la fuente**, así que lo único que se está probando es
+    la longitud y no la literalidad."""
+    fuente = Fuente(ref=parse(f"{NORMA}#art9"), texto="Artículo 9. " + "abcdefghijklmnopqrst")
+    justo = fuente.texto[-MIN_CARACTERES_QUOTE:]
+    assert len(justo) == MIN_CARACTERES_QUOTE
+    assert verificar([Cita(n=1, quote=justo)], (fuente,)).ok is True
+
+    corto = justo[1:]
+    assert len(corto) == MIN_CARACTERES_QUOTE - 1
+    v = verificar([Cita(n=1, quote=corto)], (fuente,))
     assert v.ok is False
     assert v.motivo is Motivo.QUOTE_DEMASIADO_CORTO
 

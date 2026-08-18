@@ -131,6 +131,25 @@ def test_retractado_es_absorbente() -> None:
     assert guardia.consumir("[[REF:1]]") is Estado.RETRACTADO
 
 
+def test_tras_retractar_no_queda_nada_pendiente() -> None:
+    """Si el guardia retuviera algo tras retractar, existiría un camino por el que el hueco malo
+    —o lo que venía detrás— acaba saliendo. La garantía es que no lo hay."""
+    guardia = StreamGuard(MAX)
+    alimentar(guardia, "Texto [[REF:9]] y una cola larga que no debe salir.")
+    assert guardia.estado is Estado.RETRACTADO
+    assert guardia.pendiente == ""
+
+
+def test_lo_pendiente_es_siempre_un_prefijo_de_hueco_y_no_texto_normal() -> None:
+    """Retener texto que ya no puede llegar a ser un hueco sería un token que el usuario no ve
+    sin motivo, y en un stream eso se nota."""
+    guardia = StreamGuard(MAX)
+    guardia.consumir("Un texto normal y corriente")
+    assert guardia.pendiente == ""
+    guardia.consumir(" [[RE")
+    assert guardia.pendiente == "[[RE"
+
+
 def test_las_citas_vistas_se_recogen_en_orden() -> None:
     """El verificador necesita saber qué huecos usó el modelo y en qué orden, y sacarlo del
     texto ya emitido sería parsearlo dos veces."""
@@ -171,9 +190,24 @@ def test_propiedad_todo_prefijo_de_un_stream_valido_se_acepta(
 def test_propiedad_un_hueco_fuera_de_rango_retracta_en_su_token(
     antes: str, malo: int, despues: str
 ) -> None:
-    """**Propiedad exigida.** No solo que retracte: que retracte **en el token en que aparece**
-    y no después. Se comprueba consumiendo el resto y viendo que no llegó a leerlo."""
-    tokens = trocear_en_tokens(f"{antes}[[REF:{malo}]]{despues}")
+    """**Propiedad exigida.** No solo que retracte: que retracte **en el token en que aparece**.
+
+    Se comprueba contra el índice exacto del token que cierra el hueco, y no contra «quedan
+    tokens sin leer». Esa formulación era más débil y además falsa en un caso legítimo que
+    encontró Hypothesis: con `[[REF:6]]a` sin espacios, el hueco y lo que viene detrás caen en
+    el **mismo** token, así que no queda nada por leer y no por haber leído de más.
+    """
+    texto = f"{antes}[[REF:{malo}]]{despues}"
+    tokens = trocear_en_tokens(texto)
+    # En qué token termina el hueco: el primero cuyo prefijo acumulado ya lo contiene entero.
+    fin_del_hueco = texto.index("]]", texto.index("[[REF:")) + 2
+    acumulado, cierra_en = 0, len(tokens) - 1
+    for i, token in enumerate(tokens):
+        acumulado += len(token)
+        if acumulado >= fin_del_hueco:
+            cierra_en = i
+            break
+
     guardia = StreamGuard(MAX)
     leidos = 0
     for token in tokens:
@@ -181,8 +215,9 @@ def test_propiedad_un_hueco_fuera_de_rango_retracta_en_su_token(
         if guardia.consumir(token) is Estado.RETRACTADO:
             break
     assert guardia.estado is Estado.RETRACTADO
-    restantes = "".join(tokens[leidos:])
-    assert despues.strip() == "" or restantes != "", "leyó todo el stream antes de retractar"
+    assert leidos == cierra_en + 1, (
+        f"retractó en el token {leidos} y el hueco cerraba en el {cierra_en + 1}"
+    )
 
 
 @given(st.text(max_size=80))

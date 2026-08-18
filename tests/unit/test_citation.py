@@ -21,7 +21,7 @@ import pytest
 from citebound.domain.citation import (
     MAX_FUENTES,
     Cita,
-    CitaInvalida,
+    CitaError,
     Fuente,
     Motivo,
     Veredicto,
@@ -61,12 +61,12 @@ def test_el_hueco_cero_se_rechaza() -> None:
     """`n` empieza en 1 porque así se le presenta al modelo. Un 0 es un error de índice
     disfrazado de cita, y resolverlo al último elemento —que es lo que haría Python— citaría
     un artículo que nadie eligió."""
-    with pytest.raises(CitaInvalida, match="fuera de rango"):
+    with pytest.raises(CitaError, match="fuera de rango"):
         resolver(Cita(n=0, quote="da igual"), FUENTES)
 
 
 def test_un_hueco_negativo_se_rechaza() -> None:
-    with pytest.raises(CitaInvalida, match="fuera de rango"):
+    with pytest.raises(CitaError, match="fuera de rango"):
         resolver(Cita(n=-1, quote="da igual"), FUENTES)
 
 
@@ -77,21 +77,21 @@ def test_el_hueco_seis_se_rechaza_aunque_haya_cinco_fuentes() -> None:
         Fuente(ref=parse(f"{NORMA}#art{i}"), texto=f"Artículo {i}. Texto.") for i in range(1, 6)
     )
     assert len(cinco) == MAX_FUENTES
-    with pytest.raises(CitaInvalida, match="fuera de rango"):
+    with pytest.raises(CitaError, match="fuera de rango"):
         resolver(Cita(n=6, quote="da igual"), cinco)
 
 
 def test_un_hueco_dentro_del_rango_pero_sin_fuente_se_rechaza() -> None:
     """Si la búsqueda solo trajo dos, el 3 no existe **aunque** el modelo tenga permitido
     escribir hasta el 5. El rango real lo fija lo recuperado, no la plantilla."""
-    with pytest.raises(CitaInvalida, match="fuera de rango"):
+    with pytest.raises(CitaError, match="fuera de rango"):
         resolver(Cita(n=3, quote="da igual"), FUENTES)
 
 
 def test_sin_fuentes_ningun_hueco_es_valido() -> None:
     """Corpus sin resultados: no hay nada que citar y la salida correcta es abstenerse, no
     inventar un 1."""
-    with pytest.raises(CitaInvalida, match="fuera de rango"):
+    with pytest.raises(CitaError, match="fuera de rango"):
         resolver(Cita(n=1, quote="da igual"), ())
 
 
@@ -104,13 +104,13 @@ def test_las_comillas_curvas_se_pliegan_sobre_las_rectas() -> None:
     """Un modelo devuelve «"texto"» donde el BOE escribe '"texto"'. Son el mismo texto para
     quien lee, y si no se pliegan `G-QUOTE-LIT` bajaría de 1,00 por tipografía."""
     assert normalizar_para_cotejo("“texto”") == normalizar_para_cotejo('"texto"')
-    assert normalizar_para_cotejo("‘texto’") == normalizar_para_cotejo("'texto'")
+    assert normalizar_para_cotejo("‘texto’") == normalizar_para_cotejo("'texto'")  # noqa: RUF001
 
 
 def test_los_guiones_unicode_se_pliegan_sobre_el_guion_normal() -> None:
     """El guion largo, el corto y el de no ruptura salen todos del mismo sitio: un PDF, un
     copiado, un teclado distinto."""
-    for guion in ("—", "–", "‑", "−"):
+    for guion in ("—", "–", "‑", "−"):  # noqa: RUF001
         assert normalizar_para_cotejo(f"a{guion}b") == "a-b"
 
 
@@ -151,14 +151,14 @@ def test_un_solo_caracter_cambiado_no_pasa() -> None:
     «se contara de derecha a izquierda»: una tilde. Un juez LLM diría que significan lo mismo,
     y por eso el juez no decide esto. Una cita es literal o no es una cita."""
     v = verificar([Cita(n=1, quote="el número de carriles se contara de derecha")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_NO_LITERAL
 
 
 def test_una_parafrasis_fiel_tampoco_pasa() -> None:
     """Dice lo mismo con otras palabras. Es exactamente lo que el sistema no promete."""
     v = verificar([Cita(n=1, quote="los carriles se cuentan empezando por la derecha")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_NO_LITERAL
 
 
@@ -167,15 +167,15 @@ def test_un_quote_que_cruza_dos_articulos_no_pasa() -> None:
     de los dos. Sería una cita verificable contra el corpus entero y falsa contra su ref."""
     cruzado = "se contará de derecha a izquierda. Artículo 35. Separación lateral."
     v = verificar([Cita(n=1, quote=cruzado)], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_NO_LITERAL
 
 
-def test_el_quote_se_coteja_contra_SU_fuente_y_no_contra_las_demas() -> None:
+def test_el_quote_se_coteja_contra_su_propia_fuente_y_no_contra_las_demas() -> None:
     """Un texto que sí está en el artículo 35 pero se cita como `[[REF:1]]` es una cita mal
     atribuida. Verificar contra el corpus entero la daría por buena."""
     v = verificar([Cita(n=1, quote="Se deberá guardar la separación necesaria")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_NO_LITERAL
 
 
@@ -183,13 +183,13 @@ def test_un_quote_vacio_no_pasa() -> None:
     """La cadena vacía es subcadena de cualquier texto, así que pasaría la comprobación
     literal por accidente y no citaría nada."""
     v = verificar([Cita(n=1, quote="")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_VACIO
 
 
 def test_un_quote_de_solo_espacios_no_pasa() -> None:
     v = verificar([Cita(n=1, quote="   \n ")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_VACIO
 
 
@@ -197,7 +197,7 @@ def test_un_quote_demasiado_corto_no_pasa() -> None:
     """«de» está literalmente en el artículo y no cita nada: un fragmento tan corto aparece en
     cualquier texto y convierte `G-QUOTE-LIT` en un 1,00 que no significa nada."""
     v = verificar([Cita(n=1, quote="de")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_DEMASIADO_CORTO
 
 
@@ -205,7 +205,7 @@ def test_una_cita_con_tipografia_distinta_pasa_tras_normalizar() -> None:
     """Lo contrario del test del carácter cambiado, y por eso van juntos: la normalización
     tiene que ser suficiente para la tipografía y **no más** que eso."""
     v = verificar([Cita(n=1, quote="el  número   de\ncarriles de una calzada se contará")], FUENTES)
-    assert v.ok
+    assert v.ok is True
 
 
 # ======================================================================================
@@ -221,7 +221,7 @@ def test_dos_citas_validas_devuelven_las_dos_referencias() -> None:
         ],
         FUENTES,
     )
-    assert v.ok
+    assert v.ok is True
     assert v.refs == (ART34.ref, ART35.ref)
 
 
@@ -236,7 +236,7 @@ def test_una_valida_y_una_invalida_tumban_la_respuesta_entera() -> None:
         ],
         FUENTES,
     )
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.QUOTE_NO_LITERAL
 
 
@@ -244,7 +244,7 @@ def test_una_respuesta_sin_ninguna_cita_no_pasa() -> None:
     """Sin cita no hay nada que verificar, y emitirla sería justo el RAG que este proyecto
     no quiere ser. La salida correcta es abstenerse."""
     v = verificar([], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.SIN_CITAS
 
 
@@ -252,7 +252,7 @@ def test_el_hueco_fuera_de_rango_da_su_propio_motivo() -> None:
     """Se distingue de un quote malo porque la reacción es distinta: fuera de rango significa
     que el modelo se saltó el formato, y eso se detecta en el stream sin esperar al final."""
     v = verificar([Cita(n=9, quote="da igual")], FUENTES)
-    assert not v.ok
+    assert v.ok is False
     assert v.motivo is Motivo.FUERA_DE_RANGO
 
 

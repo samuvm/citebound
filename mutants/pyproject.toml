@@ -215,6 +215,9 @@ source_paths = [
   # las dos lineas de arriba, por tercera vez. El fichero existe, la regla lo nombra, y
   # G-MUT medía sobre cinco de los seis que le tocan sin que nada lo dijera.
   "src/citebound/retrieval/fusion.py",
+  # Fase 3. `domain/` entero es tdd_obligatorio en RULES §4, y el test de listas del gate lo
+  # cazó en cuanto existió el fichero — que es exactamente para lo que se escribió.
+  "src/citebound/domain/citation.py",
 ]
 # mutmut copia el arbol a `mutants/` y solo lleva lo que le digas: sin esto, los
 # tests de contrato no encuentran `citebound.api` y falla al recolectar.

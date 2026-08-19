@@ -15,7 +15,7 @@ OLLAMA_MIN := 0.32.6
 
 .PHONY: help up down warm lint typecheck test-fast test test-int smoke-f0 \
         gate-fast gate-full done eval mutation cov-func secrets clean \
-        check-ollama check-r1 openapi ingest golden-sample golden-validate golden-review golden-build eval-retrieval \
+        check-ollama check-r1 check-prompts openapi ingest golden-sample golden-validate golden-review golden-build eval-retrieval \
         grafico-recall eval-retrieval-sin-rerank \
         clean-mutants
 
@@ -63,6 +63,9 @@ typecheck:  ## mypy --strict sobre [tool.gate].testable, DERIVADO de esa lista
 
 check-r1:  ## R1 · ninguna cita se identifica por el id del troceador
 	$(UV) python scripts/check_no_chunk_ids.py
+
+check-prompts:  ## R5 · los prompts viven en prompts/*.md con frontmatter, nunca inline
+	$(UV) python scripts/check_prompts.py
 
 # ------------------------------------------------------------------- tests ---
 test-fast:  ## nivel 1 + 1b(dev) + 3. Presupuesto: < 20 s
@@ -123,7 +126,7 @@ secrets:  ## detect-secrets contra la baseline
 	  --exclude-files 'uv\.lock|tests/recordings/|corpus/raw/|\.snapshot\.json'
 
 # -------------------------------------------------------------------- gate ---
-gate-fast: lint typecheck check-r1 test-fast  ## lint + tipos + R1 + suite rapida
+gate-fast: lint typecheck check-r1 check-prompts test-fast  ## lint + tipos + R1 + suite rapida
 	@echo "gate-fast VERDE"
 
 gate-full: gate-fast test test-int check-r1 secrets  ## + integracion y secretos

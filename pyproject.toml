@@ -219,6 +219,7 @@ source_paths = [
   # cazó en cuanto existió el fichero — que es exactamente para lo que se escribió.
   "src/citebound/domain/citation.py",
   "src/citebound/agent/stream_guard.py",
+  "src/citebound/domain/retry.py",
 ]
 # mutmut copia el arbol a `mutants/` y solo lleva lo que le digas: sin esto, los
 # tests de contrato no encuentran `citebound.api` y falla al recolectar.

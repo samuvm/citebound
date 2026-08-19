@@ -104,9 +104,23 @@ def test_tres_intentos_malos_se_abstienen_con_el_motivo_del_ultimo() -> None:
     assert curso.refs == ()
 
 
+def test_quedarse_sin_borradores_se_abstiene_con_el_motivo_del_ultimo() -> None:
+    """Camino real: el grafo dejó de reintentar antes de agotar el presupuesto —un timeout de
+    nodo, un error del proveedor— y no hay nada verificado que emitir.
+
+    El motivo tiene que sobrevivir: el evento `abstain` del contrato SSE lo lleva **tipado**, y
+    abstenerse sin decir por qué es indistinguible de un fallo para quien recibe la respuesta."""
+    curso = resolver_curso([MAL])
+    assert curso.salida is Salida.ABSTENERSE
+    assert curso.motivo is Motivo.QUOTE_NO_LITERAL
+    assert resolver_curso([MAL, FUERA]).motivo is Motivo.FUERA_DE_RANGO
+
+
 def test_un_curso_sin_intentos_se_abstiene() -> None:
     """Ni un borrador. No hay nada que emitir y fingir lo contrario sería inventar."""
-    assert resolver_curso([]).salida is Salida.ABSTENERSE
+    curso = resolver_curso([])
+    assert curso.salida is Salida.ABSTENERSE
+    assert curso.motivo is None, "sin ningún borrador no hay motivo que dar, y fingirlo mentiría"
 
 
 def test_no_se_miran_los_intentos_de_mas() -> None:
@@ -141,15 +155,37 @@ def test_propiedad_nunca_mas_de_dos_reintentos(
     assert resolver_curso(intentos, hay_fuentes=hay_fuentes).reintentos <= MAX_REINTENTOS
 
 
-@given(st.lists(veredictos, min_size=1, max_size=12))
-def test_propiedad_abstenerse_es_absorbente(intentos: list[Veredicto]) -> None:
-    """**Propiedad exigida.** Una vez decidido abstenerse, ningún intento posterior lo revierte.
+@given(veredictos, st.integers(min_value=0, max_value=20), st.booleans())
+def test_propiedad_abstenerse_es_absorbente(
+    veredicto: Veredicto, hechos: int, hay_fuentes: bool
+) -> None:
+    """**Propiedad exigida**, enunciada sobre la decisión y no sobre el curso.
 
-    Se comprueba sobre el estado real: si el curso se abstiene, alargarlo con más intentos
-    —buenos incluidos— sigue abstiniéndose. Si un intento bueno pudiera rescatarlo, el tope de
+    Una vez que `decidir` dice abstenerse para un número de reintentos, lo sigue diciendo para
+    cualquier número mayor: gastar más presupuesto no reabre una puerta cerrada.
+
+    La primera versión de este test decía «si el curso se abstiene, alargarlo sigue
+    abstiniéndose», y Hypothesis la tumbó con razón: `[MAL]` se abstiene porque **se acabaron
+    los borradores**, no porque se decidiera abstenerse, y alargarlo debe poder rescatarlo —
+    eso es exactamente lo que significa reintentar. Confundir las dos cosas habría convertido
+    la propiedad en una prohibición del reintento."""
+    if decidir(veredicto, reintentos_hechos=hechos, hay_fuentes=hay_fuentes) is Salida.ABSTENERSE:
+        for mas in (hechos + 1, hechos + 7, hechos + 100):
+            assert (
+                decidir(veredicto, reintentos_hechos=mas, hay_fuentes=hay_fuentes)
+                is Salida.ABSTENERSE
+            )
+
+
+@given(st.lists(veredictos, max_size=12))
+def test_propiedad_agotado_el_presupuesto_ningun_intento_de_mas_rescata(
+    intentos: list[Veredicto],
+) -> None:
+    """La otra mitad de lo mismo, a nivel de curso: si se abstuvo **habiendo gastado el
+    presupuesto entero**, añadir borradores buenos no lo cambia. Si pudiera, el tope de
     reintentos no sería un tope."""
     curso = resolver_curso(intentos)
-    if curso.salida is Salida.ABSTENERSE:
+    if curso.salida is Salida.ABSTENERSE and curso.reintentos >= MAX_REINTENTOS:
         assert resolver_curso([*intentos, BIEN, BIEN]).salida is Salida.ABSTENERSE
 
 

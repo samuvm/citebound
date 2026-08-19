@@ -204,6 +204,58 @@
     "summary": "Ask"
    }
   },
+  "/ask/stream": {
+   "post": {
+    "description": "El agente entero por SSE. El contrato está en `docs/RULES.md` §2.2.\n\n`media_type` es `text/event-stream` y `X-Accel-Buffering: no` porque un proxy que\nacumule la respuesta convertiría el streaming en una entrega al final — y con él, el\n`TTFT` medido en un número que no tiene nada que ver con lo que vive el usuario.",
+    "operationId": "ask_stream_ask_stream_post",
+    "parameters": [
+     {
+      "in": "query",
+      "name": "pregunta",
+      "required": true,
+      "schema": {
+       "maxLength": 500,
+       "minLength": 3,
+       "title": "Pregunta",
+       "type": "string"
+      }
+     },
+     {
+      "in": "query",
+      "name": "k",
+      "required": false,
+      "schema": {
+       "default": 5,
+       "maximum": 20,
+       "minimum": 1,
+       "title": "K",
+       "type": "integer"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "content": {
+       "application/json": {
+        "schema": {}
+       }
+      },
+      "description": "Successful Response"
+     },
+     "422": {
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      },
+      "description": "Validation Error"
+     }
+    },
+    "summary": "Ask Stream"
+   }
+  },
   "/health": {
    "get": {
     "operationId": "health_health_get",

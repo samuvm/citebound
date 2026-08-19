@@ -42,6 +42,7 @@ __all__ = [
     "Motivo",
     "Veredicto",
     "normalizar_para_cotejo",
+    "parsear_borrador",
     "resolver",
     "verificar",
 ]
@@ -63,6 +64,16 @@ no significaría nada. Doce caracteres es corto para una cita jurídica y largo 
 coincidencia; si algún día estorba, se cambia con el número delante."""
 
 _ESPACIOS = re.compile(r"\s+")
+
+MARCA_CITAS = "CITAS"
+"""La línea que separa la respuesta de sus citas. Va en el prompt y se lee aquí, y tenerla en
+una constante es lo que impide que las dos se separen sin que nadie lo note."""
+
+_LINEA_CITA = re.compile(r"\[\[REF:(\d+)\]\]\s*(.*)$")
+
+# Los pares que se aceptan alrededor de un quote. El prompt pide guillemets; el modelo devuelve
+# lo que le sale, y las tres formas significan lo mismo para quien lee.
+_COMILLAS = (("\u00ab", "\u00bb"), ("\u201c", "\u201d"), ('"', '"'), ("'", "'"))
 
 # Comillas y guiones que hay que plegar, **por punto de código y no por el carácter**.
 #
@@ -2068,3 +2079,909 @@ mutants_x_verificar__mutmut['x_verificar__mutmut_44'] = x_verificar__mutmut_44 #
 mutants_x_verificar__mutmut['x_verificar__mutmut_45'] = x_verificar__mutmut_45 # type: ignore # mutmut generated
 mutants_x_verificar__mutmut['x_verificar__mutmut_46'] = x_verificar__mutmut_46 # type: ignore # mutmut generated
 mutants_x_verificar__mutmut['x_verificar__mutmut_47'] = x_verificar__mutmut_47 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut: MutantDict = {}  # type: ignore
+
+
+@_mutmut_mutated(mutants_x_parsear_borrador__mutmut)
+def parsear_borrador(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_orig(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_1(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = None
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_2(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = None
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_3(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next(None, None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_4(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next(None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_5(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), )
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_6(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(None) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_7(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() != MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_8(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is not None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_9(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = None
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_10(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=None, quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_11(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=None)
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_12(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_13(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), )
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_14(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(None), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_15(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(None)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_16(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(2)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_17(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(None))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_18(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(None)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_19(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(3)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_20(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte - 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_21(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 2 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_22(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(None)) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_23(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_24(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(None).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_25(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "XX\nXX".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_26(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(None)
+
+mutants_x_parsear_borrador__mutmut['_mutmut_orig'] = x_parsear_borrador__mutmut_orig # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_1'] = x_parsear_borrador__mutmut_1 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_2'] = x_parsear_borrador__mutmut_2 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_3'] = x_parsear_borrador__mutmut_3 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_4'] = x_parsear_borrador__mutmut_4 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_5'] = x_parsear_borrador__mutmut_5 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_6'] = x_parsear_borrador__mutmut_6 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_7'] = x_parsear_borrador__mutmut_7 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_8'] = x_parsear_borrador__mutmut_8 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_9'] = x_parsear_borrador__mutmut_9 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_10'] = x_parsear_borrador__mutmut_10 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_11'] = x_parsear_borrador__mutmut_11 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_12'] = x_parsear_borrador__mutmut_12 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_13'] = x_parsear_borrador__mutmut_13 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_14'] = x_parsear_borrador__mutmut_14 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_15'] = x_parsear_borrador__mutmut_15 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_16'] = x_parsear_borrador__mutmut_16 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_17'] = x_parsear_borrador__mutmut_17 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_18'] = x_parsear_borrador__mutmut_18 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_19'] = x_parsear_borrador__mutmut_19 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_20'] = x_parsear_borrador__mutmut_20 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_21'] = x_parsear_borrador__mutmut_21 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_22'] = x_parsear_borrador__mutmut_22 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_23'] = x_parsear_borrador__mutmut_23 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_24'] = x_parsear_borrador__mutmut_24 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_25'] = x_parsear_borrador__mutmut_25 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_26'] = x_parsear_borrador__mutmut_26 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut: MutantDict = {}  # type: ignore
+
+
+@_mutmut_mutated(mutants_x__desentrecomillar__mutmut)
+def _desentrecomillar(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_orig(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_1(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = None
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_2(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) or len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_3(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) or limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_4(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(None) and limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_5(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(None) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_6(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) > 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_7(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) >= 3:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio
+
+
+def x__desentrecomillar__mutmut_8(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : +len(cierra)].strip()
+    return limpio
+
+mutants_x__desentrecomillar__mutmut['_mutmut_orig'] = x__desentrecomillar__mutmut_orig # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_1'] = x__desentrecomillar__mutmut_1 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_2'] = x__desentrecomillar__mutmut_2 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_3'] = x__desentrecomillar__mutmut_3 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_4'] = x__desentrecomillar__mutmut_4 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_5'] = x__desentrecomillar__mutmut_5 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_6'] = x__desentrecomillar__mutmut_6 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_7'] = x__desentrecomillar__mutmut_7 # type: ignore # mutmut generated
+mutants_x__desentrecomillar__mutmut['x__desentrecomillar__mutmut_8'] = x__desentrecomillar__mutmut_8 # type: ignore # mutmut generated

@@ -40,6 +40,7 @@ from citebound.retrieval.vector import Recuperado
 __all__ = [
     "CARACTERES_POR_CANDIDATO",
     "PEDIDOS",
+    "PROMPT_ID",
     "PROMPT_VERSION",
     "CacheJuicios",
     "ReordenadorLLM",
@@ -50,9 +51,9 @@ __all__ = [
 ]
 
 PROMPT_VERSION = 2
-"""Sube cuando cambie `_PLANTILLA` **o cómo se llama al modelo**. Forma parte de la clave de
-caché: un juicio emitido con otro prompt es un juicio sobre otra pregunta, y reutilizarlo sería
-mentir sobre qué se midió.
+"""Sube cuando cambie `prompts/rerank-listwise.md` **o cómo se llama al modelo**. Forma parte
+de la clave de caché: un juicio emitido con otro prompt es un juicio sobre otra pregunta, y
+reutilizarlo sería mentir sobre qué se midió.
 
 - `1`: ordenación completa de los 30, candidatos numerados. **0,856.**
 - `2` (2026-08-17): etiquetas de dos letras y se piden exactamente `PEDIDOS`. **0,852.** Un
@@ -105,19 +106,30 @@ def etiquetas(cuantas: int) -> list[str]:
     return [_ALFABETO[i // 26] + _ALFABETO[i % 26] for i in range(cuantas)]
 
 
-_PLANTILLA = """Pregunta: {pregunta}
+PROMPT_ID = "rerank-listwise"
+"""El prompt vive en `prompts/rerank-listwise.md`, nunca aquí (R5).
 
-Artículos candidatos:
-{bloques}
+Un prompt inline no tiene versión, así que un informe de eval no puede decir con cuál se midió;
+no tiene `cambios`, así que una regresión no se puede atribuir. El esquema del informe pide
+`prompt_id` y `version`: sin fichero no hay nada que poner ahí."""
 
-De los candidatos anteriores, elige los {pedidos} MÁS relevantes, del más al menos relevante.
 
-Relevante significa: el artículo que TIPIFICA la conducta por la que se pregunta, no el que
-solo la menciona de pasada ni el que regula algo parecido.
+def _plantilla() -> str:
+    """El cuerpo del prompt, sin su frontmatter. Se lee una vez y se memoriza.
 
-Responde ÚNICAMENTE con {pedidos} etiquetas separadas por comas, así: {ejemplo}
-Nada más: ni el número del artículo, ni explicación.
-"""
+    `retrieval/` sí puede tocar disco —`domain/` es el que no (R6)— y leerlo al importar
+    obligaría a tener el fichero presente para importar el módulo, que rompe los tests que no
+    lo usan.
+    """
+    global _CUERPO
+    if _CUERPO is None:
+        texto = (_RAIZ / "prompts" / f"{PROMPT_ID}.md").read_text(encoding="utf-8")
+        _CUERPO = texto.split("\n---\n", 1)[1].lstrip("\n") if texto.startswith("---\n") else texto
+    return _CUERPO
+
+
+_RAIZ = Path(__file__).resolve().parents[3]
+_CUERPO: str | None = None
 
 
 def nombrados_por_etiquetas(respuesta: str, candidatos: Sequence[Recuperado]) -> list[Recuperado]:
@@ -263,7 +275,7 @@ class ReordenadorLLM:
             for e, r in zip(marcas, grupo, strict=True)
         )
         respuesta = self._generador.completar(
-            _PLANTILLA.format(
+            _plantilla().format(
                 pregunta=pregunta,
                 bloques=bloques,
                 pedidos=cuantos,

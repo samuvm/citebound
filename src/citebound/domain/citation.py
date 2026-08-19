@@ -65,6 +65,16 @@ coincidencia; si algún día estorba, se cambia con el número delante."""
 
 _ESPACIOS = re.compile(r"\s+")
 
+MARCA_CITAS = "CITAS"
+"""La línea que separa la respuesta de sus citas. Va en el prompt y se lee aquí, y tenerla en
+una constante es lo que impide que las dos se separen sin que nadie lo note."""
+
+_LINEA_CITA = re.compile(r"\[\[REF:(\d+)\]\]\s*(.*)$")
+
+# Los pares que se aceptan alrededor de un quote. El prompt pide guillemets; el modelo devuelve
+# lo que le sale, y las tres formas significan lo mismo para quien lee.
+_COMILLAS = (("\u00ab", "\u00bb"), ("\u201c", "\u201d"), ('"', '"'), ("'", "'"))
+
 # Comillas y guiones que hay que plegar, **por punto de código y no por el carácter**.
 #
 # Es una tabla cuyo objeto es distinguir homoglifos, así que escribir el carácter la volvería
@@ -199,5 +209,40 @@ def verificar(citas: Sequence[Cita], fuentes: Sequence[Fuente]) -> Veredicto:
 
 
 def parsear_borrador(borrador: str) -> tuple[str, tuple[Cita, ...]]:
-    """Sin implementar todavía: el rojo se compromete antes que el verde."""
-    return ("", ())
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in lineas[corte + 1 :]
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+
+
+def _desentrecomillar(quote: str) -> str:
+    """Quita el par de comillas exterior, sea cual sea. Si no lo hay, devuelve el texto tal cual.
+
+    Tomarlo entero y dejar que decida la verificación literal es deliberado: descartar aquí una
+    línea mal entrecomillada convertiría un fallo de formato en una abstención sin motivo claro,
+    y el motivo es lo que hace útil a una abstención.
+    """
+    limpio = quote.strip()
+    for abre, cierra in _COMILLAS:
+        if limpio.startswith(abre) and limpio.endswith(cierra) and len(limpio) >= 2:
+            return limpio[len(abre) : -len(cierra)].strip()
+    return limpio

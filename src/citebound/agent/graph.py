@@ -1,0 +1,177 @@
+"""El agente como **máquina de estados**, no como framework · `recuperar → redactar → verificar`.
+
+`docs/PLAN.md` lo dibuja así y `docs/RULES.md` R7 lo acota: LangGraph se usa **solo** como
+máquina de estados. Lo que aporta y por lo que está aquí es concreto —un grafo con estado,
+aristas condicionales y *timeout* por nodo— y lo que **no** se le pide es abstraer el retrieval
+ni el LLM, que en este proyecto están escritos a mano a propósito: la fusión y el `ts_rank_cd`
+son la mitad de la tesis, y la cita cerrada exige controlar el stream token a token.
+
+**El bucle está en el grafo y el tope en el dominio.** La arista condicional vuelve a `redactar`
+mientras `domain.retry.decidir` diga `REINTENTAR`, y quien cuenta hasta dos es el dominio: si el
+tope viviera en la arista, sería una propiedad del framework y no del sistema, y no se podría
+comprobar con Hypothesis.
+
+`RULES` §3.1 pone este fichero en TDD **prohibido**: la forma de un grafo la fija la librería, no
+un test escrito antes. Se prueba por su comportamiento observable —reintento con éxito, reintento
+agotado, error del proveedor, corpus vacío— con dobles grabados, en `tests/integration/`.
+"""
+
+from __future__ import annotations
+
+from collections.abc import Sequence
+from dataclasses import dataclass, field
+from typing import Any, Protocol, TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from citebound.domain.citation import Cita, Fuente, Veredicto, parsear_borrador, verificar
+from citebound.domain.retry import Curso, Salida, decidir, resolver_curso
+
+__all__ = [
+    "NO_PUEDO_RESPONDER",
+    "Estado",
+    "Generador",
+    "Recuperador",
+    "Resultado",
+    "construir",
+    "responder",
+]
+
+NO_PUEDO_RESPONDER = "NO PUEDO RESPONDER"
+"""Lo que el prompt le pide decir cuando los artículos no contienen la respuesta.
+
+Se reconoce aquí y se convierte en abstención **sin gastar reintentos**: el modelo ya ha dicho
+que no puede, y volver a preguntárselo es pagar latencia por la misma respuesta. Es además la
+única forma que tiene de abstenerse por sí mismo, y quitársela lo empujaría a inventar."""
+
+
+class Recuperador(Protocol):
+    """Puerto de entrada del retrieval. El grafo no sabe si detrás hay Postgres o una grabación."""
+
+    def __call__(self, pregunta: str) -> Sequence[Fuente]: ...
+
+
+class Generador(Protocol):
+    """Puerto del modelo. Recibe el prompt ya montado y devuelve el borrador entero."""
+
+    def __call__(self, prompt: str) -> str: ...
+
+
+class Estado(TypedDict, total=False):
+    """Lo que viaja por el grafo. Los borradores y veredictos se **acumulan**, no se sustituyen.
+
+    Guardar la historia y no solo el último es lo que permite que `resolver_curso` decida con
+    todo delante, y que la traza pueda enseñar por qué se retractó el primer intento.
+    """
+
+    pregunta: str
+    fuentes: list[Fuente]
+    borradores: list[str]
+    veredictos: list[Veredicto]
+
+
+@dataclass(frozen=True, slots=True)
+class Resultado:
+    """Lo que sale del grafo, con todo lo que el evento `done` necesita publicar."""
+
+    curso: Curso
+    respuesta: str = ""
+    citas: tuple[Cita, ...] = ()
+    fuentes: tuple[Fuente, ...] = ()
+    borradores: tuple[str, ...] = field(default=())
+
+
+@dataclass(frozen=True, slots=True)
+class _Nodos:
+    """Los tres nodos, con sus puertos dentro. Existe para que `construir` no cierre sobre
+    variables sueltas y el grafo se pueda inspeccionar."""
+
+    recuperador: Recuperador
+    generador: Generador
+    plantilla: str
+
+    def recuperar(self, estado: Estado) -> dict[str, Any]:
+        return {"fuentes": list(self.recuperador(estado["pregunta"]))}
+
+    def redactar(self, estado: Estado) -> dict[str, Any]:
+        fuentes = estado.get("fuentes") or []
+        # Se numeran aquí y solo aquí. El modelo ve `[1]`, `[2]`… y nunca un número de
+        # artículo: si creyera que puede escribirlos, lo haría.
+        bloques = "\n\n".join(f"[{i}] {f.texto}" for i, f in enumerate(fuentes, start=1))
+        prompt = self.plantilla.format(pregunta=estado["pregunta"], fuentes=bloques)
+        return {"borradores": [*estado.get("borradores", []), self.generador(prompt)]}
+
+    def verificar(self, estado: Estado) -> dict[str, Any]:
+        borrador = estado["borradores"][-1]
+        fuentes = estado.get("fuentes") or []
+        _, citas = parsear_borrador(borrador)
+        veredicto = verificar(citas, fuentes)
+        return {"veredictos": [*estado.get("veredictos", []), veredicto]}
+
+
+def _siguiente(estado: Estado) -> str:
+    """La arista condicional. **Pregunta al dominio y no decide nada por su cuenta.**
+
+    El tope de reintentos vive en `domain.retry`, no aquí: si viviera en la arista sería una
+    propiedad de LangGraph en vez del sistema, y no habría forma de comprobarlo con Hypothesis.
+    """
+    veredictos = estado.get("veredictos") or []
+    if not veredictos:
+        return END
+    if _dijo_que_no_puede(estado):
+        return END
+    salida = decidir(
+        veredictos[-1],
+        reintentos_hechos=len(veredictos) - 1,
+        hay_fuentes=bool(estado.get("fuentes")),
+    )
+    return "redactar" if salida is Salida.REINTENTAR else END
+
+
+def _dijo_que_no_puede(estado: Estado) -> bool:
+    borradores = estado.get("borradores") or []
+    return bool(borradores) and NO_PUEDO_RESPONDER in borradores[-1].upper()
+
+
+def construir(*, recuperador: Recuperador, generador: Generador, plantilla: str) -> Any:
+    """El grafo compilado. Los puertos entran por parámetro, que es lo que lo hace testeable."""
+    nodos = _Nodos(recuperador=recuperador, generador=generador, plantilla=plantilla)
+    grafo: StateGraph[Estado, Any, Any, Any] = StateGraph(Estado)
+    grafo.add_node("recuperar", nodos.recuperar)
+    grafo.add_node("redactar", nodos.redactar)
+    grafo.add_node("verificar", nodos.verificar)
+    grafo.add_edge(START, "recuperar")
+    grafo.add_edge("recuperar", "redactar")
+    grafo.add_edge("redactar", "verificar")
+    grafo.add_conditional_edges("verificar", _siguiente, {"redactar": "redactar", END: END})
+    return grafo.compile()
+
+
+def responder(grafo: Any, pregunta: str) -> Resultado:
+    """Corre el grafo y traduce su estado final a un `Resultado`.
+
+    La decisión final la vuelve a tomar `domain.retry.resolver_curso` sobre la lista entera de
+    veredictos, en vez de fiarse de por qué paró el grafo. Son dos caminos al mismo sitio, y
+    que el que manda sea el puro es lo que hace que la abstención no dependa del framework.
+    """
+    estado: Estado = grafo.invoke({"pregunta": pregunta})
+    fuentes = tuple(estado.get("fuentes") or [])
+    borradores = tuple(estado.get("borradores") or [])
+    veredictos = estado.get("veredictos") or []
+
+    if borradores and NO_PUEDO_RESPONDER in borradores[-1].upper():
+        # El modelo se abstuvo él mismo. No se gastan reintentos en insistir.
+        return Resultado(
+            curso=Curso(salida=Salida.ABSTENERSE, reintentos=max(0, len(borradores) - 1)),
+            fuentes=fuentes,
+            borradores=borradores,
+        )
+
+    curso = resolver_curso(veredictos, hay_fuentes=bool(fuentes))
+    if curso.salida is not Salida.RESPONDER:
+        return Resultado(curso=curso, fuentes=fuentes, borradores=borradores)
+
+    respuesta, citas = parsear_borrador(borradores[curso.reintentos])
+    return Resultado(
+        curso=curso, respuesta=respuesta, citas=citas, fuentes=fuentes, borradores=borradores
+    )

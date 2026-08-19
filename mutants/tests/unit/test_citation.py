@@ -27,6 +27,7 @@ from citebound.domain.citation import (
     Motivo,
     Veredicto,
     normalizar_para_cotejo,
+    parsear_borrador,
     resolver,
     verificar,
 )
@@ -287,3 +288,79 @@ def test_un_apartado_inventado_sobre_un_articulo_real_no_se_puede_expresar() -> 
     modelo, y el modelo solo escribe un número del 1 al 5. Esto lo comprueba."""
     assert resolver(Cita(n=1, quote="el número de carriles"), FUENTES) == ART34.ref
     assert resolver(Cita(n=1, quote="el número de carriles"), FUENTES).apartado is None
+
+
+# ======================================================================================
+# Parseo del borrador · separar la respuesta de sus citas
+# ======================================================================================
+#
+# El contrato SSE (`docs/RULES.md` §2.2) reparte el trabajo: los `[[REF:n]]` viajan en los
+# tokens y se validan en vuelo, y las citas con su `quote` salen **al final**, ya verificadas.
+# Así que el modelo tiene que producir las dos cosas, y este parseo es la frontera entre lo que
+# el modelo escribe y lo que el verificador comprueba.
+
+
+def test_una_respuesta_con_su_bloque_de_citas_se_separa() -> None:
+    borrador = (
+        "No se puede adelantar en un cambio de rasante [[REF:1]].\n"
+        "\n"
+        "CITAS\n"
+        "[[REF:1]] «el número de carriles de una calzada»\n"
+    )
+    respuesta, citas = parsear_borrador(borrador)
+    assert respuesta == "No se puede adelantar en un cambio de rasante [[REF:1]]."
+    assert citas == (Cita(n=1, quote="el número de carriles de una calzada"),)
+
+
+def test_varias_citas_salen_en_orden() -> None:
+    borrador = (
+        "Primero [[REF:2]] y luego [[REF:1]].\n\nCITAS\n"
+        "[[REF:2]] «Se deberá guardar la separación»\n"
+        "[[REF:1]] «el número de carriles»\n"
+    )
+    _, citas = parsear_borrador(borrador)
+    assert [c.n for c in citas] == [2, 1]
+
+
+def test_sin_bloque_de_citas_la_respuesta_es_todo_y_no_hay_citas() -> None:
+    """El modelo se saltó el formato. No se inventa un bloque: se devuelven cero citas y el
+    verificador dirá `SIN_CITAS`, que dispara reintento con el motivo delante."""
+    respuesta, citas = parsear_borrador("Una respuesta sin citar nada.")
+    assert respuesta == "Una respuesta sin citar nada."
+    assert citas == ()
+
+
+def test_las_comillas_del_quote_pueden_ser_de_cualquier_tipo() -> None:
+    """Se le piden guillemets y devolverá lo que le salga. Pelearse con el prompt por esto es
+    más caro que aceptar las tres formas."""
+    for abre, cierra in (("«", "»"), ('"', '"'), ("“", "”")):
+        _, citas = parsear_borrador(f"X [[REF:1]].\n\nCITAS\n[[REF:1]] {abre}texto{cierra}\n")
+        assert citas == (Cita(n=1, quote="texto"),), (abre, cierra)
+
+
+def test_un_quote_sin_comillas_se_toma_entero() -> None:
+    """Mejor tomarlo y que la verificación literal decida, que descartarlo aquí: descartarlo
+    convertiría un fallo de formato en una abstención sin motivo claro."""
+    _, citas = parsear_borrador("X [[REF:1]].\n\nCITAS\n[[REF:1]] texto sin comillas\n")
+    assert citas == (Cita(n=1, quote="texto sin comillas"),)
+
+
+def test_una_linea_del_bloque_que_no_es_una_cita_se_ignora() -> None:
+    """Un modelo añade «Espero que te sirva» donde no toca. Ignorar la línea es preferible a
+    tomarla como cita de la anterior."""
+    borrador = "X [[REF:1]].\n\nCITAS\n[[REF:1]] «texto»\nEspero que te sirva.\n"
+    _, citas = parsear_borrador(borrador)
+    assert citas == (Cita(n=1, quote="texto"),)
+
+
+def test_el_marcador_de_citas_no_se_confunde_con_la_palabra_en_la_respuesta() -> None:
+    """«…según las CITAS del reglamento…» dentro de la respuesta no abre el bloque: el
+    marcador es una línea entera y solo eso."""
+    borrador = "Hay CITAS en el reglamento [[REF:1]].\n\nCITAS\n[[REF:1]] «texto»\n"
+    respuesta, citas = parsear_borrador(borrador)
+    assert "Hay CITAS en el reglamento" in respuesta
+    assert len(citas) == 1
+
+
+def test_un_borrador_vacio_no_revienta() -> None:
+    assert parsear_borrador("") == ("", ())

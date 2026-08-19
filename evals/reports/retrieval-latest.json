@@ -1,21 +1,21 @@
 {
  "con_reranker": true,
- "index_version": "v1-qwen3-embedding-0.6b-1024",
+ "index_version": "v1-qwen3-embedding-0.6b-1024-apartado-v1",
  "lectura_publicada": "a_nivel_articulo (Q-016 A)",
  "metrics": [
   {
-   "a_nivel_articulo": 0.8009259259259259,
-   "estricto": 0.0787037037037037,
+   "a_nivel_articulo": 0.7638888888888888,
+   "estricto": 0.4583333333333333,
    "id": "G-RECALL5",
    "n": 216,
-   "value": 0.8009259259259259
+   "value": 0.7638888888888888
   },
   {
-   "a_nivel_articulo": 0.9768518518518519,
-   "estricto": 0.12962962962962962,
+   "a_nivel_articulo": 0.9675925925925926,
+   "estricto": 0.5833333333333334,
    "id": "G-RECALL30",
    "n": 216,
-   "value": 0.9768518518518519
+   "value": 0.9675925925925926
   }
  ],
  "modelo_reordenador": "BAAI/bge-reranker-v2-m3",
@@ -24,17 +24,17 @@
  "physical_table": "chunk_v1",
  "por_canal": {
   "fusion_y_reordenador": {
-   "recall30": 0.9768518518518519,
-   "recall5": 0.8009259259259259
+   "recall30": 0.9675925925925926,
+   "recall5": 0.7638888888888888
   },
   "solo_lexico": {
-   "recall30": 0.8148148148148148,
-   "recall5": 0.37037037037037035
+   "recall30": 0.7870370370370371,
+   "recall5": 0.25
   },
   "solo_vectorial": {
-   "recall30": 0.9537037037037037,
-   "recall5": 0.7916666666666666
+   "recall30": 0.9259259259259259,
+   "recall5": 0.7453703703703703
   }
  },
- "segundos": 137.7
+ "segundos": 203.9
 }

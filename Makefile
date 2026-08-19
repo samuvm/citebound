@@ -16,7 +16,7 @@ OLLAMA_MIN := 0.32.6
 .PHONY: help up down warm lint typecheck test-fast test test-int smoke-f0 \
         gate-fast gate-full done eval mutation cov-func secrets clean \
         check-ollama check-r1 check-prompts check-layering check-deps openapi ingest golden-sample golden-validate golden-review golden-build eval-retrieval \
-        grafico-recall eval-retrieval-sin-rerank \
+        grafico-recall eval-retrieval-sin-rerank eval-f0 bench \
         clean-mutants
 
 help:  ## esta ayuda
@@ -97,7 +97,10 @@ openapi:  ## regenera el snapshot de OpenAPI
 	@echo "  snapshot regenerado; revisa el diff antes de comprometerlo"
 
 # ----------------------------------------------------------------- medidas ---
-eval:  ## fase 0: mide G-HALLUC y escribe el informe conforme al contrato
+eval:  ## SALIDA DE LA FASE 3 · las seis metas de generacion sobre el golden set
+	$(UV) python -m scripts.eval_agente
+
+eval-f0:  ## fase 0: mide G-HALLUC sobre tres preguntas fijas. Historico
 	$(UV) python scripts/eval_f0.py
 
 golden-sample:  ## 1b · elige las 304 preguntas de la cola. Necesita Ollama: deduplica

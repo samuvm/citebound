@@ -34,6 +34,8 @@ from enum import StrEnum
 from citebound.domain.legalref import LegalRef
 
 __all__ = [
+    "MARCA_CITAS",
+    "MARCA_RESPUESTA",
     "MAX_FUENTES",
     "MIN_CARACTERES_QUOTE",
     "Cita",
@@ -64,6 +66,9 @@ no significaría nada. Doce caracteres es corto para una cita jurídica y largo 
 coincidencia; si algún día estorba, se cambia con el número delante."""
 
 _ESPACIOS = re.compile(r"\s+")
+
+MARCA_RESPUESTA = "RESPUESTA"
+"""Abre la prosa cuando el bloque de citas va primero, que es el orden del prompt v2."""
 
 MARCA_CITAS = "CITAS"
 """La línea que separa la respuesta de sus citas. Va en el prompt y se lee aquí, y tenerla en
@@ -226,12 +231,22 @@ def parsear_borrador(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def _desentrecomillar(quote: str) -> str:

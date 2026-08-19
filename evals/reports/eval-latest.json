@@ -1,27 +1,58 @@
 {
  "contract_version": 1,
- "created_at": "2026-08-10T14:38:14+00:00",
+ "created_at": "2026-08-19T15:02:03+00:00",
  "dataset": {
-  "n_cases": 3,
-  "name": "smoke-f0 (3 preguntas fijas)",
-  "sha256": "c111bb6de5d7ae50ca29bda1f0b3496172104d19d0d6b36012ced2af176295d0",
-  "version": 0
+  "n_cases": 25,
+  "name": "v2.jsonl",
+  "sha256": "02b7a195c4f1de35d5818a2cfa62c3dc99774e3b92e266420a8894555dea1ba3",
+  "version": 2
  },
  "environment": {
+  "aciertos_cache": 0,
   "deterministic": false,
   "hardware": "MacBook Pro M4 Max, 36 GB, macOS 26.5",
+  "index_version": "v1-qwen3-embedding-0.6b-1024-apartado-v1",
+  "modelo": "qwen3.5:4b-mlx",
+  "physical_table": "chunk_v1",
+  "prompt_id": "responder",
+  "prompt_version": 2,
   "python": "3.12.4"
  },
  "metrics": [
   {
    "id": "G-HALLUC",
-   "n": 15,
-   "unit": "count",
-   "value": 0
+   "n": 17,
+   "value": 0.0
+  },
+  {
+   "id": "G-QUOTE-LIT",
+   "n": 42,
+   "value": 1.0
+  },
+  {
+   "id": "G-CITA-PRECISION",
+   "n": 17,
+   "value": 0.17647058823529413
+  },
+  {
+   "id": "G-COBERTURA",
+   "n": 25,
+   "value": 0.68
+  },
+  {
+   "id": "G-ABST-FP",
+   "n": 25,
+   "value": 0.32
+  },
+  {
+   "id": "G-ABST-FN",
+   "n": 0,
+   "value": null
   }
  ],
- "notes": "Fase 0: NO hay generador. Las 15 referencias salen del propio indice, asi que G-HALLUC=0 hoy es cero por construccion trivial y no por la cita cerrada, que llega en la fase 3. Con n=15 la cota superior al 95 % de la tasa real es ~20.0% (regla de tres). index_version=v1-bge-m3-1024 physical_table=chunk_v1 ef_search=100 k=5. Ningun otro G- se mide aqui: necesitan el golden set (fase 1) o el agente (fase 3), y fabricarlos hoy es lo que D-06 prohibe.",
+ "nota": "Las parejas G-CITA-PRECISION+G-COBERTURA y G-ABST-FP+G-ABST-FN son atomicas: medidas por separado, la forma optima de aprobar cualquiera de las dos es hacer trampa. G-HALLUC y G-QUOTE-LIT son invariantes del verificador, no metricas de calidad: si bajan, es que dejo pasar algo.",
  "project": "citebound",
- "run_id": "8a050ed47d03108a",
- "suite": "fase-0"
+ "run_id": "f1f70af94f1aa951",
+ "segundos": 358.1,
+ "suite": "fase-3"
 }

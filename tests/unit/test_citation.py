@@ -373,3 +373,37 @@ def test_un_par_de_comillas_vacio_da_un_quote_vacio_y_no_las_comillas() -> None:
 
 def test_un_borrador_vacio_no_revienta() -> None:
     assert parsear_borrador("") == ("", ())
+
+
+def test_el_bloque_de_citas_puede_ir_primero() -> None:
+    """**El orden que salvó nueve casos de veinticinco.** Con la respuesta delante, el modelo
+    agotaba el presupuesto de tokens escribiendo prosa y no llegaba nunca a la línea `CITAS`:
+    el veredicto era `SIN_CITAS` y se abstenía por truncamiento, no por no saber citar.
+
+    Poniendo las citas primero, lo que se trunca es la prosa —recuperable— y no la parte
+    verificable."""
+    borrador = (
+        "CITAS\n"
+        "[[REF:1]] «el número de carriles de una calzada»\n"
+        "\n"
+        "RESPUESTA\n"
+        "Se cuentan de derecha a izquierda [[REF:1]].\n"
+    )
+    respuesta, citas = parsear_borrador(borrador)
+    assert citas == (Cita(n=1, quote="el número de carriles de una calzada"),)
+    assert respuesta == "Se cuentan de derecha a izquierda [[REF:1]]."
+
+
+def test_el_orden_antiguo_sigue_funcionando() -> None:
+    """Sin marcador `RESPUESTA`, lo que va antes de `CITAS` es la respuesta. Aceptar los dos
+    órdenes cuesta tres líneas y evita que un cambio de prompt rompa el parseo."""
+    respuesta, citas = parsear_borrador("Texto [[REF:1]].\n\nCITAS\n[[REF:1]] «algo»\n")
+    assert respuesta == "Texto [[REF:1]]."
+    assert citas == (Cita(n=1, quote="algo"),)
+
+
+def test_con_las_citas_primero_una_respuesta_truncada_conserva_sus_citas() -> None:
+    """El caso real: el modelo se queda sin tokens a mitad de la prosa. Las citas ya salieron,
+    así que la respuesta se puede verificar igual en vez de perderse entera."""
+    _, citas = parsear_borrador("CITAS\n[[REF:1]] «algo»\n\nRESPUESTA\nSe cuentan de derec")
+    assert citas == (Cita(n=1, quote="algo"),)

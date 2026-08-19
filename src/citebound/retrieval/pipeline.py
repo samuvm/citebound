@@ -25,7 +25,7 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = ["K_CANAL", "Reordenador", "recuperar"]
 
-K_CANAL = 30
+K_CANAL = 60
 """Candidatos que pide **cada canal**, antes de fusionar y de colapsar por artículo.
 
 **Depende del troceado, y no es intuitivo.** Medido el 2026-08-17 sobre los mismos 216 casos:

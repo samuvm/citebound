@@ -232,7 +232,10 @@ source_paths = [
 # listas del gate: lee la del Markdown, que es la que manda, en vez de hacer una cuarta copia.
 also_copy = [
   "src/", "tests/", "scripts/", "corpus/", "docs/CONTRACTS/", "docs/GOALS.yaml",
-  "docs/RULES.md", "evals/golden/", "compose.yaml"
+  "docs/RULES.md", "evals/golden/", "compose.yaml",
+  # `prompts/` entra desde la fase 3: R5 los saca del codigo, asi que los tests que comprueban
+  # la regla leen ficheros de verdad y sin ellos la corrida de mutacion ni siquiera arranca.
+  "prompts/",
 ]
 # La suite de mutacion corre sin integracion: levantar Postgres por cada mutante
 # multiplicaria minutos por cientos y el gate se acabaria desactivando.

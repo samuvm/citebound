@@ -362,5 +362,14 @@ def test_el_marcador_de_citas_no_se_confunde_con_la_palabra_en_la_respuesta() ->
     assert len(citas) == 1
 
 
+def test_un_par_de_comillas_vacio_da_un_quote_vacio_y_no_las_comillas() -> None:
+    """El borde exacto del desentrecomillado, y no es cosmético: decide **qué motivo** publica
+    el verificador. Con el quote vacío dice `QUOTE_VACIO`, que es exacto; devolviendo `«»` como
+    texto diría `QUOTE_NO_LITERAL`, que manda a buscar el fallo donde no está."""
+    _, citas = parsear_borrador("X [[REF:1]].\n\nCITAS\n[[REF:1]] «»\n")
+    assert citas == (Cita(n=1, quote=""),)
+    assert verificar(list(citas), FUENTES).motivo is Motivo.QUOTE_VACIO
+
+
 def test_un_borrador_vacio_no_revienta() -> None:
     assert parsear_borrador("") == ("", ())

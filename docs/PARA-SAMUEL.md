@@ -1163,3 +1163,50 @@ MILESTONE=2` sin cerrar. El agente se puede construir igual —el material está
 tiene nada que ver con la 3.
 
 **Estado: APROBADA · 2026-08-18**
+
+---
+
+## PROPUESTA P-003 · 2026-08-19 · fase 3
+
+**Tipo:** `bajar-umbral`
+**Afecta a:** `docs/GOALS.yaml :: G-RECALL5` (**0.80**) y `:: G-RECALL30` (**0.97**)
+
+**Qué pido.** Bajar `G-RECALL5` a **0.79** y `G-RECALL30` a **0.96**. Las dos quedan **a un
+caso** de su umbral actual, y las dos bajan por el mismo motivo: el troceado cambió.
+
+**Por qué. El troceado por apartado no es una preferencia, es un requisito de la fase 3.**
+`G-CITA-PRECISION` bloquea desde la fase 3, y el contrato compartido dice que si el golden set
+especifica apartado, la cita **debe** incluirlo. Las 216 refs positivas del golden set lo
+llevan; el índice `articulo-v1` no tiene **ninguna**. Con él, `G-CITA-PRECISION` es **cero por
+construcción** — el sistema no puede citar lo que no indexa. Medido: 0,0000 sobre 25 casos, y no
+por calidad.
+
+**Lo que se recupera antes de pedir nada.** Al cambiar el índice las dos metas caían a 0,764 y
+0,968. Buscando la causa apareció un defecto real en el orden de las operaciones: se fusionaba
+por apartado y se colapsaba después, así que un artículo con tres apartados metía tres entradas
+en el RRF —tres puntuaciones mediocres en vez de una buena— y como `1/(k+r)` es convexa, ganaba
+plaza por acumulación y no por relevancia. Colapsando **antes** de fusionar:
+
+| | `G-RECALL5` | `G-RECALL30` |
+|---|---:|---:|
+| `articulo-v1` (fase 2) | 0,801 | 0,977 |
+| `apartado-v1`, fusionar y colapsar | 0,764 | 0,968 |
+| `apartado-v1`, **colapsar y fusionar** | **0,796** | **0,968** |
+| *umbral actual* | *0,80* | *0,97* |
+
+Siete casos recuperados de los ocho perdidos. Lo que queda es **un caso en cada meta**.
+
+**Qué he descartado, con su número.** Barrido de `K_CANAL` sobre el índice nuevo: 30 → 0,968 ·
+45 → 0,963 · 60 → 0,968 · 90 → 0,958 · 120 → 0,963. Ninguno llega a 0,97, y el mejor es el más
+barato, así que se queda en 30 — menos candidatos es menos trabajo para el reordenador dentro
+del presupuesto de `G-TTFT`.
+
+**Por qué 0.79 y 0.96 y no menos.** Porque es lo medido menos el redondeo, igual que en P-002.
+Los dos siguen siendo **suelos de los que no se puede bajar**: cualquier cambio que empeore un
+caso los pone en rojo.
+
+**Alternativa si dices que no.** Volver a `articulo-v1` y aceptar que `G-CITA-PRECISION` vale
+cero por construcción. Las dos metas de recall quedarían verdes y la fase 3 no cerraría nunca,
+porque su meta insignia sería inalcanzable por una decisión de troceado y no por el sistema.
+
+**Estado: PENDIENTE**

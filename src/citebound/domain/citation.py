@@ -42,6 +42,7 @@ __all__ = [
     "Motivo",
     "Veredicto",
     "normalizar_para_cotejo",
+    "parsear_borrador",
     "resolver",
     "verificar",
 ]
@@ -195,3 +196,8 @@ def verificar(citas: Sequence[Cita], fuentes: Sequence[Fuente]) -> Veredicto:
         refs.append(ref)
 
     return Veredicto(ok=True, refs=tuple(refs))
+
+
+def parsear_borrador(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """Sin implementar todavía: el rojo se compromete antes que el verde."""
+    return ("", ())

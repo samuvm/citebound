@@ -25,7 +25,7 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = ["K_CANAL", "Reordenador", "recuperar"]
 
-K_CANAL = 60
+K_CANAL = 30
 """Candidatos que pide **cada canal**, antes de fusionar y de colapsar por artículo.
 
 **Depende del troceado, y no es intuitivo.** Medido el 2026-08-17 sobre los mismos 216 casos:
@@ -87,8 +87,15 @@ def recuperar(
     for recuperado in (*vectoriales, *lexicos):
         por_ref.setdefault(str(recuperado.ref), recuperado)
 
+    # **Se colapsa antes de fusionar, no después.** Con troceado fino, un artículo con tres
+    # apartados metía tres entradas en el RRF: tres puntuaciones mediocres en vez de una buena,
+    # y como `1/(k+r)` es convexa, tres puestos malos suman más que uno bueno. La unidad de
+    # verdad es el artículo (R1), así que cada canal vota una vez por artículo.
     orden = fusionar(
-        [[str(r.ref) for r in lexicos], [str(r.ref) for r in vectoriales]],
+        [
+            [str(r.ref) for r in _uno_por_articulo(list(lexicos))],
+            [str(r.ref) for r in _uno_por_articulo(list(vectoriales))],
+        ],
         tope=None,
     )
     candidatos = _uno_por_articulo([por_ref[ref] for ref in orden])

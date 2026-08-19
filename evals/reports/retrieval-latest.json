@@ -4,11 +4,11 @@
  "lectura_publicada": "a_nivel_articulo (Q-016 A)",
  "metrics": [
   {
-   "a_nivel_articulo": 0.7638888888888888,
-   "estricto": 0.4583333333333333,
+   "a_nivel_articulo": 0.7962962962962963,
+   "estricto": 0.49537037037037035,
    "id": "G-RECALL5",
    "n": 216,
-   "value": 0.7638888888888888
+   "value": 0.7962962962962963
   },
   {
    "a_nivel_articulo": 0.9675925925925926,
@@ -25,7 +25,7 @@
  "por_canal": {
   "fusion_y_reordenador": {
    "recall30": 0.9675925925925926,
-   "recall5": 0.7638888888888888
+   "recall5": 0.7962962962962963
   },
   "solo_lexico": {
    "recall30": 0.7870370370370371,
@@ -36,5 +36,5 @@
    "recall5": 0.7453703703703703
   }
  },
- "segundos": 203.9
+ "segundos": 204.8
 }

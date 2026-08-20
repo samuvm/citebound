@@ -1,6 +1,6 @@
 {
  "contract_version": 1,
- "created_at": "2026-08-20T20:09:55+00:00",
+ "created_at": "2026-08-20T20:19:36+00:00",
  "dataset": {
   "n_cases": 55,
   "name": "v2.jsonl",
@@ -29,17 +29,17 @@
   {
    "id": "G-TTFT",
    "n": 55,
-   "value": 7293.8
+   "value": 4948.4
   },
   {
    "id": "G-TTFS",
    "n": 55,
-   "value": 154.6
+   "value": 1181.1
   }
  ],
  "por_etapa_p95_ms": {
-  "busqueda": 154.5,
-  "primer_token": 7153.7
+  "busqueda": 1181.0,
+  "primer_token": 3815.8
  },
  "presupuesto_etapa_ms": {
   "busqueda": 90.0,
@@ -51,25 +51,25 @@
  "protocolo": "bench/protocol.md",
  "repeticiones": [
   {
-   "busqueda_p95": 154.54164198599756,
+   "busqueda_p95": 656.220358912833,
    "n": 55.0,
-   "primer_token_p95": 5253.678791795392,
-   "ttfs_p95": 154.5739876339212,
-   "ttft_p95": 5401.512195344549
+   "primer_token_p95": 1969.023075082805,
+   "ttfs_p95": 656.2303918995894,
+   "ttft_p95": 2576.421525119804
   },
   {
-   "busqueda_p95": 148.7266498617828,
+   "busqueda_p95": 1181.039574823808,
    "n": 55.0,
-   "primer_token_p95": 7153.6556748789735,
-   "ttfs_p95": 148.7381912767887,
-   "ttft_p95": 7293.7902168836445
+   "primer_token_p95": 3815.7687330734916,
+   "ttfs_p95": 1181.0508123482578,
+   "ttft_p95": 4948.428441793658
   },
   {
-   "busqueda_p95": 146.38904575258493,
+   "busqueda_p95": 789.7003624471836,
    "n": 55.0,
-   "primer_token_p95": 6055.366332957055,
-   "ttfs_p95": 146.39786254847422,
-   "ttft_p95": 6188.126329355873
+   "primer_token_p95": 3111.900687601883,
+   "ttfs_p95": 789.7139124455862,
+   "ttft_p95": 3862.2665542992763
   }
  ],
  "run_id": "6f9ecaae34ad161f",

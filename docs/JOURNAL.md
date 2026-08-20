@@ -1946,3 +1946,38 @@ muestra pequeña era pesimista, no el prompt mejor.
 
 **Con esa varianza, las diferencias pequeñas entre prompts no se pueden leer.** Las de v4 y v5
 son de veinte puntos y sí; cualquier cosa menor habría que medirla sobre el golden set entero.
+
+### `make bench` · tres medidas y dos de ellas eran mías
+
+`G-TTFT` p95 = **4.948 ms** contra un umbral de 1.500. Pero llegar a ese número costó descartar
+dos artefactos propios, y los dos enseñan algo.
+
+**El bench abandonaba el generador.** Hacía `break` en el primer token, y un `break` sobre un
+generador deja la petición HTTP viva y al modelo generando del otro lado. Con 180 peticiones eso
+se acumula y el p95 acaba midiendo **la cola de trabajo abandonado**: daba 7.294 ms cuando el
+modelo en caliente responde en 51-64 ms. Se cierra con `close()`, que propaga `GeneratorExit`.
+
+**El endpoint servido se saltaba media fase 2.** Llamaba a `buscar` —el canal vectorial
+desnudo— en vez de a `pipeline.recuperar`: sin fusión y sin reordenador. Es exactamente la misma
+familia que el `make eval-retrieval` que en la fase 2 medía sin reordenador, y el mismo lema:
+**lo que se sirve tiene que ser lo que se mide.**
+
+**La atribución, ya limpia** (mediana, en caliente, con el prompt real):
+
+| Etapa | Medido | Presupuesto `RULES` §2.1 |
+|---|---:|---:|
+| Embedding de la consulta | 109 ms | 40 |
+| Búsqueda híbrida | 113 ms | 90 |
+| Rerank 30 → 5 | 460 ms | 400 |
+| Prefill + primer token | ~1.200 ms | 700 |
+| **Total** | **~1.900 ms** | 1.290 · umbral 1.500 |
+
+**Ninguna etapa cumple su presupuesto**, y el prefill es la mitad del problema. Una tercera
+medida aislada daba 81 ms de primer token y me hizo creer que sobraba margen: era con un prompt
+mínimo. Con el de verdad —1.199 caracteres de plantilla más cinco artículos— el prefill cuesta
+1,2 s. **La diferencia entre las dos medidas era mi prompt de prueba, no el sistema.**
+
+Y queda una decisión colgando que conviene nombrar: **Q-019 eligió A** —reordenador solo de
+evaluación, fuera del camino interactivo— *porque* costaba 4,6 s. Hoy cuesta 460 ms y lo he
+metido en el endpoint llamándolo arreglo. Es defendible y ADR-024 lo anticipa, pero Q-019 nunca
+se revisó formalmente. Sacarlo devolvería ~460 ms de los ~400 que faltan.

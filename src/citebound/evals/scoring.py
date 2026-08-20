@@ -36,6 +36,7 @@ __all__ = [
     "cita_pertenece",
     "cobertura",
     "precision_cita",
+    "precision_cita_articulo",
     "recall_at_k",
 ]
 
@@ -213,3 +214,8 @@ def _emparejar(
         raise ValueError(f"casos sin predicción: {', '.join(faltan)}")
 
     return [(c, por_id[c.id]) for c in casos]
+
+
+def precision_cita_articulo(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """Sin implementar todavía: el rojo se compromete antes que el verde."""
+    return Metrica("G-CITA-PRECISION-ART", 0.0, 0)

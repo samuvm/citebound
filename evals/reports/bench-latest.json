@@ -1,0 +1,77 @@
+{
+ "contract_version": 1,
+ "created_at": "2026-08-20T20:09:55+00:00",
+ "dataset": {
+  "n_cases": 55,
+  "name": "v2.jsonl",
+  "sha256": "02b7a195c4f1de35d5818a2cfa62c3dc99774e3b92e266420a8894555dea1ba3",
+  "version": 2
+ },
+ "environment": {
+  "deterministic": false,
+  "hardware": "MacBook Pro M4 Max, 36 GB, macOS 26.5",
+  "index_version": "v1-qwen3-embedding-0.6b-1024-apartado-v1",
+  "modelo": "qwen3.5:4b-mlx",
+  "physical_table": "chunk_v1",
+  "python": "3.12.4",
+  "supuestos_declarados": [
+   "portátil enchufado",
+   "sin throttling térmico entre repeticiones",
+   "modelos residentes (make warm)",
+   "ninguna otra carga de GPU en la máquina"
+  ]
+ },
+ "etapas_en_ambar": [
+  "busqueda",
+  "primer_token"
+ ],
+ "metrics": [
+  {
+   "id": "G-TTFT",
+   "n": 55,
+   "value": 7293.8
+  },
+  {
+   "id": "G-TTFS",
+   "n": 55,
+   "value": 154.6
+  }
+ ],
+ "por_etapa_p95_ms": {
+  "busqueda": 154.5,
+  "primer_token": 7153.7
+ },
+ "presupuesto_etapa_ms": {
+  "busqueda": 90.0,
+  "embedding": 40.0,
+  "primer_token": 700.0,
+  "rerank": 400.0
+ },
+ "project": "citebound",
+ "protocolo": "bench/protocol.md",
+ "repeticiones": [
+  {
+   "busqueda_p95": 154.54164198599756,
+   "n": 55.0,
+   "primer_token_p95": 5253.678791795392,
+   "ttfs_p95": 154.5739876339212,
+   "ttft_p95": 5401.512195344549
+  },
+  {
+   "busqueda_p95": 148.7266498617828,
+   "n": 55.0,
+   "primer_token_p95": 7153.6556748789735,
+   "ttfs_p95": 148.7381912767887,
+   "ttft_p95": 7293.7902168836445
+  },
+  {
+   "busqueda_p95": 146.38904575258493,
+   "n": 55.0,
+   "primer_token_p95": 6055.366332957055,
+   "ttfs_p95": 146.39786254847422,
+   "ttft_p95": 6188.126329355873
+  }
+ ],
+ "run_id": "6f9ecaae34ad161f",
+ "suite": "bench-fase-3"
+}

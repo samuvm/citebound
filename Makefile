@@ -115,6 +115,9 @@ eval-retrieval:  ## fase 2 · G-RECALL5 y G-RECALL30 contra el golden set. Desde
 eval-retrieval-sin-rerank:  ## el mismo, sin reordenar: separa culpa del recuperador y del reordenador
 	CITEBOUND_RERANK=0 $(UV) python -m scripts.eval_retrieval
 
+bench:  ## SALIDA DE LA FASE 3 · G-TTFT con el protocolo de bench/protocol.md
+	$(UV) python -m scripts.bench
+
 grafico-recall:  ## redibuja docs/img/recall-por-canal.svg desde el informe medido
 	$(UV) python -m scripts.grafico_recall
 

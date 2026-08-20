@@ -34,6 +34,8 @@ from citebound.db.conexion import dsn
 from citebound.domain.citation import MAX_FUENTES, Fuente
 from citebound.providers.chat import ChatError, generador_por_defecto
 from citebound.providers.embeddings import EmbeddingError
+from citebound.providers.reranker import reordenador_por_defecto
+from citebound.retrieval import pipeline
 from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activo
 
 __all__ = ["PROMPT_RESPONDER", "Cita", "Respuesta", "crear_app"]
@@ -201,7 +203,12 @@ def _fuentes(
     """Recupera y anota cuándo estuvo listo. `sources` es lo primero que el usuario ve."""
     import time
 
-    recuperados = buscar(cur, pregunta, embedder=embedder_del_indice(cur), k=k)
+    # **La tubería entera, no solo el canal vectorial.** Estaba llamando a `buscar`, que es
+    # el vectorial desnudo: el endpoint servido se saltaba la fusión y el reordenador, es
+    # decir, todo el trabajo de la fase 2. Lo que se sirve tiene que ser lo que se mide.
+    recuperados = pipeline.recuperar(
+        cur, pregunta, embedder=embedder_del_indice(cur), k=k, reordenador=reordenador_por_defecto()
+    )
     marcas["sources_ms"] = (time.monotonic() - arranque) * 1000
     return [Fuente(ref=r.ref, texto=r.content) for r in recuperados]
 

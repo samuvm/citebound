@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from citebound.domain.legalref import LegalRef, matches
+from citebound.domain.legalref import LegalRef, MatchLevel, matches
 
 from .schema import CasoGolden, Tipo
 
@@ -217,5 +217,34 @@ def _emparejar(
 
 
 def precision_cita_articulo(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
-    """Sin implementar todavía: el rojo se compromete antes que el verde."""
-    return Metrica("G-CITA-PRECISION-ART", 0.0, 0)
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))

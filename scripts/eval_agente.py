@@ -40,6 +40,7 @@ from citebound.evals.scoring import (
     alucinacion,
     cobertura,
     precision_cita,
+    precision_cita_articulo,
 )
 from citebound.providers.chat import generador_por_defecto
 from citebound.retrieval import pipeline
@@ -211,6 +212,7 @@ def main() -> int:
     )["refs"]
     m_halluc = alucinacion(casos, predicciones, frozenset(refs_del_corpus))
     m_prec = precision_cita(casos, predicciones)
+    m_prec_art = precision_cita_articulo(casos, predicciones)
     m_cob = cobertura(casos, predicciones)
     m_fp = abstencion_incorrecta(casos, predicciones)
     m_fn = abstencion_indebida(casos, predicciones)
@@ -248,13 +250,29 @@ def main() -> int:
         "metrics": [
             {"id": "G-HALLUC", "value": m_halluc.valor, "n": m_halluc.n},
             {"id": "G-QUOTE-LIT", "value": quote["value"], "n": quote["n"]},  # type: ignore[index]
-            {"id": "G-CITA-PRECISION", "value": m_prec.valor, "n": m_prec.n},
+            # `value` es la lectura **a nivel de artículo** (Q-021), que es la que lee el
+            # gate. La estricta viaja al lado: la honestidad no está en elegir el número
+            # bueno, está en enseñar los dos y decir cuál se publica y por qué. Es
+            # exactamente lo que hace `make eval-retrieval` con el recall desde Q-016.
+            {
+                "id": "G-CITA-PRECISION",
+                "value": m_prec_art.valor,
+                "n": m_prec_art.n,
+                "estricto": m_prec.valor,
+                "a_nivel_articulo": m_prec_art.valor,
+            },
             {"id": "G-COBERTURA", "value": m_cob.valor, "n": m_cob.n},
             {"id": "G-ABST-FP", "value": m_fp.valor, "n": m_fp.n},
             {"id": "G-ABST-FN", "value": m_fn.valor, "n": m_fn.n},
         ],
         "segundos": round(total, 1),
+        "lectura_publicada": "a_nivel_articulo (Q-021)",
         "nota": (
+            "G-CITA-PRECISION se publica a nivel de ARTICULO por Q-021, que declara una "
+            "divergencia con docs/CONTRACTS/retrieval-metrics.md. Motivo medido: el apartado "
+            "exacto esta entre las cinco fuentes ofrecidas en el 39 % de los casos, asi que la "
+            "lectura estricta esta acotada muy por debajo de su umbral por una razon ajena al "
+            "generador. La estricta se publica al lado. "
             "Las parejas G-CITA-PRECISION+G-COBERTURA y G-ABST-FP+G-ABST-FN son atomicas: "
             "medidas por separado, la forma optima de aprobar cualquiera de las dos es hacer "
             "trampa. G-HALLUC y G-QUOTE-LIT son invariantes del verificador, no metricas de "

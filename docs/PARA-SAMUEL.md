@@ -1210,3 +1210,53 @@ cero por construcción. Las dos metas de recall quedarían verdes y la fase 3 no
 porque su meta insignia sería inalcanzable por una decisión de troceado y no por el sistema.
 
 **Estado: PENDIENTE**
+
+---
+
+### Q-021 · fase 3 · DIVERGENCIA DE CONTRATO DECLARADA · granularidad de la precisión de cita
+
+**Qué es esto.** No es una pregunta: es el registro de una decisión que ya tomaste el
+2026-08-20 («vamos con B») y de lo que implica, porque toca un contrato compartido y **eso se
+declara en los dos repos** (regla de `CLAUDE.md`, igual que Q-012 y Q-013).
+
+**Qué dice el contrato.** `docs/CONTRACTS/retrieval-metrics.md`, tabla de precisión de cita:
+*«Si el golden set especifica apartado, la cita **debe** incluirlo. `21` cuando lo correcto es
+`21.1` es fallo»*.
+
+**Por qué diverge este repositorio.** Porque ese nivel es inalcanzable, y **no por el
+generador**. Medido el 2026-08-20 sobre 80 casos positivos, cuántas veces el apartado exacto
+está entre las fuentes que se le ofrecen al modelo:
+
+| candidatos ofrecidos | con colapso por artículo | sin colapso |
+|---:|---:|---:|
+| 5 | 0,388 | 0,463 |
+| 8 | 0,463 | 0,537 |
+| 12 | 0,487 | **0,562** |
+
+El umbral de `G-CITA-PRECISION` es **0,85**. Ni ofreciéndole doce fuentes sin colapsar se pasa
+de 0,56: **no se le ofrece lo que se le exige citar.** El recuperador encuentra el *artículo*
+bien —0,80 en top-5 y 0,97 en top-30— y el *apartado* aproximadamente la mitad de las veces.
+
+**Qué se hace.** `G-CITA-PRECISION` se compara a **nivel de artículo**, y la lectura estricta se
+publica al lado en el mismo informe. Es la misma lectura que Q-016 eligió para el recall, y
+resolver la misma pregunta distinto en dos sitios es lo que crea las contradicciones que este
+proyecto lleva dos fases pagando.
+
+Medido con el prompt v3 sobre 25 casos: **0,167 estricta · 0,444 a nivel de artículo.**
+
+**Lo que se pierde, y conviene que esté escrito.** Con esta lectura, citar `art34.2` cuando lo
+correcto es `art34.1` **cuenta como acierto**. El sistema puede señalar el apartado de al lado y
+la métrica no lo verá. El README lo dirá con esas palabras.
+
+**Y una tensión con tu propia respuesta de Q-016**, que señalo para que la ratifiques sabiéndolo:
+allí escribiste que *«bajar al apartado es del generador, que es lo que cobra
+`G-CITA-PRECISION`»*. Esta decisión dice que el generador tampoco se mide por el apartado. Es
+coherente con lo medido —no se le ofrece— pero deja **a nadie** cobrando esa precisión, y eso es
+una pérdida real de garantía, no un tecnicismo.
+
+**Pendiente de propagar:** decírselo al **02** y al **04**, como Q-012, Q-013 y Q-016. Queda
+escrito en `indexkeeper-04/docs/PARA-SAMUEL.md` con esta misma fecha.
+
+**Estado: RESPONDIDA · 2026-08-20**
+`>> ` **B**, decidido por Samuel: la precisión de cita se mide a nivel de artículo, las dos
+lecturas se publican, y la divergencia con el contrato queda declarada aquí y en el 04.

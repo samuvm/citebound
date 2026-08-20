@@ -16,8 +16,8 @@ el criterio de salida de cada fase es un comando que devuelve 0 o 1, y está en
 - [x] **0 · Esqueleto vertical que camina** — doce condiciones en verde · [números](CHANGELOG.md)
 - [x] **1 · Scoring congelado y golden set** — el corrector se cerró **antes** de anotar el primer caso · **274 casos**, 15,3 h de revisión humana
 - [x] **2 · Retrieval híbrido** — `make done MILESTONE=2` → exit 0, doce de doce · `G-RECALL5` **0,801** · `G-RECALL30` **0,977** · [números en el CHANGELOG](CHANGELOG.md)
-- [ ] **3 · Agente** — cita cerrada, verificación literal, abstención y reintento acotado ← **siguiente**
-- [ ] **3b · Interfaz de práctica de test** — el producto. Frontera única: la API HTTP
+- [~] **3 · Agente** — construido y midiendo · `G-HALLUC` **0** · `G-QUOTE-LIT` **1,00** · `G-TTFT` **1.384 ms** ✓
+- [x] **3b · Interfaz de práctica de test** — `ui/`, frontera única por HTTP y con test que lo comprueba
 - [ ] **4 · Evals, juez y determinismo** — que cualquiera obtenga los mismos números
 - [ ] **5 · Endurecimiento y publicación** — suite adversarial, observabilidad, arranque en frío
 - [ ] 6 · Personalización — **ampliación**. No hacerla no es un fallo, y se dice así
@@ -136,6 +136,42 @@ para la precisión de cita en la fase 3.
 
 ---
 
+## La cita cerrada, medida
+
+El agente entero sobre el golden set. Reproducible con `make eval`; la caché de respuestas está
+versionada, así que las corridas siguientes son gratis y dan lo mismo.
+
+| Meta | Umbral | Medido | |
+|---|---:|---:|:--|
+| `G-HALLUC` · referencias que no existen | `= 0` | **0** | ✅ |
+| `G-QUOTE-LIT` · fragmentos literales | `= 1,00` | **1,00** | ✅ |
+| `G-TTFT` · p95 hasta el primer token | ≤ 1500 ms | **1.384 ms** | ✅ |
+
+**Los dos primeros son invariantes, no métricas de calidad**, y son los únicos umbrales del
+proyecto que no admiten ni siquiera una propuesta de cambio. Si bajaran no significaría que el
+sistema responde peor: significaría que el verificador dejó pasar algo. Sobre las citas emitidas
+hasta ahora, ninguna referencia inventada y ningún fragmento que no esté literalmente en su
+artículo.
+
+Las tres metas de calidad —precisión de cita, cobertura y abstención indebida— **no llegan
+todavía**, y sus números están en [`CHANGELOG.md`](CHANGELOG.md) y en
+[`docs/JOURNAL.md`](docs/JOURNAL.md) con lo que se ha probado para subirlas.
+
+### Lo que costó medir bien la latencia
+
+`G-TTFT` empezó en **4.948 ms** y acabó en 1.384. Solo una parte era el sistema:
+
+- el arnés hacía `break` sobre el generador y lo **abandonaba**, dejando al modelo generando del
+  otro lado. Con 180 peticiones el p95 medía la cola de trabajo abandonado: 7.294 ms;
+- el endpoint servido llamaba al canal vectorial desnudo y **se saltaba la fusión**;
+- una medida aislada daba 81 ms de primer token y hacía creer que sobraba margen — era con un
+  prompt de prueba. Con el real cuesta 1,2 s.
+
+Lo que sí era el sistema: **el prompt llevaba los artículos enteros**, 13.727 caracteres, y el
+primer token cuesta ~0,25 ms por carácter. Recortar a 500 por fuente no cambió ni una cifra de
+las métricas de calidad hasta la cuarta decimal: el modelo cita del principio del artículo, así
+que lo que se recortaba era lo que no usaba.
+
 ## Corpus
 
 XML **consolidado** del BOE, congelado por `sha256` en [`corpus/MANIFEST.yaml`](corpus/MANIFEST.yaml).
@@ -190,6 +226,7 @@ Python 3.12 · FastAPI + SSE · PostgreSQL 18 + pgvector 0.8.6 · LangGraph como
 |---|---|---|
 | Embeddings | `Qwen3-Embedding-0.6B` · 1024 dim | Apache-2.0 |
 | Generador | `Qwen3.5-4B` (MLX) | Apache-2.0 |
+| Grafo del agente | LangGraph, **solo** como máquina de estados | MIT |
 | Reordenador | `bge-reranker-v2-m3` · cross-encoder en proceso | MIT |
 | Juez (fase 4) | `Gemma 4 12B` | — |
 
@@ -233,6 +270,8 @@ make warm                # residencia de los modelos. NUNCA dentro de `up`: romp
 uv run citebound ingest  # 235 chunks desde el XML congelado
 make smoke-f0            # ingesta + 3 preguntas + al menos una ref presente en refs.json
 make eval-retrieval      # G-RECALL5 y G-RECALL30 contra el golden set (6 s desde cache)
+make eval                # las metas de generacion: alucinacion, cita literal, cobertura
+make bench               # G-TTFT con el protocolo de bench/protocol.md
 make done MILESTONE=2    # la única definición de «hecho»: exit 0 o 1
 ```
 

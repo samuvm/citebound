@@ -48,6 +48,12 @@ from citebound.retrieval.vector import embedder_del_indice, indice_activo
 
 __all__ = ["CacheRespuestas", "main", "medir"]
 
+CADA_CUANTOS = 10
+"""Cada cuántas respuestas se vuelca la caché a disco.
+
+No es una optimización: es lo que hace **reanudable** una corrida de setenta minutos. Volcando
+solo al final, una interrupción tira el trabajo entero — y eso no es hipotético."""
+
 RAIZ = Path(__file__).resolve().parents[1]
 GOLDEN = max((RAIZ / "evals" / "golden").glob("v*.jsonl"))
 INFORME = RAIZ / "evals" / "reports" / "eval-latest.json"
@@ -77,6 +83,7 @@ class CacheRespuestas:
             json.loads(ruta.read_text(encoding="utf-8")) if ruta.is_file() else {}
         )
         self.aciertos = 0
+        self._sin_volcar = 0
 
     @staticmethod
     def clave(pregunta: str, fuentes: Sequence[Fuente], modelo: str) -> str:
@@ -94,8 +101,16 @@ class CacheRespuestas:
 
     def guardar(self, clave: str, borradores: Sequence[str]) -> None:
         self._datos[clave] = list(borradores)
+        self._sin_volcar += 1
+        # **Se vuelca cada `CADA_CUANTOS`, no solo al final.** Una corrida sobre los 274 casos
+        # son ~70 minutos, y volcando solo al final una interrupción tira el trabajo entero —
+        # pasó el 2026-08-20. Con volcado incremental, relanzar reanuda: las claves ya
+        # calculadas son aciertos de caché y solo se pagan las que faltan.
+        if self._sin_volcar >= CADA_CUANTOS:
+            self.volcar()
 
     def volcar(self) -> None:
+        self._sin_volcar = 0
         self._ruta.parent.mkdir(parents=True, exist_ok=True)
         self._ruta.write_text(
             json.dumps(self._datos, ensure_ascii=False, indent=1, sort_keys=True) + "\n",

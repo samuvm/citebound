@@ -34,7 +34,6 @@ from citebound.db.conexion import dsn
 from citebound.domain.citation import MAX_FUENTES, Fuente
 from citebound.providers.chat import ChatError, generador_por_defecto
 from citebound.providers.embeddings import EmbeddingError
-from citebound.providers.reranker import reordenador_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activo
 
@@ -203,12 +202,16 @@ def _fuentes(
     """Recupera y anota cuándo estuvo listo. `sources` es lo primero que el usuario ve."""
     import time
 
-    # **La tubería entera, no solo el canal vectorial.** Estaba llamando a `buscar`, que es
-    # el vectorial desnudo: el endpoint servido se saltaba la fusión y el reordenador, es
-    # decir, todo el trabajo de la fase 2. Lo que se sirve tiene que ser lo que se mide.
-    recuperados = pipeline.recuperar(
-        cur, pregunta, embedder=embedder_del_indice(cur), k=k, reordenador=reordenador_por_defecto()
-    )
+    # **Fusión sí, reordenador no**, y las dos mitades tienen su motivo.
+    #
+    # La fusión entra porque estaba llamando a `buscar` —el canal vectorial desnudo— y el
+    # endpoint se saltaba medio trabajo de la fase 2. Lo que se sirve tiene que ser lo que se
+    # mide, y `make eval` mide la tubería fusionada.
+    #
+    # El reordenador **no** entra porque **Q-019 eligió A**: fuera del camino interactivo.
+    # Llegué a meterlo llamándolo arreglo; cuesta 460 ms medidos y `G-TTFT` no los tiene. La
+    # decisión sigue siendo suya y no se revierte por inercia en un refactor.
+    recuperados = pipeline.recuperar(cur, pregunta, embedder=embedder_del_indice(cur), k=k)
     marcas["sources_ms"] = (time.monotonic() - arranque) * 1000
     return [Fuente(ref=r.ref, texto=r.content) for r in recuperados]
 

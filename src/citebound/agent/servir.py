@@ -19,7 +19,13 @@ from __future__ import annotations
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 
-from citebound.agent.graph import NO_PUEDO_RESPONDER, Generador, Recuperador, Resultado
+from citebound.agent.graph import (
+    NO_PUEDO_RESPONDER,
+    Generador,
+    Recuperador,
+    Resultado,
+    bloques_de,
+)
 from citebound.agent.stream_guard import Estado, StreamGuard
 from citebound.domain.citation import Fuente, Veredicto, parsear_borrador, verificar
 from citebound.domain.retry import Salida, decidir, resolver_curso
@@ -59,7 +65,7 @@ def servir(
 
     for intento in range(tope + 1):
         guardia = StreamGuard(len(fuentes))
-        prompt = plantilla.format(pregunta=pregunta, fuentes=_bloques(fuentes))
+        prompt = plantilla.format(pregunta=pregunta, fuentes=bloques_de(fuentes))
         emitido_antes = ""
 
         for token in generador.emitir(prompt):
@@ -102,12 +108,6 @@ def servir(
         fuentes=tuple(fuentes),
         borradores=tuple(borradores),
     )
-
-
-def _bloques(fuentes: Sequence[Fuente]) -> str:
-    """Idéntico al del grafo, y a propósito: si numeraran distinto, el mismo borrador
-    significaría cosas distintas según por dónde se sirviera."""
-    return "\n\n".join(f"[{i}] {f.texto}" for i, f in enumerate(fuentes, start=1))
 
 
 def _fuera_de_rango() -> Veredicto:

@@ -132,3 +132,37 @@ def test_sin_fuentes_se_abstiene_sin_reintentar() -> None:
     final = sirve("Lo que sea.", fuentes=())[-1]
     assert isinstance(final, Resultado)
     assert final.curso.salida is Salida.ABSTENERSE
+
+
+def test_los_dos_caminos_numeran_las_fuentes_exactamente_igual() -> None:
+    """Si numeraran distinto, el mismo borrador significaría cosas distintas según por dónde se
+    sirviera, y `make eval` mediría un sistema que nadie ejecuta. Comparten función, y esto
+    comprueba que la siguen compartiendo."""
+    from citebound.agent.graph import CARACTERES_POR_FUENTE, bloques_de
+
+    largo = Fuente(ref=parse(f"{NORMA}#art9"), texto="Artículo 9. " + "x" * 4000)
+    bloques = bloques_de([ART34, largo])
+    assert bloques.startswith("[1] ")
+    assert "\n\n[2] " in bloques
+    assert len(bloques.split("\n\n[2] ")[1]) == CARACTERES_POR_FUENTE
+
+
+def test_el_texto_se_trunca_en_el_prompt_pero_no_al_verificar() -> None:
+    """**La razón de que truncar sea seguro.** El verificador coteja contra el texto completo de
+    la fuente, no contra lo que vio el modelo: truncar reduce de dónde puede citar, nunca
+    convierte una cita buena en no literal."""
+    from citebound.agent.graph import CARACTERES_POR_FUENTE
+
+    cola = "esta frase está más allá del corte y sigue siendo del artículo"
+    largo = Fuente(ref=parse(f"{NORMA}#art9"), texto="A" * CARACTERES_POR_FUENTE + " " + cola)
+    borrador = f"CITAS\n[[REF:1]] «{cola}»\n\nRESPUESTA\nSí [[REF:1]].\n"
+    final = list(
+        servir(
+            "¿y?",
+            recuperador=lambda _: (largo,),
+            generador=grabado(borrador),
+            plantilla=PLANTILLA,
+        )
+    )[-1]
+    assert isinstance(final, Resultado)
+    assert final.curso.salida is Salida.RESPONDER

@@ -29,7 +29,6 @@ from citebound.agent.servir import Trozo, servir
 from citebound.domain.citation import Fuente
 from citebound.evals.schema import CasoGolden
 from citebound.providers.chat import generador_por_defecto
-from citebound.providers.reranker import reordenador_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.vector import embedder_del_indice, indice_activo
 
@@ -85,7 +84,6 @@ def main() -> int:
         "CITEBOUND_PG_URL", f"postgresql://citebound:citebound@localhost:{puerto}/citebound"
     )
     generador = generador_por_defecto()
-    reordenador = reordenador_por_defecto()
     plantilla = _plantilla()
 
     repeticiones: list[dict[str, float]] = []
@@ -106,9 +104,9 @@ def main() -> int:
                     q: str, _m: dict[str, float] = marca, _t: float = arranque
                 ) -> list[Fuente]:
                     t0 = time.monotonic()
-                    traidos = pipeline.recuperar(
-                        cur, q, embedder=embedder, k=5, reordenador=reordenador
-                    )
+                    # Sin reordenador: Q-019 (A) lo dejó fuera del camino interactivo, y el
+                    # bench mide lo que se sirve, no una configuración que nadie ejecuta.
+                    traidos = pipeline.recuperar(cur, q, embedder=embedder, k=5)
                     _m["busqueda"] = (time.monotonic() - t0) * 1000
                     _m["sources"] = (time.monotonic() - _t) * 1000
                     return [Fuente(ref=r.ref, texto=r.content) for r in traidos]

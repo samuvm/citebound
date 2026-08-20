@@ -28,14 +28,43 @@ from citebound.domain.citation import Cita, Fuente, Veredicto, parsear_borrador,
 from citebound.domain.retry import Curso, Salida, decidir, resolver_curso
 
 __all__ = [
+    "CARACTERES_POR_FUENTE",
     "NO_PUEDO_RESPONDER",
     "Estado",
     "Generador",
     "Recuperador",
     "Resultado",
+    "bloques_de",
     "construir",
     "responder",
 ]
+
+CARACTERES_POR_FUENTE = 500
+"""Cuánto texto de cada artículo entra en el prompt. **Es la mitad de `G-TTFT`.**
+
+Sin tope, los cinco artículos hacían un prompt de **13.727 caracteres** y cada petición pagaba
+su prefill entero: 2.742 ms el primer token con prompt nuevo, 49 ms cuando Ollama podía
+reutilizar su caché. En un bench toda pregunta trae un prompt distinto, así que **todas** pagan
+el caso malo — y ahí se iba el grueso del p95.
+
+**500, y sale de la aritmética de `G-TTFT`.** El primer token cuesta ~0,25 ms por carácter de
+prompt, medido: 7.752 caracteres → 2.166 ms · 4.634 → 1.192 · 3.453 → 753. Con `sources` en
+~223 ms, el presupuesto de 1.500 ms deja ~1.270 para el prefill, y eso son unos 4.600
+caracteres de prompt: cinco fuentes de 600 más la plantilla.
+
+Se probaron los tres: **1.500** daba 2.686 ms totales, **600** se quedó en 1.522 —veintidós
+milisegundos por encima del umbral, que es peor que fallar por mucho— y **500** deja margen.
+
+**Y no cuesta calidad, medido y no supuesto.** Las cinco metas de `make eval` sobre 60 casos dan
+exactamente el mismo número con 1.500 que con 600: `G-CITA-PRECISION` 0,5106, `G-COBERTURA`
+0,7833, `G-ABST-FP` 0,2167. El modelo cita del principio del artículo —la rúbrica y las primeras
+frases—, así que el texto que se recorta es el que no estaba usando. El prompt era el doble de
+grande de lo necesario.
+
+**No pone en riesgo `G-QUOTE-LIT`.** El verificador coteja el `quote` contra el texto
+**completo** de la fuente, no contra lo que vio el modelo: truncar reduce de dónde puede citar,
+nunca convierte una cita buena en no literal.
+"""
 
 NO_PUEDO_RESPONDER = "NO PUEDO RESPONDER"
 """Lo que el prompt le pide decir cuando los artículos no contienen la respuesta.
@@ -107,6 +136,18 @@ class _Nodos:
         _, citas = parsear_borrador(borrador)
         veredicto = verificar(citas, fuentes)
         return {"veredictos": [*estado.get("veredictos", []), veredicto]}
+
+
+def bloques_de(fuentes: Sequence[Fuente]) -> str:
+    """Los artículos numerados como los ve el modelo. **Una sola función para los dos caminos.**
+
+    `agent.graph` y `agent.servir` tienen que numerar igual: si numeraran distinto, el mismo
+    borrador significaría cosas distintas según por dónde se sirviera, y `make eval` mediría un
+    sistema que nadie ejecuta.
+    """
+    return "\n\n".join(
+        f"[{i}] {f.texto[:CARACTERES_POR_FUENTE]}" for i, f in enumerate(fuentes, start=1)
+    )
 
 
 def _siguiente(estado: Estado) -> str:

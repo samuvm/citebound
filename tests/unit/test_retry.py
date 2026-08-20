@@ -223,8 +223,7 @@ def test_una_puntuacion_baja_abstiene_sin_llamar_al_modelo() -> None:
     """**El punto entero.** Si lo recuperado no viene a cuento, generar es pagar latencia para
     acabar citando algo real que no responde — que es peor que callarse, porque parece bueno."""
     assert (
-        decidir(BIEN, reintentos_hechos=0, hay_fuentes=True, relevancia=0.001)
-        is Salida.ABSTENERSE
+        decidir(BIEN, reintentos_hechos=0, hay_fuentes=True, relevancia=0.001) is Salida.ABSTENERSE
     )
 
 

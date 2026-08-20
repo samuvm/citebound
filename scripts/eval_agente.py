@@ -30,8 +30,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from citebound.agent.graph import Resultado, construir, responder
-from citebound.domain.citation import Fuente
-from citebound.domain.retry import Salida
+from citebound.domain.citation import Fuente, Motivo
+from citebound.domain.retry import UMBRAL_RELEVANCIA, Curso, Salida
 from citebound.evals.schema import CasoGolden
 from citebound.evals.scoring import (
     Prediccion,
@@ -43,6 +43,7 @@ from citebound.evals.scoring import (
     precision_cita_articulo,
 )
 from citebound.providers.chat import generador_por_defecto
+from citebound.providers.reranker import puntuador_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.vector import embedder_del_indice, indice_activo
 
@@ -185,6 +186,7 @@ def main() -> int:
 
     cache = CacheRespuestas(CACHE)
     generador = generador_por_defecto()
+    puntuador = puntuador_por_defecto()
     plantilla = _plantilla()
     resultados: dict[str, Resultado] = {}
     arranque = time.monotonic()
@@ -215,6 +217,17 @@ def main() -> int:
             grafo = construir(
                 recuperador=lambda _q, _f=fuentes: _f, generador=responde, plantilla=plantilla
             )
+            # La relevancia se calcula sobre las MISMAS cinco fuentes que ve el modelo, que
+            # es lo que hace el camino servido. Si el eval no lo hiciera, mediría un sistema
+            # que se abstiene distinto del que responde.
+            relevancia = max(puntuador(caso.pregunta, fuentes), default=None) if fuentes else None
+            if relevancia is not None and relevancia < UMBRAL_RELEVANCIA:
+                resultados[caso.id] = Resultado(
+                    curso=Curso(salida=Salida.ABSTENERSE, motivo=Motivo.SIN_RELEVANCIA),
+                    fuentes=tuple(fuentes),
+                )
+                cache.guardar(clave, [])
+                continue
             resultados[caso.id] = responder(grafo, caso.pregunta)
             cache.guardar(clave, grabados)
 

@@ -22,13 +22,20 @@ from dataclasses import dataclass
 from citebound.agent.graph import (
     NO_PUEDO_RESPONDER,
     Generador,
+    Puntuador,
     Recuperador,
     Resultado,
     bloques_de,
 )
 from citebound.agent.stream_guard import Estado, StreamGuard
-from citebound.domain.citation import Fuente, Veredicto, parsear_borrador, verificar
-from citebound.domain.retry import Salida, decidir, resolver_curso
+from citebound.domain.citation import Fuente, Motivo, Veredicto, parsear_borrador, verificar
+from citebound.domain.retry import (
+    UMBRAL_RELEVANCIA,
+    Curso,
+    Salida,
+    decidir,
+    resolver_curso,
+)
 
 __all__ = ["Trozo", "servir"]
 
@@ -48,6 +55,7 @@ def servir(
     recuperador: Recuperador,
     generador: Generador,
     plantilla: str,
+    puntuador: Puntuador | None = None,
     max_reintentos: int | None = None,
 ) -> Iterator[Trozo | Resultado]:
     """Emite `Trozo` mientras el modelo escribe y termina con un `Resultado`.
@@ -62,6 +70,16 @@ def servir(
     fuentes: list[Fuente] = list(recuperador(pregunta))
     veredictos: list[Veredicto] = []
     borradores: list[str] = []
+    # **Antes de gastar un solo token.** Si nada de lo recuperado viene a cuento, generar es
+    # pagar latencia para acabar citando algo real que no responde. Sobre los negativos esto
+    # ADELANTA la respuesta en vez de retrasarla: se contesta sin llamar al modelo.
+    relevancia = max(puntuador(pregunta, fuentes), default=None) if puntuador and fuentes else None
+    if relevancia is not None and relevancia < UMBRAL_RELEVANCIA:
+        yield Resultado(
+            curso=Curso(salida=Salida.ABSTENERSE, motivo=Motivo.SIN_RELEVANCIA),
+            fuentes=tuple(fuentes),
+        )
+        return
 
     for intento in range(tope + 1):
         guardia = StreamGuard(len(fuentes))
@@ -95,7 +113,7 @@ def servir(
         if salida is not Salida.REINTENTAR:
             break
 
-    curso = resolver_curso(veredictos, hay_fuentes=bool(fuentes))
+    curso = resolver_curso(veredictos, hay_fuentes=bool(fuentes), relevancia=relevancia)
     if curso.salida is not Salida.RESPONDER:
         yield Resultado(curso=curso, fuentes=tuple(fuentes), borradores=tuple(borradores))
         return

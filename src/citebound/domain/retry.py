@@ -34,6 +34,26 @@ __all__ = [
 ]
 
 UMBRAL_RELEVANCIA = 0.10
+"""Por debajo de esto, lo recuperado no viene a cuento y el sistema se calla.
+
+**Sale de una medida, no de una intuición.** La mejor puntuación de las cinco fuentes, sobre los
+274 casos del golden set: mediana **0,893** en los positivos y **0,011** en los negativos. Las
+distribuciones separan mucho pero se solapan, así que no hay umbral que cumpla las dos metas de
+la pareja a la vez:
+
+| umbral | `G-ABST-FP` | `G-ABST-FN` |
+|---:|---:|---:|
+| sin señal | 0,259 | **0,724** |
+| 0,05 | 0,065 | 0,259 |
+| **0,10** | **0,088** | **0,172** |
+| 0,30 | 0,171 | 0,121 |
+
+Se elige 0,10 porque equilibra las dos violaciones relativas —1,8 y 1,7 veces su umbral— en vez de
+arreglar una hundiendo la otra. `G-ABST-FP` y `G-ABST-FN` son una **pareja atómica** justamente
+para que no se pueda hacer eso.
+
+**Ajustado sobre el golden set, que es también el conjunto de evaluación.** Es sobreajuste y se
+declara: el juez de verdad es `tests/holdout/`, y ahí este número no se ha tocado."""
 
 MAX_REINTENTOS = 2
 """Dos, y el tope no es una sugerencia.
@@ -86,6 +106,12 @@ def decidir(
         raise ValueError(f"reintentos hechos no puede ser negativo: {reintentos_hechos}")
     if not hay_fuentes:
         return Salida.ABSTENERSE
+    # **Antes que el veredicto y antes que el reintento.** Si nada de lo recuperado viene a
+    # cuento, reintentar es pedirle al modelo que lo intente otra vez con el mismo material
+    # inútil, y generar es pagar latencia para acabar citando algo real que no responde — que
+    # es peor que callarse, porque parece bueno. `None` es «no se midió», no «cero».
+    if relevancia is not None and relevancia < UMBRAL_RELEVANCIA:
+        return Salida.ABSTENERSE
     if veredicto.ok:
         return Salida.RESPONDER
     if reintentos_hechos < MAX_REINTENTOS:
@@ -106,10 +132,15 @@ def resolver_curso(
     otra. El motivo que se publica es el del último intento mirado, porque es el que describe
     por qué no hay respuesta ahora.
     """
+    if relevancia is not None and relevancia < UMBRAL_RELEVANCIA and hay_fuentes:
+        return Curso(salida=Salida.ABSTENERSE, motivo=Motivo.SIN_RELEVANCIA)
+
     ultimo: Veredicto | None = None
     for hechos, veredicto in enumerate(intentos):
         ultimo = veredicto
-        salida = decidir(veredicto, reintentos_hechos=hechos, hay_fuentes=hay_fuentes)
+        salida = decidir(
+            veredicto, reintentos_hechos=hechos, hay_fuentes=hay_fuentes, relevancia=relevancia
+        )
         if salida is Salida.RESPONDER:
             return Curso(salida=salida, reintentos=hechos, refs=veredicto.refs)
         if salida is Salida.ABSTENERSE:

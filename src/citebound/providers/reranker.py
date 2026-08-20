@@ -22,7 +22,7 @@ grabar primero y testear contra la grabación — de ahí `RecordedReranker`.
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -36,6 +36,7 @@ __all__ = [
     "RecordedReranker",
     "RerankerError",
     "ordenar_por_puntos",
+    "puntuador_por_defecto",
     "reordenador_por_defecto",
 ]
 
@@ -174,3 +175,21 @@ def reordenador_por_defecto() -> CrossEncoderReranker:
         modelo=os.environ.get("CITEBOUND_RERANKER", MODELO_POR_DEFECTO),
         dispositivo=os.environ.get("CITEBOUND_RERANKER_DEVICE", "mps"),
     )
+
+
+def puntuador_por_defecto() -> Callable[[str, Sequence[Any]], list[float]]:
+    """Puntúa las fuentes **que se le enseñan al modelo**, no las treinta recuperadas.
+
+    Es la diferencia entre caber en `G-TTFT` y no caber: puntuar cinco cuesta **67 ms** y
+    reordenar treinta **348**, contra 116 ms de margen. Y para decidir si el corpus responde
+    basta con la mejor de las cinco, que son las únicas que el modelo puede citar.
+    """
+    reordenador = reordenador_por_defecto()
+
+    def puntuar(pregunta: str, fuentes: Sequence[Any]) -> list[float]:
+        if not fuentes:
+            return []
+        pares = [(pregunta, f.texto[: reordenador.caracteres]) for f in fuentes]
+        return [float(p) for p in reordenador.motor.predict(pares)]
+
+    return puntuar

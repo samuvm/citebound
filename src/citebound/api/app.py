@@ -34,6 +34,7 @@ from citebound.db.conexion import dsn
 from citebound.domain.citation import MAX_FUENTES, Fuente
 from citebound.providers.chat import ChatError, generador_por_defecto
 from citebound.providers.embeddings import EmbeddingError
+from citebound.providers.reranker import puntuador_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activo
 
@@ -165,6 +166,7 @@ def _emitir(pregunta: str, k: int) -> Iterator[str]:
                 recuperador=lambda q: _fuentes(cur, q, k, marcas, arranque),
                 generador=generador,
                 plantilla=_plantilla_responder(),
+                puntuador=puntuador_por_defecto(),
             )
             primero = True
             resultado: Resultado | None = None

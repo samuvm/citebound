@@ -80,6 +80,13 @@ class Recuperador(Protocol):
     def __call__(self, pregunta: str) -> Sequence[Fuente]: ...
 
 
+class Puntuador(Protocol):
+    """Da una relevancia por fuente. **Opcional a propósito**: sin él el sistema decide como
+    antes, y su ausencia nunca se lee como irrelevancia."""
+
+    def __call__(self, pregunta: str, fuentes: Sequence[Fuente]) -> list[float]: ...
+
+
 class Generador(Protocol):
     """Puerto del modelo. Recibe el prompt ya montado y devuelve el borrador entero."""
 

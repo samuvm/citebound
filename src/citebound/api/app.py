@@ -39,7 +39,7 @@ from citebound.retrieval.vector import buscar, embedder_del_indice, indice_activ
 __all__ = ["PROMPT_RESPONDER", "Cita", "Respuesta", "crear_app"]
 
 PROMPT_RESPONDER = "responder"
-PROMPT_RESPONDER_VERSION = 3
+PROMPT_RESPONDER_VERSION = 6
 """Viajan en el evento `done`. Sin ellos, dos trazas de dos versiones del prompt serían
 indistinguibles y una regresión de calidad no se podría atribuir."""
 

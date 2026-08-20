@@ -1884,3 +1884,65 @@ es el que recibe quien pregunta**, que es lo que este proyecto dice querer.
 
 **Balance de la fase 2: veinte experimentos medidos, doce negativos.** El número publicado es
 0,801 contra un umbral de 0,90, y sigue siendo lo único rojo del gate.
+
+---
+
+## 2026-08-20 · fase 3 · el agente mide, y dos «mejoras» del prompt que salieron peor
+
+### Los dos invariantes se sostienen, y eso es la tesis
+
+Sobre 60 casos del golden set, con el agente entero:
+
+| Meta | Umbral | Medido | |
+|---|---:|---:|:--|
+| `G-HALLUC` | `= 0` | **0,0000** | ✅ n=47 |
+| `G-QUOTE-LIT` | `= 1,00` | **1,0000** | ✅ **n=58 citas** |
+| `G-CITA-PRECISION` | ≥ 0,85 | 0,5106 | ❌ |
+| `G-COBERTURA` | ≥ 0,90 | 0,7833 | ❌ |
+| `G-ABST-FP` | ≤ 0,05 | 0,2167 | ❌ |
+
+**58 citas emitidas y las 58 están literalmente en su artículo. Ni una referencia inventada.**
+Los dos umbrales que no admiten ni propuesta son los dos que se cumplen, y no por suerte: son
+invariantes del verificador, no métricas de calidad.
+
+### Tres defectos míos que la medida destapó
+
+**Borradores truncados.** Con `max_tokens=512` el modelo gastaba el presupuesto en prosa y no
+llegaba a la línea `CITAS`: veredicto `SIN_CITAS`, reintento, lo mismo. **Nueve de veinticinco
+casos se abstenían por truncamiento**, no por no saber citar. El prompt v2 pone las citas
+**primero**, así lo que se trunca es la prosa —recuperable— y no la parte verificable.
+
+**Citaba de más.** 23 de 25 respuestas citaban más de un artículo (mediana 2, máximo 5) y el
+golden set espera uno. El contrato dice que una cita correcta más una de más cuenta como fallo,
+así que citar de más no es minuciosidad: es tumbar el caso. v3 pide **una**.
+
+**El apartado no se le ofrecía.** Detallado en Q-021: el apartado exacto está entre las cinco
+fuentes en el 39 % de los casos, contra un umbral de 0,85.
+
+### Dos intentos de mejora, los dos medidos y los dos peores
+
+| prompt | qué cambia | `G-COBERTURA` |
+|---|---|---:|
+| **v3** | una cita, citas primero | **0,72** |
+| v4 | fragmento **corto**, 10-25 palabras | 0,48 |
+| v5 | fragmento **continuo**, sin saltos | 0,52 |
+
+**v4 es el interesante.** Los fallos de v3 eran quotes de 173 a 550 caracteres donde el modelo
+copiaba bien un prefijo largo y fallaba cerca del final. Parecía evidente que pedirle brevedad
+lo arreglaría. Lo empeoró a la mitad: **con un fragmento corto el modelo deja de copiar y
+empieza a componer** — resume la cláusula en vez de transcribirla. La longitud no era el
+problema; era el mecanismo, y acortarla lo cambió a peor.
+
+Se vuelve a v3, renumerado a **v6** en vez de reescribir la historia: la versión entra en la
+clave de la caché de respuestas, y dos juicios con el mismo número tienen que ser el mismo
+prompt.
+
+### Y una advertencia metodológica sobre mí mismo
+
+Estuve comparando prompts sobre **25 casos**, donde un caso son cuatro puntos, con un modelo que
+en la fase 2 medí que **no es determinista entre corridas**. Al subir a 60 casos los tres
+números mejoraron a la vez —0,44 → 0,51, 0,72 → 0,78, 0,28 → 0,22— sin tocar el prompt: la
+muestra pequeña era pesimista, no el prompt mejor.
+
+**Con esa varianza, las diferencias pequeñas entre prompts no se pueden leer.** Las de v4 y v5
+son de veinte puntos y sí; cualquier cosa menor habría que medirla sobre el golden set entero.

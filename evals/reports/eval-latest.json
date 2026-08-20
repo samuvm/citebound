@@ -1,8 +1,8 @@
 {
  "contract_version": 1,
- "created_at": "2026-08-20T18:39:56+00:00",
+ "created_at": "2026-08-20T19:10:25+00:00",
  "dataset": {
-  "n_cases": 25,
+  "n_cases": 60,
   "name": "v2.jsonl",
   "sha256": "02b7a195c4f1de35d5818a2cfa62c3dc99774e3b92e266420a8894555dea1ba3",
   "version": 2
@@ -15,37 +15,37 @@
   "modelo": "qwen3.5:4b-mlx",
   "physical_table": "chunk_v1",
   "prompt_id": "responder",
-  "prompt_version": 3,
+  "prompt_version": 6,
   "python": "3.12.4"
  },
  "lectura_publicada": "a_nivel_articulo (Q-021)",
  "metrics": [
   {
    "id": "G-HALLUC",
-   "n": 18,
+   "n": 47,
    "value": 0.0
   },
   {
    "id": "G-QUOTE-LIT",
-   "n": 22,
+   "n": 58,
    "value": 1.0
   },
   {
-   "a_nivel_articulo": 0.4444444444444444,
-   "estricto": 0.16666666666666666,
+   "a_nivel_articulo": 0.5106382978723404,
+   "estricto": 0.2978723404255319,
    "id": "G-CITA-PRECISION",
-   "n": 18,
-   "value": 0.4444444444444444
+   "n": 47,
+   "value": 0.5106382978723404
   },
   {
    "id": "G-COBERTURA",
-   "n": 25,
-   "value": 0.72
+   "n": 60,
+   "value": 0.7833333333333333
   },
   {
    "id": "G-ABST-FP",
-   "n": 25,
-   "value": 0.28
+   "n": 60,
+   "value": 0.21666666666666667
   },
   {
    "id": "G-ABST-FN",
@@ -55,7 +55,7 @@
  ],
  "nota": "G-CITA-PRECISION se publica a nivel de ARTICULO por Q-021, que declara una divergencia con docs/CONTRACTS/retrieval-metrics.md. Motivo medido: el apartado exacto esta entre las cinco fuentes ofrecidas en el 39 % de los casos, asi que la lectura estricta esta acotada muy por debajo de su umbral por una razon ajena al generador. La estricta se publica al lado. Las parejas G-CITA-PRECISION+G-COBERTURA y G-ABST-FP+G-ABST-FN son atomicas: medidas por separado, la forma optima de aprobar cualquiera de las dos es hacer trampa. G-HALLUC y G-QUOTE-LIT son invariantes del verificador, no metricas de calidad: si bajan, es que dejo pasar algo.",
  "project": "citebound",
- "run_id": "bdba74067d0cd766",
- "segundos": 168.5,
+ "run_id": "0e978961dda70c9e",
+ "segundos": 402.3,
  "suite": "fase-3"
 }

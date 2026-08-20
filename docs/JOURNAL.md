@@ -1981,3 +1981,67 @@ Y queda una decisión colgando que conviene nombrar: **Q-019 eligió A** —reor
 evaluación, fuera del camino interactivo— *porque* costaba 4,6 s. Hoy cuesta 460 ms y lo he
 metido en el endpoint llamándolo arreglo. Es defendible y ADR-024 lo anticipa, pero Q-019 nunca
 se revisó formalmente. Sacarlo devolvería ~460 ms de los ~400 que faltan.
+
+---
+
+## 2026-08-21 · fase 3 · la señal que faltaba, y el precio que tiene
+
+### El agente medido entero, por primera vez
+
+274 casos. **Los dos invariantes se sostienen**: `G-HALLUC` = 0 y `G-QUOTE-LIT` = 1,00 sobre
+**262 citas emitidas**. Ni una referencia inventada, ni un fragmento que no esté literalmente en
+su artículo.
+
+Y apareció el número que faltaba: **`G-ABST-FN` = 0,724** contra un umbral de 0,10. De 58
+preguntas que el corpus **no** contesta, el sistema respondió y verificó en **42**.
+
+Lo que eso dice, exactamente: **abstenerse estaba descorrelacionado de que el corpus responda**
+—26 % en positivos, 28 % en negativos—. El sistema se callaba cuando el modelo escribía mal la
+cita, no cuando no había respuesta. Es la capa que el README declara como no garantizada: la
+cita cerrada asegura que el fragmento **existe**, no que **responda**. Ahora está medida.
+
+### Hay señal, y es del cross-encoder
+
+La mejor puntuación de las cinco fuentes que se le enseñan al modelo:
+
+| | mediana | |
+|---|---:|---|
+| positivos | **0,893** | n=216 |
+| negativos | **0,011** | n=58 |
+
+Separan mucho y se solapan, así que **no hay umbral que cumpla las dos metas de la pareja**. Se
+eligió 0,10 por equilibrar las dos violaciones relativas en vez de arreglar una hundiendo la
+otra — que es justo lo que la pareja atómica existe para impedir.
+
+| | `G-CITA-PRECISION` | `G-COBERTURA` | `G-ABST-FP` | `G-ABST-FN` |
+|---|---:|---:|---:|---:|
+| sin puntuador | 0,436 | **0,741** | **0,259** | 0,724 |
+| con puntuador | **0,549** | 0,667 | 0,333 | **0,155** |
+| umbral | 0,85 | 0,90 | 0,05 | 0,10 |
+
+`G-ABST-FN` pasa de 7,2 a 1,6 veces su umbral. `G-ABST-FP` empeora, y **mi predicción falló
+justo ahí**: dije 0,088 y salió 0,333, porque la tabla contaba solo las abstenciones del
+puntuador y las de verificación fallida **se suman**.
+
+### El precio: `G-TTFT`
+
+| configuración | `G-TTFT` p95 | `G-ABST-FN` |
+|---|---:|---:|
+| sin puntuador | **1.384 ms** ✅ | 0,724 ❌ |
+| puntuador en CPU | 2.541 ms ❌ | **0,155** |
+| puntuador en MPS | 3.140 ms ❌ | 0,155 |
+
+**MPS es peor que CPU**, y eso sí se entiende: el cross-encoder corre en proceso con PyTorch y
+Ollama sirve el generador en la misma GPU. Cuando compiten, puntuar es más rápido y **responder
+mucho más lento**. Es el coste escondido del «segundo camino de servir modelos» que Q-017
+temía, medido desde el otro lado.
+
+### Cuatro veces me ha engañado una medida aislada, y siempre igual
+
+Puntuar cinco fuentes aislado: **67 ms**. En el bench: **~1.150 ms**. La causa es la misma que
+en los otros tres casos de esta fase: **al repetir el mismo prompt, Ollama reutiliza su caché de
+prefill**; en el bench cada pregunta trae un prompt nuevo y todas pagan el caso malo.
+
+La regla, ya con cuatro datos: **una latencia medida sobre una entrada repetida no dice nada
+sobre una carga real.** Vale para el primer token (81 ms aislado contra 1.200 reales), para el
+9B, para la ventana del reordenador y para esto.

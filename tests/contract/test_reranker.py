@@ -19,6 +19,7 @@ import pytest
 
 from citebound.domain.legalref import parse
 from citebound.providers.reranker import (
+    DISPOSITIVO_POR_DEFECTO,
     INSTRUCCION,
     MODELO_POR_DEFECTO,
     CrossEncoderReranker,
@@ -122,10 +123,15 @@ def test_lo_que_queda_fuera_del_tope_no_se_toca() -> None:
     assert r.tope == 2
 
 
-def test_el_dispositivo_es_un_parametro_y_no_una_edicion() -> None:
-    """`mps` es la máquina de desarrollo, no un requisito: el mismo código corre en `cuda` o
-    `cpu`. Que esté en el constructor es lo que hace cierta esa frase del README."""
-    assert CrossEncoderReranker(dispositivo="cpu").dispositivo == "cpu"
+def test_el_dispositivo_por_defecto_es_cpu_y_eso_es_una_medida() -> None:
+    """**Contraintuitivo y medido.** El cross-encoder corre en proceso con PyTorch y Ollama
+    sirve el generador en la misma GPU: cuando compiten, puntuar es más rápido en MPS (161 ms
+    contra 313) y **responder es mucho más lento** (1.598 contra 255). Total 1.759 contra 569.
+
+    Aislado, MPS parece el doble de bueno. La contienda solo se ve de punta a punta."""
+    assert DISPOSITIVO_POR_DEFECTO == "cpu"
+    assert CrossEncoderReranker().dispositivo == "cpu"
+    assert CrossEncoderReranker(dispositivo="cuda").dispositivo == "cuda"
 
 
 def test_la_instruccion_del_dominio_dice_tipificar_y_no_parecerse() -> None:

@@ -30,6 +30,7 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = [
     "CARACTERES_POR_CANDIDATO",
+    "DISPOSITIVO_POR_DEFECTO",
     "INSTRUCCION",
     "MODELO_POR_DEFECTO",
     "CrossEncoderReranker",
@@ -78,6 +79,24 @@ Medido sobre un par de ejemplo, la distancia entre el artículo correcto y su ve
 **2,0 con la genérica a 5,5 con esta**. El efecto sobre el recall está en `docs/JOURNAL.md`.
 """
 
+DISPOSITIVO_POR_DEFECTO = "cpu"
+"""**CPU y no MPS, y es contraintuitivo hasta que se mide.**
+
+El cross-encoder corre en proceso con PyTorch; Ollama sirve el generador en la misma GPU. Cuando
+los dos se pelean por ella, puntuar es más rápido y **responder es mucho más lento**:
+
+| dispositivo | puntuar 5 | primer token después | total |
+|---|---:|---:|---:|
+| `mps` | 161 ms | 1.598 ms | 1.759 ms |
+| **`cpu`** | 313 ms | **255 ms** | **569 ms** |
+
+En MPS la contienda cuesta ~1,3 s de `G-TTFT`. Medirlo por separado no lo enseña: aislado, el
+puntuador en MPS parece el doble de rápido. Es exactamente el coste escondido del «segundo
+camino de servir modelos» que Q-017 temía, ahora medido desde el otro lado.
+
+`mps` y `cuda` siguen disponibles por `CITEBOUND_RERANKER_DEVICE`: en una máquina con GPU
+dedicada al reranker la aritmética es otra."""
+
 _TOPE = 30
 """Cuántos candidatos se reordenan. Con 10 el techo medido era 0,785 y con 30 es 0,977: el 17 %
 de los casos tenía el artículo correcto en los puestos 11-30 y el reordenador ni los miraba."""
@@ -117,7 +136,7 @@ class CrossEncoderReranker:
     """
 
     modelo: str = MODELO_POR_DEFECTO
-    dispositivo: str = "mps"
+    dispositivo: str = DISPOSITIVO_POR_DEFECTO
     tope: int = _TOPE
     caracteres: int = CARACTERES_POR_CANDIDATO
     instruccion: str = INSTRUCCION
@@ -173,7 +192,7 @@ def reordenador_por_defecto() -> CrossEncoderReranker:
     """El de verdad, configurado desde el entorno. Se lee aquí y en ningún sitio más abajo."""
     return CrossEncoderReranker(
         modelo=os.environ.get("CITEBOUND_RERANKER", MODELO_POR_DEFECTO),
-        dispositivo=os.environ.get("CITEBOUND_RERANKER_DEVICE", "mps"),
+        dispositivo=os.environ.get("CITEBOUND_RERANKER_DEVICE", DISPOSITIVO_POR_DEFECTO),
     )
 
 

@@ -29,6 +29,7 @@ from citebound.agent.servir import Trozo, servir
 from citebound.domain.citation import Fuente
 from citebound.evals.schema import CasoGolden
 from citebound.providers.chat import generador_por_defecto
+from citebound.providers.reranker import puntuador_por_defecto
 from citebound.retrieval import pipeline
 from citebound.retrieval.vector import embedder_del_indice, indice_activo
 
@@ -84,6 +85,7 @@ def main() -> int:
         "CITEBOUND_PG_URL", f"postgresql://citebound:citebound@localhost:{puerto}/citebound"
     )
     generador = generador_por_defecto()
+    puntuador = puntuador_por_defecto()
     plantilla = _plantilla()
 
     repeticiones: list[dict[str, float]] = []
@@ -116,6 +118,7 @@ def main() -> int:
                     recuperador=recupera,
                     generador=generador,
                     plantilla=plantilla,
+                    puntuador=puntuador,
                 )
                 try:
                     for pieza in corriente:

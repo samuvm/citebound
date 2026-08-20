@@ -1,6 +1,6 @@
 {
  "contract_version": 1,
- "created_at": "2026-08-20T22:12:05+00:00",
+ "created_at": "2026-08-20T22:49:06+00:00",
  "dataset": {
   "n_cases": 274,
   "name": "v2.jsonl",
@@ -22,40 +22,40 @@
  "metrics": [
   {
    "id": "G-HALLUC",
-   "n": 202,
+   "n": 153,
    "value": 0.0
   },
   {
    "id": "G-QUOTE-LIT",
-   "n": 262,
+   "n": 197,
    "value": 1.0
   },
   {
-   "a_nivel_articulo": 0.43564356435643564,
-   "estricto": 0.297029702970297,
+   "a_nivel_articulo": 0.5490196078431373,
+   "estricto": 0.3790849673202614,
    "id": "G-CITA-PRECISION",
-   "n": 202,
-   "value": 0.43564356435643564
+   "n": 153,
+   "value": 0.5490196078431373
   },
   {
    "id": "G-COBERTURA",
    "n": 216,
-   "value": 0.7407407407407407
+   "value": 0.6666666666666666
   },
   {
    "id": "G-ABST-FP",
    "n": 216,
-   "value": 0.25925925925925924
+   "value": 0.3333333333333333
   },
   {
    "id": "G-ABST-FN",
    "n": 58,
-   "value": 0.7241379310344828
+   "value": 0.15517241379310345
   }
  ],
  "nota": "G-CITA-PRECISION se publica a nivel de ARTICULO por Q-021, que declara una divergencia con docs/CONTRACTS/retrieval-metrics.md. Motivo medido: el apartado exacto esta entre las cinco fuentes ofrecidas en el 39 % de los casos, asi que la lectura estricta esta acotada muy por debajo de su umbral por una razon ajena al generador. La estricta se publica al lado. Las parejas G-CITA-PRECISION+G-COBERTURA y G-ABST-FP+G-ABST-FN son atomicas: medidas por separado, la forma optima de aprobar cualquiera de las dos es hacer trampa. G-HALLUC y G-QUOTE-LIT son invariantes del verificador, no metricas de calidad: si bajan, es que dejo pasar algo.",
  "project": "citebound",
  "run_id": "9676833e20933855",
- "segundos": 2178.8,
+ "segundos": 1753.7,
  "suite": "fase-3"
 }

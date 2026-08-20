@@ -24,7 +24,16 @@ from enum import StrEnum
 from citebound.domain.citation import Motivo, Veredicto
 from citebound.domain.legalref import LegalRef
 
-__all__ = ["MAX_REINTENTOS", "Curso", "Salida", "decidir", "resolver_curso"]
+__all__ = [
+    "MAX_REINTENTOS",
+    "UMBRAL_RELEVANCIA",
+    "Curso",
+    "Salida",
+    "decidir",
+    "resolver_curso",
+]
+
+UMBRAL_RELEVANCIA = 0.10
 
 MAX_REINTENTOS = 2
 """Dos, y el tope no es una sugerencia.
@@ -59,7 +68,13 @@ class Curso:
     motivo: Motivo | None = None
 
 
-def decidir(veredicto: Veredicto, *, reintentos_hechos: int, hay_fuentes: bool) -> Salida:
+def decidir(
+    veredicto: Veredicto,
+    *,
+    reintentos_hechos: int,
+    hay_fuentes: bool,
+    relevancia: float | None = None,
+) -> Salida:
     """La decisión de un solo paso. Todo lo que la determina son sus tres argumentos.
 
     **Sin fuentes se abstiene sin gastar un reintento.** Si la búsqueda no trajo nada, el modelo
@@ -81,7 +96,9 @@ def decidir(veredicto: Veredicto, *, reintentos_hechos: int, hay_fuentes: bool) 
     return Salida.ABSTENERSE
 
 
-def resolver_curso(intentos: Sequence[Veredicto], *, hay_fuentes: bool = True) -> Curso:
+def resolver_curso(
+    intentos: Sequence[Veredicto], *, hay_fuentes: bool = True, relevancia: float | None = None
+) -> Curso:
     """El curso entero a partir de los veredictos de cada borrador.
 
     Se para en cuanto la salida es terminal y **no mira los intentos de más**: que el grafo

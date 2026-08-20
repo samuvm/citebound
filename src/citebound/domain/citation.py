@@ -124,6 +124,10 @@ class Motivo(StrEnum):
     QUOTE_VACIO = "quote_vacio"
     QUOTE_DEMASIADO_CORTO = "quote_demasiado_corto"
     SIN_CITAS = "sin_citas"
+    SIN_RELEVANCIA = "sin_relevancia"
+    """Lo recuperado no viene a cuento. **Es distinto de `QUOTE_NO_LITERAL`** y la diferencia
+    importa: este dice «el corpus no lo responde» y aquel dice «el modelo lo escribió mal».
+    Confundirlos manda a arreglar lo que no está roto."""
 
 
 @dataclass(frozen=True, slots=True)

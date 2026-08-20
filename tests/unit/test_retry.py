@@ -24,6 +24,7 @@ from citebound.domain.citation import Motivo, Veredicto
 from citebound.domain.legalref import parse
 from citebound.domain.retry import (
     MAX_REINTENTOS,
+    UMBRAL_RELEVANCIA,
     Curso,
     Salida,
     decidir,
@@ -200,3 +201,58 @@ def test_propiedad_responder_implica_que_el_ultimo_intento_mirado_verifico(
     if curso.salida is Salida.RESPONDER:
         assert curso.refs != ()
         assert curso.motivo is None
+
+
+# ======================================================================================
+# Abstención por irrelevancia · la señal que faltaba
+# ======================================================================================
+#
+# La cita cerrada garantiza que el fragmento **existe**. No garantiza que **responda**, y eso
+# se midió el 2026-08-21: de 58 preguntas que el corpus no contesta, el sistema respondió y
+# verificó en 42. Las citas eran reales; simplemente no venían a cuento.
+#
+# El cross-encoder sí distingue: sobre los 274 casos, la mejor puntuación de las cinco fuentes
+# tiene mediana 0,893 en los positivos y 0,011 en los negativos.
+
+
+def test_una_puntuacion_alta_deja_responder() -> None:
+    assert decidir(BIEN, reintentos_hechos=0, hay_fuentes=True, relevancia=0.9) is Salida.RESPONDER
+
+
+def test_una_puntuacion_baja_abstiene_sin_llamar_al_modelo() -> None:
+    """**El punto entero.** Si lo recuperado no viene a cuento, generar es pagar latencia para
+    acabar citando algo real que no responde — que es peor que callarse, porque parece bueno."""
+    assert (
+        decidir(BIEN, reintentos_hechos=0, hay_fuentes=True, relevancia=0.001)
+        is Salida.ABSTENERSE
+    )
+
+
+def test_sin_puntuacion_se_decide_como_siempre() -> None:
+    """`None` es «no se midió», no «cero». El evaluador y la API pueden correr sin puntuador, y
+    tratar su ausencia como irrelevancia abstendría el sistema entero."""
+    assert decidir(BIEN, reintentos_hechos=0, hay_fuentes=True, relevancia=None) is Salida.RESPONDER
+
+
+def test_el_borde_del_umbral_deja_responder() -> None:
+    """Justo en el umbral se responde: `>=`. Un borde ambiguo aquí movería la pareja
+    `G-ABST-FP`/`G-ABST-FN` sin que nadie supiera por qué."""
+    assert (
+        decidir(BIEN, reintentos_hechos=0, hay_fuentes=True, relevancia=UMBRAL_RELEVANCIA)
+        is Salida.RESPONDER
+    )
+
+
+def test_la_irrelevancia_manda_sobre_el_veredicto() -> None:
+    """Se comprueba antes que el reintento: si nada de lo recuperado viene a cuento, reintentar
+    es pedirle al modelo que lo intente otra vez con el mismo material inútil."""
+    assert decidir(MAL, reintentos_hechos=0, hay_fuentes=True, relevancia=0.0) is Salida.ABSTENERSE
+
+
+def test_un_curso_irrelevante_se_abstiene_con_su_motivo() -> None:
+    """El motivo es propio: `sin_relevancia` dice «el corpus no lo responde», y
+    `quote_no_literal` dice «el modelo lo escribió mal». Confundirlos manda a arreglar lo que
+    no está roto."""
+    curso = resolver_curso([BIEN], hay_fuentes=True, relevancia=0.0)
+    assert curso.salida is Salida.ABSTENERSE
+    assert curso.motivo is Motivo.SIN_RELEVANCIA

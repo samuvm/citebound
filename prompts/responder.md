@@ -1,9 +1,14 @@
 ---
 id: responder
-version: 2
+version: 3
 modelo_destino: qwen3.5:4b-mlx
 temperatura: 0.0
 cambios: |
+  v3 · se le pide UNA cita, y dos solo si la respuesta de verdad se apoya en dos.
+       Medido sobre 25 casos con v2: 23 de 25 respuestas citaban más de un artículo
+       (mediana 2, máximo 5) y el golden set espera uno. El contrato compartido dice
+       que una cita correcta más una de más cuenta como FALLO, así que citar de más
+       no es minuciosidad: es tumbar el caso. G-CITA-PRECISION 0,06 con v2.
   v2 · el bloque CITAS va PRIMERO. Con la respuesta delante, el modelo agotaba el
        presupuesto de tokens escribiendo prosa y no llegaba nunca a las citas: nueve
        de veinticinco casos se abstenían por truncamiento, no por no saber citar.
@@ -40,11 +45,15 @@ línea por cada artículo en el que te vayas a apoyar, con un fragmento **copiad
 CITAS
 [[REF:1]] «fragmento copiado tal cual del artículo 1»
 
-Reglas del fragmento:
+Reglas, y la primera es la que más importa:
 
-1. Tiene que estar **palabra por palabra** en el artículo. Se comprueba carácter a carácter. No
-   lo resumas, no lo adaptes, no lo completes: cópialo.
-2. **Solo existen los números que ves arriba.** No escribas ningún otro número, ni menciones
+1. **Cita UN solo artículo.** El que *tipifica* la conducta por la que se pregunta, no el que
+   la menciona de pasada ni el que regula algo parecido. Añade un segundo **solo** si la
+   respuesta no se sostiene sin él. Citar artículos de más no es ser minucioso: es un error, y
+   se cuenta como tal.
+2. El fragmento tiene que estar **palabra por palabra** en el artículo. Se comprueba carácter a
+   carácter. No lo resumas, no lo adaptes, no lo completes: cópialo.
+3. **Solo existen los números que ves arriba.** No escribas ningún otro número, ni menciones
    artículos por su número: el marcador es tu única forma de referirte a ellos.
 
 Después de las citas, escribe una línea que diga exactamente RESPUESTA y debajo tu respuesta en

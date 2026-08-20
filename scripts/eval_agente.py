@@ -51,7 +51,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 GOLDEN = max((RAIZ / "evals" / "golden").glob("v*.jsonl"))
 INFORME = RAIZ / "evals" / "reports" / "eval-latest.json"
 CACHE = RAIZ / "evals" / "cache" / "respuestas.json"
-PROMPT_ID, PROMPT_VERSION = "responder", 2
+PROMPT_ID, PROMPT_VERSION = "responder", 3
 
 MAX_TOKENS = 1024
 """Suficiente para la prosa **y** el bloque de citas, que es donde se rompía.

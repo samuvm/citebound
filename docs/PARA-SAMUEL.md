@@ -1329,4 +1329,52 @@ umbral o parar el proyecto, y ninguna de las dos es verdad.
 y sigo con las palancas de calidad de la opción D sin cerrar la fase. Es más lento y no pierde
 nada.
 
+**ACTUALIZACIÓN 2026-08-21 · tu idea de la segunda máquina funcionó · quedan TRES, no cinco**
+
+Serviste los modelos desde el equipo de la RTX 3070 y **dos metas se pusieron verdes solas**:
+
+| meta | todo en el Mac | dos máquinas | umbral | |
+|---|---:|---:|---:|---|
+| `G-TTFT` | 2.039 ms | **1.014 ms** | ≤ 1.500 | ✅ |
+| `G-ABST-FN` | 0,155 | **0,069** | ≤ 0,10 | ✅ |
+| `G-CITA-PRECISION` | 0,549 | 0,602 | ≥ 0,85 | ❌ |
+| `G-COBERTURA` | 0,667 | 0,528 | ≥ 0,90 | ❌ |
+| `G-ABST-FP` | 0,333 | 0,472 | ≤ 0,05 | ❌ |
+
+Y **el modelo grande queda descartado con datos**: el 9B sobre los 274 casos pierde en las
+cuatro métricas contra el 4B y tarda el doble (1.638 s contra 925). La mejora que parecía tener
+con 60 casos era ruido.
+
+**Lo que eso cambia en las opciones.** C (generador de pago) pierde casi todo su sentido: el
+problema no es potencia, y ya está medido dos veces. B (bajar umbrales) ya no hace falta para
+`G-TTFT` ni `G-ABST-FN`, que están en verde por mérito.
+
+**Queda un diagnóstico, y es preciso**: la mitad de las preguntas que el corpus **sí** contesta
+acaban en abstención porque el modelo escribe un `quote` que no aparece literalmente en su
+artículo. `G-COBERTURA` y `G-ABST-FP` son ese mismo fallo contado de dos maneras. El verificador
+funciona; el generador falla **al copiar**.
+
+**Y ahí hay una palanca que no se ha tocado, y es la tesis del proyecto un nivel más abajo:** si
+el modelo no puede escribir la referencia porque la resuelve el código, ¿por qué le dejamos
+escribir el fragmento? Podría señalar el tramo —«desde la palabra N hasta la M»— y **copiarlo el
+código**. Un `quote` así **no puede** no verificar, por construcción, igual que hoy una
+referencia no puede estar inventada.
+
+Eso es trabajo de fase 4 con diseño propio, no un ajuste. **Refuerza la opción D.**
+
+**Lo que te pido ahora, concreto:**
+
+1. **Ratificar la pareja de máquinas** como `hardware_referencia` en `GOALS.yaml` (zona roja,
+   solo tú). Va con el detalle: Mac por WiFi + RTX 3070 por cable, jitter de red medido en 11 ms
+   de mediana y 97 de p95, `OLLAMA_KEEP_ALIVE ≥ 10m` en el equipo remoto. Sin eso no puedo
+   publicar 1.014 ms: sería un número de una configuración que el proyecto no declara.
+2. **Decidir D** (o lo que prefieras) para `G-CITA-PRECISION` y `G-COBERTURA`.
+3. **Saber si `G-ABST-FP` te vale en 0,47 publicado** mientras la fase 4 lo ataca, o si prefieres
+   que la fase 3 no cierre hasta arreglarlo.
+
+**Aviso que no me quiero callar:** el embebedor en CUDA da flotantes distintos a los de Metal y
+`G-RECALL5` baja de 0,7963 a **0,7917**, con umbral 0,79 aprobado en P-002. Sigue en verde por
+**0,002**, que es un caso de 216. Con la pareja de máquinas ratificada, ese margen es tan fino
+que el primer cambio de cualquier cosa lo tumba. Merece decisión aparte.
+
 **Estado: PENDIENTE**

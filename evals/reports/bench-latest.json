@@ -1,6 +1,6 @@
 {
  "contract_version": 1,
- "created_at": "2026-08-21T00:19:47+00:00",
+ "created_at": "2026-08-21T19:08:22+00:00",
  "dataset": {
   "n_cases": 55,
   "name": "v2.jsonl",
@@ -11,7 +11,7 @@
   "deterministic": false,
   "hardware": "MacBook Pro M4 Max, 36 GB, macOS 26.5",
   "index_version": "v1-qwen3-embedding-0.6b-1024-apartado-v1",
-  "modelo": "qwen3.5:4b-mlx",
+  "modelo": "qwen3.5:4b",
   "physical_table": "chunk_v1",
   "python": "3.12.4",
   "supuestos_declarados": [
@@ -29,17 +29,17 @@
   {
    "id": "G-TTFT",
    "n": 55,
-   "value": 2039.4
+   "value": 1014.3
   },
   {
    "id": "G-TTFS",
    "n": 55,
-   "value": 145.0
+   "value": 166.7
   }
  ],
  "por_etapa_p95_ms": {
-  "busqueda": 145.0,
-  "primer_token": 1901.4
+  "busqueda": 166.7,
+  "primer_token": 922.7
  },
  "presupuesto_etapa_ms": {
   "busqueda": 90.0,
@@ -51,27 +51,27 @@
  "protocolo": "bench/protocol.md",
  "repeticiones": [
   {
-   "busqueda_p95": 143.21847495157272,
+   "busqueda_p95": 157.30733321979642,
    "n": 55.0,
-   "primer_token_p95": 1859.6890911576338,
-   "ttfs_p95": 143.22866266593337,
-   "ttft_p95": 1993.526270473376
+   "primer_token_p95": 860.1592294871807,
+   "ttfs_p95": 157.3198001133278,
+   "ttft_p95": 937.5202625291422
   },
   {
-   "busqueda_p95": 143.238212633878,
+   "busqueda_p95": 160.8394251903519,
    "n": 55.0,
-   "primer_token_p95": 1901.4449580921791,
-   "ttfs_p95": 143.24407926760614,
-   "ttft_p95": 2039.4438873277977
+   "primer_token_p95": 797.3981291754171,
+   "ttfs_p95": 160.85476698353887,
+   "ttft_p95": 893.1991873541847
   },
   {
-   "busqueda_p95": 144.97189562534913,
+   "busqueda_p95": 166.65572056081146,
    "n": 55.0,
-   "primer_token_p95": 1494.8247125488706,
-   "ttfs_p95": 144.98442484764382,
-   "ttft_p95": 1630.7064287131652
+   "primer_token_p95": 922.7089874679223,
+   "ttfs_p95": 166.6713544400409,
+   "ttft_p95": 1014.3354589352384
   }
  ],
- "run_id": "6f9ecaae34ad161f",
+ "run_id": "62ab32014a95a4f0",
  "suite": "bench-fase-3"
 }

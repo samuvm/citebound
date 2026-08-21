@@ -79,7 +79,23 @@ Medido sobre un par de ejemplo, la distancia entre el artículo correcto y su ve
 **2,0 con la genérica a 5,5 con esta**. El efecto sobre el recall está en `docs/JOURNAL.md`.
 """
 
-DISPOSITIVO_POR_DEFECTO = "cpu"
+DISPOSITIVO_POR_DEFECTO = os.environ.get("CITEBOUND_DISPOSITIVO_PUNTUADOR", "cpu")
+"""Dónde corre el cross-encoder. **El valor correcto depende de dónde viva Ollama**, y esa es
+toda la lección:
+
+| Ollama | dispositivo | `G-TTFT` p95 | `make eval-retrieval` |
+|---|---|---:|---:|
+| en esta máquina | `mps` | 3.140 ms | — |
+| en esta máquina | **`cpu`** | **2.039 ms** | 299 s |
+| en otra máquina | **`mps`** | **1.014 ms** | **154 s** |
+| en otra máquina | `cpu` | — | 299 s |
+
+Compartiendo máquina, MPS puntúa más rápido y **hace que responder sea mucho más lento**: la
+contienda por la GPU cuesta más de lo que ahorra. Sin compartir, MPS gana en todo por el doble.
+
+El valor por defecto sigue siendo `cpu` porque `GOALS.yaml :: hardware_referencia` declara **una
+sola máquina**. Cambiarlo antes que esa declaración sería publicar números de una configuración
+que el proyecto no dice ejecutar — la cicatriz de Q-019, otra vez."""
 """**CPU y no MPS, y es contraintuitivo hasta que se mide.**
 
 El cross-encoder corre en proceso con PyTorch; Ollama sirve el generador en la misma GPU. Cuando

@@ -4,18 +4,18 @@
  "lectura_publicada": "a_nivel_articulo (Q-016 A)",
  "metrics": [
   {
-   "a_nivel_articulo": 0.7962962962962963,
+   "a_nivel_articulo": 0.7916666666666666,
    "estricto": 0.49537037037037035,
    "id": "G-RECALL5",
    "n": 216,
-   "value": 0.7962962962962963
+   "value": 0.7916666666666666
   },
   {
-   "a_nivel_articulo": 0.9675925925925926,
-   "estricto": 0.5833333333333334,
+   "a_nivel_articulo": 0.9629629629629629,
+   "estricto": 0.5879629629629629,
    "id": "G-RECALL30",
    "n": 216,
-   "value": 0.9675925925925926
+   "value": 0.9629629629629629
   }
  ],
  "modelo_reordenador": "BAAI/bge-reranker-v2-m3",
@@ -24,8 +24,8 @@
  "physical_table": "chunk_v1",
  "por_canal": {
   "fusion_y_reordenador": {
-   "recall30": 0.9675925925925926,
-   "recall5": 0.7962962962962963
+   "recall30": 0.9629629629629629,
+   "recall5": 0.7916666666666666
   },
   "solo_lexico": {
    "recall30": 0.7870370370370371,
@@ -36,5 +36,5 @@
    "recall5": 0.7453703703703703
   }
  },
- "segundos": 204.8
+ "segundos": 161.1
 }

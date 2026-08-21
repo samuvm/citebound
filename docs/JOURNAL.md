@@ -2115,3 +2115,93 @@ contra 0,5: `G-TTFT` sería mucho peor, no mejor.
 ### Dónde queda la fase 3
 
 Cinco metas en rojo y ninguna se arregla con más ingeniería de la que cabe aquí. Va a Q-022.
+
+## 2026-08-21 · fase 3 · dos máquinas: `G-TTFT` y `G-ABST-FN` en verde, y el modelo grande enterrado
+
+Samuel propone servir los modelos desde otro equipo suyo en la red local (RTX 3070, 8 GB, por
+cable; el Mac por WiFi). No hace falta tocar código: `OPENAI_BASE_URL` ya apunta el generador
+**y** el embebedor a donde se le diga.
+
+### Lo primero, la red
+
+Cuarenta peticiones vacías: mediana **11,3 ms**, p95 **97,1 ms**, máximo 115. El WiFi del Mac se
+come el 6 % del presupuesto de `G-TTFT`. Asumible y **declarable**; por cable en los dos lados
+sería menos.
+
+### `G-TTFT`: 2.039 → 1.014 ms, y por fin repetible
+
+| | rep 1 | rep 2 | rep 3 | p95 publicado |
+|---|---:|---:|---:|---:|
+| todo en el Mac | 2.037 | 5.298 | 3.114 | 5.298 ms |
+| dos máquinas | 938 | 893 | 1.014 | **1.014 ms** |
+
+**Lo importante no es solo que baje, es que deja de oscilar.** En el Mac la misma configuración
+daba entre 2.0 y 5.3 segundos según lo que estuviera haciendo la máquina; separadas, las tres
+repeticiones caben en 121 ms. La contienda no costaba tiempo: costaba **poder medir**.
+
+Y el dispositivo del puntuador se da la vuelta con la mudanza:
+
+| Ollama | dispositivo | `G-TTFT` | `eval-retrieval` |
+|---|---|---:|---:|
+| misma máquina | `mps` | 3.140 ms | — |
+| misma máquina | `cpu` | 2.039 ms | 299 s |
+| **otra máquina** | **`mps`** | **1.014 ms** | **154 s** |
+
+Con Ollama fuera, MPS gana por el doble en todo. **El valor por defecto NO se cambia**: sigue
+`cpu` porque `GOALS.yaml :: hardware_referencia` declara una sola máquina, y publicar números de
+una configuración que el proyecto no dice ejecutar es la cicatriz de Q-019. Se cambia cuando
+Samuel ratifique la pareja, no antes.
+
+### El embebedor en CUDA cuesta exactamente un caso
+
+`G-RECALL5` 0,7963 → **0,7917** y `G-RECALL30` 0,9676 → **0,9630**. El índice se construyó
+embebiendo en Metal y las consultas pasan a embeberse en CUDA: mismo modelo, misma cuantización,
+flotantes distintos en el cuarto decimal. Un caso de 216 en cada métrica. Siguen por encima de
+los umbrales de P-002 (0,79 y 0,96) pero **el margen se queda en 0,002**.
+
+### La cuantización mueve la calidad, y no en la dirección esperada
+
+`qwen3.5:4b-mlx` (Metal) contra `qwen3.5:4b` Q4_K_M (CUDA), los mismos 274 casos:
+
+| | MLX | GGUF | umbral |
+|---|---:|---:|---:|
+| `G-HALLUC` | 0 | **0** | = 0 |
+| `G-QUOTE-LIT` | 1,00 | **1,00** | = 1,00 |
+| `G-CITA-PRECISION` | 0,549 | **0,602** | 0,85 |
+| `G-COBERTURA` | **0,667** | 0,528 | 0,90 |
+| `G-ABST-FP` | **0,333** | 0,472 | 0,05 |
+| `G-ABST-FN` | 0,155 | **0,069** | 0,10 |
+
+El GGUF es **más prudente**: cita mejor cuando responde y responde a 118 casos en vez de 153.
+`G-ABST-FN` pasa a verde por eso, no por mérito.
+
+**Y los dos invariantes se sostienen en la tercera configuración independiente**: dos máquinas,
+dos cuantizaciones, dos backends. `G-HALLUC` = 0 y `G-QUOTE-LIT` = 1,00 las tres veces. Eso ya no
+es suerte, es la construcción.
+
+### El modelo grande, enterrado con datos
+
+El 9B entra entero en la 3070 (5,5 de 8 GB) y por fin se puede medir sobre los 274:
+
+| | 4B | 9B |
+|---|---:|---:|
+| `G-CITA-PRECISION` | **0,602** | 0,580 |
+| `G-COBERTURA` | **0,528** | 0,495 |
+| `G-ABST-FP` | **0,472** | 0,505 |
+| `G-ABST-FN` | **0,069** | 0,086 |
+| tiempo | **925 s** | 1.638 s |
+
+**El 4B gana las cuatro y tarda la mitad.** Y esto corrige lo que medí ayer con 60 casos, donde
+el 9B parecía mejor en precisión (0,659): era ruido, como dije que podía serlo. Con n=274 no lo
+es. La palanca «modelo más grande» queda cerrada con medidas, no con opinión.
+
+### Qué queda, y qué es exactamente
+
+Tres metas, y dos de ellas son la misma cosa vista dos veces: **la mitad de las preguntas que el
+corpus sí contesta acaban en abstención**, casi siempre porque el modelo escribe un `quote` que
+no aparece literalmente en su artículo. El verificador hace su trabajo; el generador falla al
+copiar.
+
+Eso apunta a una palanca que **no se ha tocado y es la tesis del proyecto un nivel más abajo**:
+si el modelo no puede escribir la referencia y la resuelve el código, ¿por qué escribe el
+fragmento? Podría señalar el tramo y **copiarlo el código**. Va a Q-022 como fase 4.

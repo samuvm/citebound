@@ -157,3 +157,11 @@ def test_los_hilos_por_defecto_son_cuatro_y_tambien_es_una_medida() -> None:
     from citebound.providers.reranker import HILOS_POR_DEFECTO
 
     assert HILOS_POR_DEFECTO == 4
+
+
+def test_el_dispositivo_se_puede_mover_sin_tocar_codigo() -> None:
+    """El dispositivo correcto **depende de dónde viva Ollama** (tabla en el módulo), así que
+    tiene que ser configuración y no una constante: con Ollama en otra máquina, `mps` baja
+    `G-TTFT` de 2.039 a 1.014 ms, y compartiendo máquina lo sube a 3.140."""
+    assert CrossEncoderReranker(dispositivo="mps").dispositivo == "mps"
+    assert CrossEncoderReranker().dispositivo == DISPOSITIVO_POR_DEFECTO

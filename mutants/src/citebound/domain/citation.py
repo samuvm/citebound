@@ -34,6 +34,8 @@ from enum import StrEnum
 from citebound.domain.legalref import LegalRef
 
 __all__ = [
+    "MARCA_CITAS",
+    "MARCA_RESPUESTA",
     "MAX_FUENTES",
     "MIN_CARACTERES_QUOTE",
     "Cita",
@@ -64,6 +66,9 @@ no significaría nada. Doce caracteres es corto para una cita jurídica y largo 
 coincidencia; si algún día estorba, se cambia con el número delante."""
 
 _ESPACIOS = re.compile(r"\s+")
+
+MARCA_RESPUESTA = "RESPUESTA"
+"""Abre la prosa cuando el bloque de citas va primero, que es el orden del prompt v2."""
 
 MARCA_CITAS = "CITAS"
 """La línea que separa la respuesta de sus citas. Va en el prompt y se lee aquí, y tenerla en
@@ -122,6 +127,10 @@ class Motivo(StrEnum):
     QUOTE_VACIO = "quote_vacio"
     QUOTE_DEMASIADO_CORTO = "quote_demasiado_corto"
     SIN_CITAS = "sin_citas"
+    SIN_RELEVANCIA = "sin_relevancia"
+    """Lo recuperado no viene a cuento. **Es distinto de `QUOTE_NO_LITERAL`** y la diferencia
+    importa: este dice «el corpus no lo responde» y aquel dice «el modelo lo escribió mal».
+    Confundirlos manda a arreglar lo que no está roto."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -2101,12 +2110,22 @@ def parsear_borrador(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_orig(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2127,12 +2146,22 @@ def x_parsear_borrador__mutmut_orig(borrador: str) -> tuple[str, tuple[Cita, ...
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_1(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2153,12 +2182,22 @@ def x_parsear_borrador__mutmut_1(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_2(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2179,12 +2218,22 @@ def x_parsear_borrador__mutmut_2(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_3(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2205,12 +2254,22 @@ def x_parsear_borrador__mutmut_3(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_4(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2231,12 +2290,22 @@ def x_parsear_borrador__mutmut_4(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_5(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2257,12 +2326,22 @@ def x_parsear_borrador__mutmut_5(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_6(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2283,12 +2362,22 @@ def x_parsear_borrador__mutmut_6(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_7(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2309,12 +2398,22 @@ def x_parsear_borrador__mutmut_7(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_8(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2335,12 +2434,22 @@ def x_parsear_borrador__mutmut_8(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is not None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_9(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2361,8 +2470,19 @@ def x_parsear_borrador__mutmut_9(borrador: str) -> tuple[str, tuple[Cita, ...]]:
     if corte is None:
         return borrador.strip(), ()
 
-    citas = None
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = None
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_10(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2383,12 +2503,22 @@ def x_parsear_borrador__mutmut_10(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        None,
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=None, quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_11(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2409,12 +2539,21 @@ def x_parsear_borrador__mutmut_11(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(1)), quote=None)
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_12(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2435,12 +2574,21 @@ def x_parsear_borrador__mutmut_12(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_13(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2461,12 +2609,22 @@ def x_parsear_borrador__mutmut_13(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(None, corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(1)), )
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_14(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2487,12 +2645,22 @@ def x_parsear_borrador__mutmut_14(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], None) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(None), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_15(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2513,12 +2681,22 @@ def x_parsear_borrador__mutmut_15(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(None)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_16(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2539,12 +2717,22 @@ def x_parsear_borrador__mutmut_16(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], ) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(2)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_17(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2565,12 +2753,22 @@ def x_parsear_borrador__mutmut_17(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte - 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(None))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_18(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2591,12 +2789,22 @@ def x_parsear_borrador__mutmut_18(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 2 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(None)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_19(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2617,12 +2825,22 @@ def x_parsear_borrador__mutmut_19(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte - 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
-        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(3)))
-        for linea in lineas[corte + 1 :]
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_20(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2643,12 +2861,22 @@ def x_parsear_borrador__mutmut_20(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 2) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte - 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_21(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2669,12 +2897,22 @@ def x_parsear_borrador__mutmut_21(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() != MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 2 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_22(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2695,12 +2933,22 @@ def x_parsear_borrador__mutmut_22(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = None
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
-        if (encontrado := _LINEA_CITA.match(None)) is not None
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_23(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2721,12 +2969,22 @@ def x_parsear_borrador__mutmut_23(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte - 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
-        if (encontrado := _LINEA_CITA.match(linea.strip())) is None
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_24(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2747,12 +3005,22 @@ def x_parsear_borrador__mutmut_24(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 2 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(None).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_25(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2773,12 +3041,22 @@ def x_parsear_borrador__mutmut_25(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "XX\nXX".join(lineas[:corte]).strip(), tuple(citas)
+    return "\n".join(prosa).strip(), tuple(citas)
 
 
 def x_parsear_borrador__mutmut_26(borrador: str) -> tuple[str, tuple[Cita, ...]]:
@@ -2799,12 +3077,774 @@ def x_parsear_borrador__mutmut_26(borrador: str) -> tuple[str, tuple[Cita, ...]]
     if corte is None:
         return borrador.strip(), ()
 
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte - 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
     citas = [
         Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
-        for linea in lineas[corte + 1 :]
+        for linea in zona_citas
         if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
     ]
-    return "\n".join(lineas[:corte]).strip(), tuple(None)
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_27(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 2 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_28(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = None
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_29(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin - 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_30(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 2 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_31(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_32(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = None
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_33(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=None, quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_34(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=None)
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_35(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_36(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), )
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_37(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(None), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_38(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(None)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_39(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(2)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_40(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(None))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_41(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(None)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_42(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(3)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_43(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(None)) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_44(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is None
+    ]
+    return "\n".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_45(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(None).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_46(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "XX\nXX".join(prosa).strip(), tuple(citas)
+
+
+def x_parsear_borrador__mutmut_47(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+    """`(respuesta, citas)` a partir de lo que escribió el modelo.
+
+    **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por
+    eso es tolerante en la forma y estricta en el fondo: acepta tres tipos de comillas y un
+    quote sin ellas, porque pelearse con el prompt por tipografía sale más caro que aceptarla;
+    pero no inventa un bloque de citas que no esté. Sin bloque salen cero citas, el verificador
+    dice `SIN_CITAS` y eso dispara un reintento con el motivo delante — que es mejor que una
+    abstención sin explicar.
+
+    El marcador `CITAS` es **una línea entera y solo eso**, para que «según las CITAS del
+    reglamento» dentro de la respuesta no abra el bloque.
+    """
+    lineas = borrador.splitlines()
+    corte = next((i for i, x in enumerate(lineas) if x.strip() == MARCA_CITAS), None)
+    if corte is None:
+        return borrador.strip(), ()
+
+    # Los dos órdenes. Con `RESPUESTA` detrás de `CITAS`, la prosa es lo que va después; sin
+    # él, lo que va antes. Aceptar ambos cuesta tres líneas y evita que un cambio de prompt
+    # rompa el parseo de todo lo grabado hasta ahora.
+    fin = next(
+        (i for i, x in enumerate(lineas[corte + 1 :], corte + 1) if x.strip() == MARCA_RESPUESTA),
+        None,
+    )
+    zona_citas = lineas[corte + 1 : fin] if fin is not None else lineas[corte + 1 :]
+    prosa = lineas[fin + 1 :] if fin is not None else lineas[:corte]
+
+    citas = [
+        Cita(n=int(encontrado.group(1)), quote=_desentrecomillar(encontrado.group(2)))
+        for linea in zona_citas
+        if (encontrado := _LINEA_CITA.match(linea.strip())) is not None
+    ]
+    return "\n".join(prosa).strip(), tuple(None)
 
 mutants_x_parsear_borrador__mutmut['_mutmut_orig'] = x_parsear_borrador__mutmut_orig # type: ignore # mutmut generated
 mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_1'] = x_parsear_borrador__mutmut_1 # type: ignore # mutmut generated
@@ -2833,6 +3873,27 @@ mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_23'] = x_parsear_
 mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_24'] = x_parsear_borrador__mutmut_24 # type: ignore # mutmut generated
 mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_25'] = x_parsear_borrador__mutmut_25 # type: ignore # mutmut generated
 mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_26'] = x_parsear_borrador__mutmut_26 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_27'] = x_parsear_borrador__mutmut_27 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_28'] = x_parsear_borrador__mutmut_28 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_29'] = x_parsear_borrador__mutmut_29 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_30'] = x_parsear_borrador__mutmut_30 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_31'] = x_parsear_borrador__mutmut_31 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_32'] = x_parsear_borrador__mutmut_32 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_33'] = x_parsear_borrador__mutmut_33 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_34'] = x_parsear_borrador__mutmut_34 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_35'] = x_parsear_borrador__mutmut_35 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_36'] = x_parsear_borrador__mutmut_36 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_37'] = x_parsear_borrador__mutmut_37 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_38'] = x_parsear_borrador__mutmut_38 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_39'] = x_parsear_borrador__mutmut_39 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_40'] = x_parsear_borrador__mutmut_40 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_41'] = x_parsear_borrador__mutmut_41 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_42'] = x_parsear_borrador__mutmut_42 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_43'] = x_parsear_borrador__mutmut_43 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_44'] = x_parsear_borrador__mutmut_44 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_45'] = x_parsear_borrador__mutmut_45 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_46'] = x_parsear_borrador__mutmut_46 # type: ignore # mutmut generated
+mutants_x_parsear_borrador__mutmut['x_parsear_borrador__mutmut_47'] = x_parsear_borrador__mutmut_47 # type: ignore # mutmut generated
 mutants_x__desentrecomillar__mutmut: MutantDict = {}  # type: ignore
 
 

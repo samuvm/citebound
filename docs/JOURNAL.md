@@ -2045,3 +2045,73 @@ prefill**; en el bench cada pregunta trae un prompt nuevo y todas pagan el caso 
 La regla, ya con cuatro datos: **una latencia medida sobre una entrada repetida no dice nada
 sobre una carga real.** Vale para el primer token (81 ms aislado contra 1.200 reales), para el
 9B, para la ventana del reordenador y para esto.
+
+## 2026-08-21 · fase 3 · cuatro experimentos para cerrar `G-TTFT`, y por qué no se cierra
+
+El portero de relevancia arregla `G-ABST-FN` (0,724 → 0,155) y cuesta `G-TTFT`. Cuatro intentos
+de quedarse con lo primero sin pagar lo segundo. **Tres salieron que no**, y eso también es un
+resultado: queda escrito para que nadie los reintente a ciegas.
+
+### 1 · Un portero más barato · NO
+
+El portero solo usa `max(...)` de las cinco puntuaciones, así que parecía obvio que se podía
+comprar más barato. Se midieron ocho configuraciones sobre los 274 casos, más la señal **gratis**
+—la distancia vectorial, que ya está calculada— con el mismo criterio de umbral que se usó para
+elegir 0,10:
+
+| señal | `ABST-FP` | `ABST-FN` | ms/caso |
+|---|---:|---:|---:|
+| distancia vectorial (gratis) | 0,296 | 0,621 | **0** |
+| **cross 5×500** | **0,083** | **0,172** | 303 |
+| cross 3×500 | 0,102 | 0,190 | 208 |
+| cross 5×200 | 0,097 | 0,224 | 186 |
+| cross 3×200 | 0,102 | 0,207 | 124 |
+| cross 1×200 | 0,167 | 0,328 | 80 |
+
+La señal gratis **no separa**. Y ninguna configuración más barata gana: todas empeoran **las dos
+columnas a la vez**, que es lo que hace la decisión fácil. El portero de 5×500 es el que hay.
+
+### 2 · Cuatro hilos en vez de catorce · SÍ, ~200 ms
+
+PyTorch coge los 14 núcleos y deja a Ollama sin CPU para su lado del trabajo. Tres pares
+alternados, misma dirección las tres veces: 5.835→5.634, 2.225→2.039, 2.541→2.095. Con 2 hilos
+se hunde a 4.166 porque puntuar pasa a ser el cuello.
+
+**Y el dato importante no es ese**: el salto entre pares —5,8 s contra 2,2 s **con la misma
+configuración**— es estado de la máquina. Por eso se comparan pares alternados y no corridas
+sueltas. Una comparación A/B de latencia en esta máquina sin alternar no vale nada.
+
+### 3 · Solapar el portero con el generador · NO, y estrepitosamente
+
+Puntuar (~300 ms de CPU) y el primer token (~1.100 ms de GPU) no dependen el uno del otro:
+solapados deberían dar el máximo en vez de la suma. Se implementó —hilo, buzón, cierre de la
+corriente descartada— y dio **8.008 ms contra 2.039**. Hasta el `G-TTFS`, que la especulación ni
+toca, subió de 161 a 2.023.
+
+La causa: **cerrar el stream del lado del cliente no impide que Ollama termine lo que ya
+empezó.** En los negativos se arranca una generación que se tira, y esa congestiona a las
+peticiones siguientes. Se vio en el bench **siguiente**, doce minutos después de terminar el
+experimento — ese es el par 1 de la tabla de arriba, y su 5,8 s no era ruido: era la resaca.
+
+Es la misma cicatriz del `corriente.close()` del bench, en un sitio nuevo. Revertido.
+
+### 4 · Un generador más grande · NO decide nada, y cuesta 27×
+
+60 casos positivos, mismo corpus y mismo prompt:
+
+| | `G-CITA-PRECISION` | `G-COBERTURA` | `G-ABST-FP` | tiempo |
+|---|---:|---:|---:|---:|
+| `qwen3.5:4b-mlx` | 0,545 | **0,733** | **0,267** | 33 s (caché) |
+| `qwen3.5:9b-mlx` | **0,659** | 0,683 | 0,317 | **909 s** |
+| umbral | 0,85 | 0,90 | 0,05 | |
+
+El 9B **cita mejor cuando responde y responde menos veces**: la pareja atómica se mueve en
+direcciones opuestas, que es exactamente para lo que existe. Con n=60 esas diferencias están
+dentro del intervalo, así que la lectura honesta es **que no decide**. Y son 15 s por caso
+contra 0,5: `G-TTFT` sería mucho peor, no mejor.
+
+**El tamaño del generador no es la palanca que lleva de 0,55 a 0,85.**
+
+### Dónde queda la fase 3
+
+Cinco metas en rojo y ninguna se arregla con más ingeniería de la que cabe aquí. Va a Q-022.

@@ -22,13 +22,20 @@ se testea contra la grabación.
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from typing import Any, Protocol
 
 import httpx
 
-__all__ = ["ChatError", "Generador", "OpenAICompatProvider", "Respuesta", "generador_por_defecto"]
+__all__ = [
+    "ChatError",
+    "Generador",
+    "OpenAICompatProvider",
+    "RecordedGenerador",
+    "Respuesta",
+    "generador_por_defecto",
+]
 
 _BASE_POR_DEFECTO = "http://localhost:11434/v1"
 _MODELO_POR_DEFECTO = "qwen3.5:4b-mlx"
@@ -62,6 +69,10 @@ class Generador(Protocol):
         self, prompt: str, *, max_tokens: int = 256, temperatura: float = 0.0
     ) -> Respuesta: ...
 
+    def emitir(
+        self, prompt: str, *, max_tokens: int = 256, temperatura: float = 0.0
+    ) -> Iterator[str]: ...
+
 
 class OpenAICompatProvider:
     """Un `POST /v1/chat/completions` y la validación de lo que vuelve."""
@@ -91,6 +102,42 @@ class OpenAICompatProvider:
         )
         respuesta.raise_for_status()
         return _leer(respuesta.json(), esperado=self._model)
+
+    def emitir(
+        self, prompt: str, *, max_tokens: int = 256, temperatura: float = 0.0
+    ) -> Iterator[str]:
+        """Los trozos según llegan. **Es lo que hace que `G-TTFT` mida lo que dice medir.**
+
+        Sin esto el primer `event: token` saldría cuando el modelo hubiera terminado de
+        escribir, y el `p95 hasta el primer token` sería en realidad el tiempo de generación
+        completa — un número que cumple el nombre de la meta y no su intención.
+        """
+        import json as _json
+
+        import httpx
+
+        cuerpo = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": temperatura,
+            "max_tokens": max_tokens,
+            "reasoning_effort": "none",
+            "stream": True,
+        }
+        try:
+            with httpx.stream(
+                "POST",
+                f"{self._base_url}/chat/completions",
+                json=cuerpo,
+                timeout=self._timeout,
+            ) as respuesta:
+                respuesta.raise_for_status()
+                for linea in respuesta.iter_lines():
+                    trozo = _trozo_sse(linea, _json)
+                    if trozo:
+                        yield trozo
+        except httpx.HTTPError as err:
+            raise ChatError(f"{self._model} en {self._base_url} no respondió: {err}") from err
 
 
 def _leer(cuerpo: object, *, esperado: str) -> Respuesta:
@@ -144,6 +191,16 @@ class RecordedGenerador:
         self._i += 1
         return self._respuestas[self._i - 1]
 
+    def emitir(
+        self, prompt: str, *, max_tokens: int = 256, temperatura: float = 0.0
+    ) -> Iterator[str]:
+        """Trocea la grabación como llegaría por red. **No imita al tokenizador del modelo** —
+        eso dependería del modelo— sino que da una entrada troceada realista al guardia, y lo
+        que el guardia garantiza no depende de dónde caigan los cortes."""
+        import re as _re
+
+        yield from _re.findall(r"\S+\s*|\s+", self.completar(prompt).texto)
+
 
 def generador_por_defecto() -> Generador:
     """El de verdad, configurado desde el entorno.
@@ -155,3 +212,22 @@ def generador_por_defecto() -> Generador:
         base_url=os.environ.get("OPENAI_BASE_URL", _BASE_POR_DEFECTO),
         model=os.environ.get("CITEBOUND_MODELO", _MODELO_POR_DEFECTO),
     )
+
+
+def _trozo_sse(linea: str, _json: Any) -> str:
+    """El `delta.content` de una línea `data:` del stream, o `""` si no lo trae.
+
+    Se ignora en silencio lo que no es contenido —`[DONE]`, líneas vacías, el primer *chunk*
+    con el rol— porque son parte del protocolo y no un error. Lo que sí sería un error es
+    reventar aquí y dejar la petición sin respuesta por una línea de control.
+    """
+    if not linea.startswith("data:"):
+        return ""
+    carga = linea[5:].strip()
+    if not carga or carga == "[DONE]":
+        return ""
+    try:
+        trozos = _json.loads(carga).get("choices") or [{}]
+    except ValueError:
+        return ""
+    return str((trozos[0].get("delta") or {}).get("content") or "")

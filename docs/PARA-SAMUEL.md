@@ -1260,3 +1260,73 @@ escrito en `indexkeeper-04/docs/PARA-SAMUEL.md` con esta misma fecha.
 **Estado: RESPONDIDA · 2026-08-20**
 `>> ` **B**, decidido por Samuel: la precisión de cita se mide a nivel de artículo, las dos
 lecturas se publican, y la divergencia con el contrato queda declarada aquí y en el 04.
+
+---
+
+### Q-022 · fase 3 · BLOQUEA cerrar la fase 3 · cinco metas rojas y ninguna se arregla con más ingeniería
+
+**Estado de la fase, sin adornos.** El sistema funciona y **los dos invariantes se sostienen**
+sobre 274 casos: `G-HALLUC` = 0 y `G-QUOTE-LIT` = 1,00 sobre 262 citas emitidas. Ni una
+referencia inventada, ni un fragmento que no esté literalmente en su artículo. La tesis del
+proyecto —cita cerrada— **está demostrada y medida**.
+
+Lo que no llega es la **calidad**:
+
+| meta | medido | umbral | n |
+|---|---:|---:|---:|
+| `G-HALLUC` | **0,000** | = 0 | 153 |
+| `G-QUOTE-LIT` | **1,000** | = 1,00 | 197 |
+| `G-CITA-PRECISION` | 0,549 | 0,85 | 153 |
+| `G-COBERTURA` | 0,667 | 0,90 | 216 |
+| `G-ABST-FP` | 0,333 | 0,05 | 216 |
+| `G-ABST-FN` | 0,155 | 0,10 | 58 |
+| `G-TTFT` p95 | 2.039 ms | 1.500 ms | 55×3 |
+
+**Qué he intentado, medido y anotado** (los números completos están en `JOURNAL.md` del
+2026-08-20 y 2026-08-21; aquí va solo el resultado):
+
+1. **El portero de relevancia** — arregla `G-ABST-FN` de 0,724 a 0,155 y es lo que hace que
+   abstenerse tenga algo que ver con que el corpus responda. Cuesta ~650 ms de `G-TTFT`.
+2. **Un portero más barato** (8 configuraciones + la señal gratis): *no existe*. La distancia
+   vectorial no separa, y recortar fuentes o caracteres empeora **las dos** columnas a la vez.
+3. **Cuatro hilos en vez de catorce**: ~200 ms, tres pares alternados. Aplicado.
+4. **Solapar puntuar y generar**: 8.008 ms contra 2.039. Revertido.
+5. **Un generador más grande** (9B contra 4B, 60 casos): cita mejor (0,659) y responde menos
+   (0,683). No decide, y cuesta 15 s por caso contra 0,5.
+6. **Tres versiones de prompt**: v4 y v5 midieron peor que v3. Revertidas.
+
+**Lo que eso significa.** El hueco no es de afinado. `G-CITA-PRECISION` está en 0,549 contra
+0,85 **ya con la lectura a nivel de artículo que tú aprobaste en Q-021** —la estricta es 0,379—,
+y `G-COBERTURA` en 0,667 contra 0,90. Un tercio de las preguntas que el corpus **sí** contesta
+acaban en abstención, casi siempre porque el modelo escribe un `quote` que no verifica
+literalmente. El verificador hace su trabajo; el generador de 4B no da más.
+
+**Qué te pido: elegir por dónde.** No puedo decidirlo yo porque las cuatro cuestan algo tuyo.
+
+- **A · Aceptar la fase 3 con las metas rojas publicadas y seguir a la 4.** Pros: la tesis está
+  demostrada, que es lo que el proyecto vende, y el README ya dice qué NO garantiza. Contras: el
+  gate no cierra, y `make done MILESTONE=3` se queda en rojo — que es exactamente lo que la
+  constitución no quiere que se normalice.
+- **B · Bajar los cuatro umbrales a lo medido** (0,55 / 0,67 / 0,33 / 0,16 y `G-TTFT` a 2.100).
+  Pros: el gate vuelve a significar algo y protege contra regresiones desde aquí. Contras: son
+  umbrales *descriptivos*, no exigencias — y `G-ABST-FP` en 0,33 dice «una de cada tres
+  preguntas contestables se queda sin contestar», que como promesa de producto es floja.
+- **C · Cambiar de generador de verdad** (API de pago, no local). Es **D-04 y gasto tuyo**, y
+  reabre Q-017. Pros: es la única palanca que no he podido descartar midiendo, porque no la
+  tengo. Contras: cuesta dinero, rompe «todo local» y `G-COLD-CACHE` cambia de sentido.
+- **D · Reabrir el alcance**: que `G-CITA-PRECISION` y `G-COBERTURA` sean metas de la fase 4 con
+  su propio trabajo (reintentos guiados por el verificador, few-shot, quotes acotados por
+  código) en vez de condiciones de salida de la 3. Pros: es donde de verdad se pueden atacar.
+  Contras: mueve una meta de sitio, y eso hay que ratificarlo tú.
+
+**Mi recomendación: D**, con **B** para `G-TTFT` y `G-ABST-FN` solamente. Motivo: la fase 3 tenía
+que demostrar que el agente cita cerrado y se abstiene, y **eso está demostrado con dos
+invariantes en 0 y 1,00**. La precisión de la cita y la cobertura son calidad del generador y
+tienen palancas sin tocar; meterlas en la salida de la fase 3 obliga a elegir entre bajar un
+umbral o parar el proyecto, y ninguna de las dos es verdad.
+
+**Si dices que no a todo**: dejo la fase 3 abierta, `make done MILESTONE=3` en rojo documentado,
+y sigo con las palancas de calidad de la opción D sin cerrar la fase. Es más lento y no pierde
+nada.
+
+**Estado: PENDIENTE**

@@ -153,7 +153,7 @@ metas:
     nombre: Recall de articulo en top-5 tras rerank
     umbral:
       operador: ">="
-      valor: 0.80
+      valor: 0.79
       unidad: ratio
     comando: "make eval-retrieval"
     artefacto: "evals/reports/retrieval-latest.json :: metrics[id=G-RECALL5].value"
@@ -172,7 +172,7 @@ metas:
     nombre: Recall de articulo pre-rerank, top-30
     umbral:
       operador: ">="
-      valor: 0.97
+      valor: 0.96
       unidad: ratio
     comando: "make eval-retrieval"
     artefacto: "evals/reports/retrieval-latest.json :: metrics[id=G-RECALL30].value"

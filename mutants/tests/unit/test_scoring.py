@@ -36,6 +36,7 @@ from citebound.evals.scoring import (
     alucinacion,
     cobertura,
     precision_cita,
+    precision_cita_articulo,
     recall_at_k,
 )
 
@@ -622,3 +623,87 @@ def test_la_precision_de_cita_divide_entre_los_respondidos_y_no_multiplica() -> 
     metrica = precision_cita(casos, prediccion)
     assert metrica.valor == pytest.approx(0.75)  # 3/4, no 3*4
     assert metrica.n == 4
+
+
+# ======================================================================================
+# Precisión de cita a nivel de artículo · Q-021, la divergencia declarada
+# ======================================================================================
+#
+# El contrato compartido dice que si el golden set especifica apartado, la cita **debe**
+# incluirlo. Medido el 2026-08-20, ese nivel es inalcanzable y no por el modelo: el apartado
+# exacto está entre las cinco fuentes ofrecidas en el 39 % de los casos, y entre doce sin
+# colapsar en el 56 %. El umbral es 0,85. No es que el generador cite mal — es que no se le
+# ofrece lo que se le exige citar.
+#
+# Samuel eligió medir también la precisión de cita **a nivel de artículo** (Q-021), que es la
+# misma lectura que ya había elegido para el recall en Q-016. Se publican **las dos**, igual
+# que con el recall: la honestidad no está en elegir el número bueno, está en enseñar los dos.
+
+
+def test_a_nivel_de_articulo_una_cita_sin_apartado_vale() -> None:
+    """`art34` cuando el golden set dice `art34.1`. Con la lectura estricta es fallo; con
+    esta, acierto — y la diferencia entre las dos es exactamente lo que Q-021 declara."""
+    uno = caso("gs-1", "RD-1428/2003#art34.1")
+    pred = [Prediccion(caso_id="gs-1", refs=(parse("RD-1428/2003#art34"),))]
+    assert precision_cita([uno], pred).valor == 0.0
+    assert precision_cita_articulo([uno], pred).valor == 1.0
+
+
+def test_a_nivel_de_articulo_el_apartado_equivocado_tambien_vale() -> None:
+    """`art34.2` cuando lo correcto es `art34.1`. **Esto es lo que se pierde** al bajar el
+    nivel, y por eso se dice en voz alta: el sistema puede señalar el apartado de al lado y
+    la métrica no lo verá."""
+    uno = caso("gs-1", "RD-1428/2003#art34.1")
+    pred = [Prediccion(caso_id="gs-1", refs=(parse("RD-1428/2003#art34.2"),))]
+    assert precision_cita([uno], pred).valor == 0.0
+    assert precision_cita_articulo([uno], pred).valor == 1.0
+
+
+def test_a_nivel_de_articulo_otro_articulo_sigue_siendo_fallo() -> None:
+    """Lo que **no** cambia: citar el 35 cuando la respuesta es el 34 es fallo en las dos
+    lecturas. Bajar la granularidad no es dejar de medir."""
+    uno = caso("gs-1", "RD-1428/2003#art34.1")
+    pred = [Prediccion(caso_id="gs-1", refs=(parse("RD-1428/2003#art35.1"),))]
+    assert precision_cita_articulo([uno], pred).valor == 0.0
+
+
+def test_a_nivel_de_articulo_una_cita_buena_y_una_de_mas_sigue_siendo_fallo() -> None:
+    """La regla de todo o nada del contrato no se toca: lo que cambia es la granularidad,
+    no la exigencia de que **todas** las citas pertenezcan a R(q)."""
+    uno = caso("gs-1", "RD-1428/2003#art34.1")
+    pred = [
+        Prediccion(
+            caso_id="gs-1",
+            refs=(parse("RD-1428/2003#art34"), parse("RD-1428/2003#art99")),
+        )
+    ]
+    assert precision_cita_articulo([uno], pred).valor == 0.0
+
+
+def test_a_nivel_de_articulo_las_abstenciones_siguen_fuera_del_denominador() -> None:
+    casos = [caso("gs-1", "RD-1428/2003#art34.1"), caso("gs-2", "RD-1428/2003#art35")]
+    pred = [
+        Prediccion(caso_id="gs-1", refs=(parse("RD-1428/2003#art34"),)),
+        Prediccion(caso_id="gs-2", abstenida=True),
+    ]
+    metrica = precision_cita_articulo(casos, pred)
+    assert metrica.n == 1
+    assert metrica.valor == 1.0
+
+
+def test_la_lectura_de_articulo_nunca_es_peor_que_la_estricta() -> None:
+    """Propiedad de las dos lecturas: recortar el apartado solo puede convertir fallos en
+    aciertos, nunca al revés. Si alguna vez fuera al revés, una de las dos estaría mal."""
+    casos = [
+        caso("gs-1", "RD-1428/2003#art34.1"),
+        caso("gs-2", "RD-1428/2003#art35.2"),
+        caso("gs-3", "RD-1428/2003#art36"),
+    ]
+    pred = [
+        Prediccion(caso_id="gs-1", refs=(parse("RD-1428/2003#art34"),)),
+        Prediccion(caso_id="gs-2", refs=(parse("RD-1428/2003#art35.2"),)),
+        Prediccion(caso_id="gs-3", refs=(parse("RD-1428/2003#art99"),)),
+    ]
+    estricta = precision_cita(casos, pred).valor or 0.0
+    articulo = precision_cita_articulo(casos, pred).valor or 0.0
+    assert articulo >= estricta

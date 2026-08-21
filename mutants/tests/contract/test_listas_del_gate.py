@@ -82,3 +82,36 @@ def test_lo_excluido_de_cobertura_no_puede_exigir_tdd_a_la_vez() -> None:
         assert not any(ruta.startswith(e.rstrip("/")) for e in excluido), (
             f"{ruta} exige TDD y está excluido de cobertura: el gate se contradice"
         )
+
+
+def test_lo_que_los_tests_importan_esta_en_also_copy() -> None:
+    """**La quinta vez que `[tool.mutmut].also_copy` se quedó corto, y la primera que se caza.**
+
+    mutmut copia el repositorio a `mutants/` y corre la suite **allí**. Lo que no esté en
+    `also_copy` no existe en esa copia, y el fallo no se parece a lo que es: no dice «falta
+    `ui/`», dice `ModuleNotFoundError` en la colección y `G-MUT` no llega a medirse.
+
+    Ya pasó con `docs/RULES.md`, con `prompts/` y con `ui/`. El patrón es siempre el mismo —un
+    test nuevo lee algo de disco— así que lo que se comprueba es justo eso: **todo paquete de
+    primer nivel que la suite importa tiene que viajar a la copia.**
+    """
+    copiado = {c.rstrip("/") for c in _pyproject()["tool"]["mutmut"]["also_copy"]}  # type: ignore[index,call-overload]
+    # **Sin exigir `__init__.py`.** `ui/` no lo tiene —es un paquete de espacio de nombres— y
+    # exigirlo dejaba fuera justo el caso que este test viene a cazar: escrito así, pasaba en
+    # verde sobre la configuración rota. Un directorio con `.py` dentro es importable y basta.
+    paquetes = {
+        d.name
+        for d in RAIZ.iterdir()
+        if d.is_dir() and not d.name.startswith(".") and any(d.glob("*.py"))
+    }
+    importados = set()
+    for test in (RAIZ / "tests").rglob("test_*.py"):
+        texto = test.read_text(encoding="utf-8")
+        for paquete in paquetes:
+            if re.search(rf"^\s*(from|import)\s+{re.escape(paquete)}\b", texto, re.MULTILINE):
+                importados.add(paquete)
+    faltan = sorted(importados - copiado - {"src", "tests"})
+    assert not faltan, (
+        f"la suite importa {faltan} y `[tool.mutmut].also_copy` no los copia: "
+        "`make mutation` reventará en la colección y G-MUT no se medirá"
+    )

@@ -23,7 +23,7 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from citebound.domain.legalref import LegalRef, matches
+from citebound.domain.legalref import LegalRef, MatchLevel, matches
 
 from .schema import CasoGolden, Tipo
 
@@ -36,6 +36,7 @@ __all__ = [
     "cita_pertenece",
     "cobertura",
     "precision_cita",
+    "precision_cita_articulo",
     "recall_at_k",
 ]
 
@@ -4381,3 +4382,1354 @@ mutants_x__emparejar__mutmut['x__emparejar__mutmut_9'] = x__emparejar__mutmut_9 
 mutants_x__emparejar__mutmut['x__emparejar__mutmut_10'] = x__emparejar__mutmut_10 # type: ignore # mutmut generated
 mutants_x__emparejar__mutmut['x__emparejar__mutmut_11'] = x__emparejar__mutmut_11 # type: ignore # mutmut generated
 mutants_x__emparejar__mutmut['x__emparejar__mutmut_12'] = x__emparejar__mutmut_12 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut: MutantDict = {}  # type: ignore
+
+
+@_mutmut_mutated(mutants_x_precision_cita_articulo__mutmut)
+def precision_cita_articulo(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_orig(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_1(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = None
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_2(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(None, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_3(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, None)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_4(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_5(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, )
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_6(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = None
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_7(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_8(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_9(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica(None, None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_10(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, None)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_11(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica(None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_12(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_13(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, )
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_14(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("XXG-CITA-PRECISIONXX", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_15(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("g-cita-precision", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_16(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 1)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_17(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = None
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_18(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        None
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_19(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        2
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_20(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs or all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_21(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            None
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_22(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(None)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_23(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(None, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_24(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, None, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_25(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, None) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_26(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_27(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_28(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, ) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_29(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica(None, aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_30(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", None, len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_31(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), None)
+
+
+def x_precision_cita_articulo__mutmut_32(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica(aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_33(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_34(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos / len(respondidos), )
+
+
+def x_precision_cita_articulo__mutmut_35(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("XXG-CITA-PRECISIONXX", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_36(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("g-cita-precision", aciertos / len(respondidos), len(respondidos))
+
+
+def x_precision_cita_articulo__mutmut_37(casos: Sequence[CasoGolden], pred: Sequence[Prediccion]) -> Metrica:
+    """La misma métrica, comparando **a nivel de artículo**. Q-021, decidido por Samuel.
+
+    **Es una divergencia declarada con `docs/CONTRACTS/retrieval-metrics.md`**, que dice que si
+    el golden set especifica apartado la cita debe incluirlo. Se sostiene sobre una medida: el
+    apartado exacto está entre las cinco fuentes que se le ofrecen al generador en el **39 %**
+    de los casos, y entre doce sin colapsar en el **56 %**, contra un umbral de 0,85. No es que
+    el generador cite mal — **es que no se le ofrece lo que se le exige citar**.
+
+    Es además la misma lectura que Q-016 eligió para el recall, y resolver la misma pregunta
+    distinto en dos sitios es lo que crea las contradicciones que este proyecto lleva dos fases
+    pagando.
+
+    **Lo que se pierde, dicho en voz alta:** con esta lectura, citar `art34.2` cuando lo
+    correcto es `art34.1` cuenta como acierto. El sistema puede señalar el apartado de al lado
+    y la métrica no lo verá. Por eso se publican **las dos** y el informe dice cuál se compara
+    contra el umbral, igual que hace `make eval-retrieval` desde la fase 2.
+    """
+    emparejado = _emparejar(casos, pred)
+    respondidos = [(c, p) for c, p in emparejado if not p.abstenida]
+    if not respondidos:
+        return Metrica("G-CITA-PRECISION", None, 0)
+    aciertos = sum(
+        1
+        for caso, prediccion in respondidos
+        if prediccion.refs
+        and all(
+            any(matches(cita, r, MatchLevel.ARTICULO) for r in caso.refs)
+            for cita in prediccion.refs
+        )
+    )
+    return Metrica("G-CITA-PRECISION", aciertos * len(respondidos), len(respondidos))
+
+mutants_x_precision_cita_articulo__mutmut['_mutmut_orig'] = x_precision_cita_articulo__mutmut_orig # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_1'] = x_precision_cita_articulo__mutmut_1 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_2'] = x_precision_cita_articulo__mutmut_2 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_3'] = x_precision_cita_articulo__mutmut_3 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_4'] = x_precision_cita_articulo__mutmut_4 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_5'] = x_precision_cita_articulo__mutmut_5 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_6'] = x_precision_cita_articulo__mutmut_6 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_7'] = x_precision_cita_articulo__mutmut_7 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_8'] = x_precision_cita_articulo__mutmut_8 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_9'] = x_precision_cita_articulo__mutmut_9 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_10'] = x_precision_cita_articulo__mutmut_10 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_11'] = x_precision_cita_articulo__mutmut_11 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_12'] = x_precision_cita_articulo__mutmut_12 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_13'] = x_precision_cita_articulo__mutmut_13 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_14'] = x_precision_cita_articulo__mutmut_14 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_15'] = x_precision_cita_articulo__mutmut_15 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_16'] = x_precision_cita_articulo__mutmut_16 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_17'] = x_precision_cita_articulo__mutmut_17 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_18'] = x_precision_cita_articulo__mutmut_18 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_19'] = x_precision_cita_articulo__mutmut_19 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_20'] = x_precision_cita_articulo__mutmut_20 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_21'] = x_precision_cita_articulo__mutmut_21 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_22'] = x_precision_cita_articulo__mutmut_22 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_23'] = x_precision_cita_articulo__mutmut_23 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_24'] = x_precision_cita_articulo__mutmut_24 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_25'] = x_precision_cita_articulo__mutmut_25 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_26'] = x_precision_cita_articulo__mutmut_26 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_27'] = x_precision_cita_articulo__mutmut_27 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_28'] = x_precision_cita_articulo__mutmut_28 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_29'] = x_precision_cita_articulo__mutmut_29 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_30'] = x_precision_cita_articulo__mutmut_30 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_31'] = x_precision_cita_articulo__mutmut_31 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_32'] = x_precision_cita_articulo__mutmut_32 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_33'] = x_precision_cita_articulo__mutmut_33 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_34'] = x_precision_cita_articulo__mutmut_34 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_35'] = x_precision_cita_articulo__mutmut_35 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_36'] = x_precision_cita_articulo__mutmut_36 # type: ignore # mutmut generated
+mutants_x_precision_cita_articulo__mutmut['x_precision_cita_articulo__mutmut_37'] = x_precision_cita_articulo__mutmut_37 # type: ignore # mutmut generated

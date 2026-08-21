@@ -35,8 +35,10 @@ class Evento(StrEnum):
     """Los siete del contrato, y ninguno más."""
 
     SOURCES = "sources"
-    # `noqa: S105` con motivo: es el nombre del evento del contrato SSE, no una credencial.
-    TOKEN = "token"  # noqa: S105
+    # `noqa: S105` y `nosec` con motivo: es el nombre del evento del contrato SSE, no una
+    # credencial, y el nombre lo fija `docs/CONTRACTS/`, no este fichero. Van los dos porque
+    # ruff y bandit no comparten supresión y el gate ejecuta a los dos.
+    TOKEN = "token"  # noqa: S105  # nosec B105
     RETRACT = "retract"
     CITATIONS = "citations"
     ABSTAIN = "abstain"

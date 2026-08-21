@@ -236,6 +236,11 @@ also_copy = [
   # `prompts/` entra desde la fase 3: R5 los saca del codigo, asi que los tests que comprueban
   # la regla leen ficheros de verdad y sin ellos la corrida de mutacion ni siquiera arranca.
   "prompts/",
+  # `ui/` por lo mismo: `tests/contract/test_ui_frontera.py` hace `from ui.cliente import ...`,
+  # y sin el paquete la coleccion entera revienta antes del primer mutante. Es la QUINTA vez
+  # que esta lista se queda corta en silencio; ahora hay un test que lo caza (ver
+  # tests/contract/test_listas_del_gate.py).
+  "ui/",
 ]
 # La suite de mutacion corre sin integracion: levantar Postgres por cada mutante
 # multiplicaria minutos por cientos y el gate se acabaria desactivando.

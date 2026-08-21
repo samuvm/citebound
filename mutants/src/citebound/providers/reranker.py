@@ -22,7 +22,7 @@ grabar primero y testear contra la grabación — de ahí `RecordedReranker`.
 from __future__ import annotations
 
 import os
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -30,12 +30,14 @@ from citebound.retrieval.vector import Recuperado
 
 __all__ = [
     "CARACTERES_POR_CANDIDATO",
+    "DISPOSITIVO_POR_DEFECTO",
     "INSTRUCCION",
     "MODELO_POR_DEFECTO",
     "CrossEncoderReranker",
     "RecordedReranker",
     "RerankerError",
     "ordenar_por_puntos",
+    "puntuador_por_defecto",
     "reordenador_por_defecto",
 ]
 
@@ -77,6 +79,41 @@ Medido sobre un par de ejemplo, la distancia entre el artículo correcto y su ve
 **2,0 con la genérica a 5,5 con esta**. El efecto sobre el recall está en `docs/JOURNAL.md`.
 """
 
+DISPOSITIVO_POR_DEFECTO = "cpu"
+"""**CPU y no MPS, y es contraintuitivo hasta que se mide.**
+
+El cross-encoder corre en proceso con PyTorch; Ollama sirve el generador en la misma GPU. Cuando
+los dos se pelean por ella, puntuar es más rápido y **responder es mucho más lento**:
+
+| dispositivo | puntuar 5 | primer token después | total |
+|---|---:|---:|---:|
+| `mps` | 161 ms | 1.598 ms | 1.759 ms |
+| **`cpu`** | 313 ms | **255 ms** | **569 ms** |
+
+En MPS la contienda cuesta ~1,3 s de `G-TTFT`. Medirlo por separado no lo enseña: aislado, el
+puntuador en MPS parece el doble de rápido. Es exactamente el coste escondido del «segundo
+camino de servir modelos» que Q-017 temía, ahora medido desde el otro lado.
+
+`mps` y `cuda` siguen disponibles por `CITEBOUND_RERANKER_DEVICE`: en una máquina con GPU
+dedicada al reranker la aritmética es otra."""
+
+HILOS_POR_DEFECTO = int(os.environ.get("CITEBOUND_HILOS_PUNTUADOR", "4"))
+"""Cuántos hilos de CPU se le dejan a PyTorch. `0` = los que quiera (14 en esta máquina).
+
+**Cuatro, y es una medida.** PyTorch coge por defecto los 14 y deja a Ollama sin CPU para su
+lado del trabajo. Tres pares de `make bench` alternados, misma dirección las tres veces:
+
+| `G-TTFT` p95 | 14 hilos | 4 hilos |
+|---|---:|---:|
+| par 1 | 5.835 ms | 5.634 ms |
+| par 2 | 2.225 ms | 2.039 ms |
+| par 3 | 2.541 ms | 2.095 ms |
+
+Con 2 hilos se hunde a 4.166: puntuar pasa a ser el cuello. Y el salto entre pares —5.8 s
+contra 2.2 s con la MISMA configuración— es estado de la máquina, no del código: el par 1 corrió
+detrás de un experimento que dejó generaciones abandonadas. **Por eso se comparan pares
+alternados y no corridas sueltas.**"""
+
 _TOPE = 30
 """Cuántos candidatos se reordenan. Con 10 el techo medido era 0,785 y con 30 es 0,977: el 17 %
 de los casos tenía el artículo correcto en los puestos 11-30 y el reordenador ni los miraba."""
@@ -116,10 +153,11 @@ class CrossEncoderReranker:
     """
 
     modelo: str = MODELO_POR_DEFECTO
-    dispositivo: str = "mps"
+    dispositivo: str = DISPOSITIVO_POR_DEFECTO
     tope: int = _TOPE
     caracteres: int = CARACTERES_POR_CANDIDATO
     instruccion: str = INSTRUCCION
+    hilos: int = HILOS_POR_DEFECTO
     _motor: Any = field(default=None, repr=False, compare=False)
 
     @property
@@ -132,6 +170,10 @@ class CrossEncoderReranker:
                     "falta `sentence-transformers`. Está pinado en pyproject.toml desde la "
                     "fase 0; ejecuta `uv sync`."
                 ) from err
+            if self.hilos:
+                import torch
+
+                torch.set_num_threads(self.hilos)
             motor = CrossEncoder(self.modelo, device=self.dispositivo)
             # La instrucción del dominio, en vez de la genérica de búsqueda web que trae la
             # librería. Se pone aquí y no en cada `predict` para que no haya dos caminos por
@@ -172,5 +214,23 @@ def reordenador_por_defecto() -> CrossEncoderReranker:
     """El de verdad, configurado desde el entorno. Se lee aquí y en ningún sitio más abajo."""
     return CrossEncoderReranker(
         modelo=os.environ.get("CITEBOUND_RERANKER", MODELO_POR_DEFECTO),
-        dispositivo=os.environ.get("CITEBOUND_RERANKER_DEVICE", "mps"),
+        dispositivo=os.environ.get("CITEBOUND_RERANKER_DEVICE", DISPOSITIVO_POR_DEFECTO),
     )
+
+
+def puntuador_por_defecto() -> Callable[[str, Sequence[Any]], list[float]]:
+    """Puntúa las fuentes **que se le enseñan al modelo**, no las treinta recuperadas.
+
+    Es la diferencia entre caber en `G-TTFT` y no caber: puntuar cinco cuesta **67 ms** y
+    reordenar treinta **348**, contra 116 ms de margen. Y para decidir si el corpus responde
+    basta con la mejor de las cinco, que son las únicas que el modelo puede citar.
+    """
+    reordenador = reordenador_por_defecto()
+
+    def puntuar(pregunta: str, fuentes: Sequence[Any]) -> list[float]:
+        if not fuentes:
+            return []
+        pares = [(pregunta, f.texto[: reordenador.caracteres]) for f in fuentes]
+        return [float(p) for p in reordenador.motor.predict(pares)]
+
+    return puntuar

@@ -5,13 +5,27 @@
   "src/citebound/ingest/chunking.py",
   "src/citebound/evals/scoring.py",
   "src/citebound/evals/bootstrap.py",
-  "src/citebound/retrieval/fusion.py"
+  "src/citebound/retrieval/fusion.py",
+  "src/citebound/domain/citation.py",
+  "src/citebound/agent/stream_guard.py",
+  "src/citebound/domain/retry.py"
  ],
- "killed": 1027,
- "killed_pct": 100,
+ "killed": 1275,
+ "killed_pct": 99,
  "minimo": 70,
  "supervivientes": [
-  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_3"
+  "citebound.ingest.boe_xml.x__raiz_texto__mutmut_29",
+  "citebound.ingest.boe_xml.x__desambiguar__mutmut_36",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_23",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_26",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_38",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_40",
+  "citebound.ingest.chunking.x_chunk_por_apartado__mutmut_63",
+  "citebound.evals.scoring.x_precision_cita_articulo__mutmut_9",
+  "citebound.evals.scoring.x_precision_cita_articulo__mutmut_14",
+  "citebound.evals.scoring.x_precision_cita_articulo__mutmut_29",
+  "citebound.evals.scoring.x_precision_cita_articulo__mutmut_35",
+  "citebound.evals.scoring.x_precision_cita_articulo__mutmut_36"
  ],
- "total": 1028
+ "total": 1287
 }

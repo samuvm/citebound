@@ -148,3 +148,12 @@ def test_el_modelo_por_defecto_es_el_medido_y_no_otro() -> None:
     cambia sin medir."""
     assert MODELO_POR_DEFECTO == "BAAI/bge-reranker-v2-m3"
     assert GRABACION["modelo"] == MODELO_POR_DEFECTO
+
+
+def test_los_hilos_por_defecto_son_cuatro_y_tambien_es_una_medida() -> None:
+    """PyTorch coge los 14 y deja a Ollama sin CPU. Tres pares alternados de `make bench` dan
+    la misma dirección las tres veces (~200 ms), y con 2 hilos se hunde a 4.166 porque puntuar
+    pasa a ser el cuello. El número está en el docstring del módulo."""
+    from citebound.providers.reranker import HILOS_POR_DEFECTO
+
+    assert HILOS_POR_DEFECTO == 4

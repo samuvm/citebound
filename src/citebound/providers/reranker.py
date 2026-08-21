@@ -97,6 +97,23 @@ camino de servir modelos» que Q-017 temía, ahora medido desde el otro lado.
 `mps` y `cuda` siguen disponibles por `CITEBOUND_RERANKER_DEVICE`: en una máquina con GPU
 dedicada al reranker la aritmética es otra."""
 
+HILOS_POR_DEFECTO = int(os.environ.get("CITEBOUND_HILOS_PUNTUADOR", "4"))
+"""Cuántos hilos de CPU se le dejan a PyTorch. `0` = los que quiera (14 en esta máquina).
+
+**Cuatro, y es una medida.** PyTorch coge por defecto los 14 y deja a Ollama sin CPU para su
+lado del trabajo. Tres pares de `make bench` alternados, misma dirección las tres veces:
+
+| `G-TTFT` p95 | 14 hilos | 4 hilos |
+|---|---:|---:|
+| par 1 | 5.835 ms | 5.634 ms |
+| par 2 | 2.225 ms | 2.039 ms |
+| par 3 | 2.541 ms | 2.095 ms |
+
+Con 2 hilos se hunde a 4.166: puntuar pasa a ser el cuello. Y el salto entre pares —5.8 s
+contra 2.2 s con la MISMA configuración— es estado de la máquina, no del código: el par 1 corrió
+detrás de un experimento que dejó generaciones abandonadas. **Por eso se comparan pares
+alternados y no corridas sueltas.**"""
+
 _TOPE = 30
 """Cuántos candidatos se reordenan. Con 10 el techo medido era 0,785 y con 30 es 0,977: el 17 %
 de los casos tenía el artículo correcto en los puestos 11-30 y el reordenador ni los miraba."""
@@ -140,6 +157,7 @@ class CrossEncoderReranker:
     tope: int = _TOPE
     caracteres: int = CARACTERES_POR_CANDIDATO
     instruccion: str = INSTRUCCION
+    hilos: int = HILOS_POR_DEFECTO
     _motor: Any = field(default=None, repr=False, compare=False)
 
     @property
@@ -152,6 +170,10 @@ class CrossEncoderReranker:
                     "falta `sentence-transformers`. Está pinado en pyproject.toml desde la "
                     "fase 0; ejecuta `uv sync`."
                 ) from err
+            if self.hilos:
+                import torch
+
+                torch.set_num_threads(self.hilos)
             motor = CrossEncoder(self.modelo, device=self.dispositivo)
             # La instrucción del dominio, en vez de la genérica de búsqueda web que trae la
             # librería. Se pone aquí y no en cada `predict` para que no haya dos caminos por

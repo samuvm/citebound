@@ -159,13 +159,14 @@ def bloques_de(fuentes: Sequence[Fuente]) -> str:
     borrador significaría cosas distintas según por dónde se sirviera, y `make eval` mediría un
     sistema que nadie ejecuta.
 
-    **La etiqueta es `[[REF:1]]` y no `[1]`, y es una medida.** Con `[1]`, el modelo escribía el
-    número del ARTÍCULO en el marcador —`[[REF:12]]` para el artículo 12, `[[REF:90]]` para el
-    90— en 36 de 274 casos, que se retractaban por fuera de rango. Enseñarle el token exacto que
-    tiene que escribir, en el sitio donde lo tiene que leer, es más barato que explicárselo.
+    **La etiqueta es `[1]` y no `[[REF:1]]`, y las dos están medidas.** Con `[[REF:1]]` el
+    modelo confunde menos el hueco con el número de artículo —`fuera_de_rango` baja de 36 a 19
+    sobre 274— pero **deja de escribir el bloque `CITAS`** mucho más a menudo: 23 → 53. En neto
+    la cobertura baja de 0,588 a 0,537, así que se queda `[1]`. Verle el marcador por todas
+    partes le desdibuja el formato, y el formato es lo que se parsea.
     """
     return "\n\n".join(
-        f"[[REF:{i}]] " + " ".join(f"({j}) {t}" for j, t in enumerate(_tramos(f), start=1))
+        f"[{i}] " + " ".join(f"({j}) {t}" for j, t in enumerate(_tramos(f), start=1))
         for i, f in enumerate(fuentes, start=1)
     )
 

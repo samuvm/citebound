@@ -143,14 +143,14 @@ def test_los_dos_caminos_numeran_las_fuentes_exactamente_igual() -> None:
 
     largo = Fuente(ref=parse(f"{NORMA}#art9"), texto="Artículo 9. " + "x" * 4000)
     bloques = bloques_de([ART34, largo])
-    assert bloques.startswith("[[REF:1]] ")
-    assert "\n\n[[REF:2]] " in bloques
+    assert bloques.startswith("[1] ")
+    assert "\n\n[2] " in bloques
     # **Acotado y alineado a tramos, no cortado en seco.** Desde v7 el modelo señala tramos
     # por su número, así que el bloque termina donde termina un tramo: cortar a 500 exactos
     # partiría el último por la mitad y el código copiaría uno más largo del que el modelo vio.
     # Lo que este test sujeta sigue siendo lo mismo —que el prompt está acotado— y además que
     # el corte cae donde el modelo puede señalar.
-    segundo = bloques.split("\n\n[[REF:2]] ")[1]
+    segundo = bloques.split("\n\n[2] ")[1]
     assert len(segundo) <= CARACTERES_POR_FUENTE + MAX_CARACTERES_TRAMO
     assert segundo.startswith("(1) ")
 

@@ -1,14 +1,14 @@
 {
  "abstenciones": {
-  "fuera_de_rango": 36,
-  "quote_demasiado_corto": 14,
-  "segmento_fuera_de_rango": 2,
-  "sin_citas": 23,
+  "fuera_de_rango": 19,
+  "quote_demasiado_corto": 13,
+  "segmento_fuera_de_rango": 1,
+  "sin_citas": 53,
   "sin_motivo_declarado": 1,
   "sin_relevancia": 67
  },
  "contract_version": 1,
- "created_at": "2026-08-22T18:07:20+00:00",
+ "created_at": "2026-08-22T19:02:01+00:00",
  "dataset": {
   "n_cases": 274,
   "name": "v2.jsonl",
@@ -23,37 +23,37 @@
   "modelo": "qwen3.5:4b",
   "physical_table": "chunk_v1",
   "prompt_id": "responder",
-  "prompt_version": 7,
+  "prompt_version": 9,
   "python": "3.12.4"
  },
  "lectura_publicada": "a_nivel_articulo (Q-021)",
  "metrics": [
   {
    "id": "G-HALLUC",
-   "n": 131,
+   "n": 120,
    "value": 0.0
   },
   {
    "id": "G-QUOTE-LIT",
-   "n": 147,
+   "n": 128,
    "value": 1.0
   },
   {
-   "a_nivel_articulo": 0.5725190839694656,
-   "estricto": 0.366412213740458,
+   "a_nivel_articulo": 0.6083333333333333,
+   "estricto": 0.4083333333333333,
    "id": "G-CITA-PRECISION",
-   "n": 131,
-   "value": 0.5725190839694656
+   "n": 120,
+   "value": 0.6083333333333333
   },
   {
    "id": "G-COBERTURA",
    "n": 216,
-   "value": 0.5879629629629629
+   "value": 0.5370370370370371
   },
   {
    "id": "G-ABST-FP",
    "n": 216,
-   "value": 0.41203703703703703
+   "value": 0.46296296296296297
   },
   {
    "id": "G-ABST-FN",
@@ -63,7 +63,7 @@
  ],
  "nota": "G-CITA-PRECISION se publica a nivel de ARTICULO por Q-021, que declara una divergencia con docs/CONTRACTS/retrieval-metrics.md. Motivo medido: el apartado exacto esta entre las cinco fuentes ofrecidas en el 39 % de los casos, asi que la lectura estricta esta acotada muy por debajo de su umbral por una razon ajena al generador. La estricta se publica al lado. Las parejas G-CITA-PRECISION+G-COBERTURA y G-ABST-FP+G-ABST-FN son atomicas: medidas por separado, la forma optima de aprobar cualquiera de las dos es hacer trampa. G-HALLUC y G-QUOTE-LIT son invariantes del verificador, no metricas de calidad: si bajan, es que dejo pasar algo.",
  "project": "citebound",
- "run_id": "ae4b1001903c01cd",
- "segundos": 77.8,
+ "run_id": "a651f2695207f4e5",
+ "segundos": 73.2,
  "suite": "fase-3"
 }

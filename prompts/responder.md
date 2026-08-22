@@ -1,9 +1,13 @@
 ---
 id: responder
-version: 8
+version: 9
 modelo_destino: qwen3.5:4b
 temperatura: 0.0
 cambios: |
+  v9 · se revierte la etiqueta de v8 y se conserva su troceador. Etiquetar los
+       artículos [[REF:1]] baja fuera_de_rango de 36 a 19 pero sube sin_citas de 23
+       a 53: en neto la cobertura cae de 0,588 a 0,537. Verle el marcador por todas
+       partes le desdibuja el formato, y el formato es lo que se parsea.
   v8 · dos arreglos medidos sobre el reparto de abstenciones de v7, que v7 hizo
        publicable por primera vez. (a) Los artículos se etiquetan [[REF:1]] en vez
        de [1]: con [1] el modelo escribía el número del ARTÍCULO en el marcador

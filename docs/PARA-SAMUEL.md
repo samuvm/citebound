@@ -1377,4 +1377,74 @@ Eso es trabajo de fase 4 con diseño propio, no un ajuste. **Refuerza la opción
 **0,002**, que es un caso de 216. Con la pareja de máquinas ratificada, ese margen es tan fino
 que el primer cambio de cualquier cosa lo tumba. Merece decisión aparte.
 
-**Estado: PENDIENTE**
+**CIERRE 2026-08-22 · lo que faltaba se ha construido · quedan TRES, y son tuyas**
+
+Ratificaste la pareja de máquinas y dijiste que cerrara si podía. Se ha atacado el diagnóstico
+en vez de mover el umbral, y ha funcionado a medias.
+
+**Lo que se ha construido: el fragmento ya no lo escribe el modelo.** Señala el tramo
+(`[[REF:1]] §2`) y lo copia el código. Es tu tesis un nivel más abajo — si no escribe la
+referencia porque la resuelve el código, tampoco tiene por qué escribir el fragmento. `G-QUOTE-LIT`
+pasa de número comprobado a **invariante estructural**; el verificador se queda igual, por si acaso.
+
+| meta | antes de anoche | **ahora** | umbral | |
+|---|---:|---:|---:|---|
+| `G-HALLUC` | 0 | **0** | = 0 | ✅ |
+| `G-QUOTE-LIT` | 1,00 | **1,00** | = 1,00 | ✅ |
+| `G-TTFT` | 2.039 ms | **1.299 ms** | ≤ 1.500 | ✅ |
+| `G-ABST-FN` | 0,155 | **0,069** | ≤ 0,10 | ✅ |
+| `G-COBERTURA` | 0,528 | **0,588** | ≥ 0,90 | ❌ |
+| `G-ABST-FP` | 0,472 | **0,412** | ≤ 0,05 | ❌ |
+| `G-CITA-PRECISION` | 0,602 | 0,573 | ≥ 0,85 | ❌ |
+
+**Y hay algo que corrijo de lo que te dije ayer.** Escribí que el modelo grande quedaba
+«enterrado con datos». Ese diagnóstico era correcto **para el prompt de entonces** y falso para
+el de ahora:
+
+| | 4B | 9B |
+|---|---:|---:|
+| `G-COBERTURA` | 0,588 | **0,718** |
+| `G-ABST-FP` | 0,412 | **0,282** |
+| `G-TTFT` | **1.299 ms** | 3.074 ms |
+
+El 9B era malo **transcribiendo** y es bueno **eligiendo**: al quitarle la transcripción, sus
+fallos de formato pasan de 59 a 5 sobre 274. No se adopta porque dobla el umbral de latencia
+—y porque comparte los 8 GB de la 3070 con el embebedor— pero **es la primera vez en toda la
+fase que una meta roja tiene una palanca conocida, medida y disponible.**
+
+---
+
+## Lo que tienes que hacer, en orden
+
+**1. Ejecuta esto en la terminal** (toca `GOALS.yaml` y `thresholds.lock`, que son tuyos):
+
+```
+cd ~/Documents/day-300/citebound-01 && ./aplicar-q022.sh --metas D+
+```
+
+**2. Dime que lo has hecho** y yo corro `make done MILESTONE=3` y cierro la fase.
+
+---
+
+### Qué hace exactamente ese comando, para que sepas qué estás firmando
+
+- Escribe la **pareja de máquinas** en `hardware_referencia`, con el jitter medido y las
+  condiciones de medida. Deja dicho que `G-TTFT`, `G-TTFS` y `G-COLD-CACHE` **solo significan
+  algo con esa pareja**, y que las de calidad no dependen del hardware.
+- Mueve **cuatro** metas de `bloqueante_desde_fase: 3` a `4`: `G-CITA-PRECISION` + `G-COBERTURA`
+  y `G-ABST-FP` + `G-ABST-FN`. **Las cuatro y no dos**, porque son dos parejas atómicas (R16) y
+  mover media pareja deja la fase bloqueada igual.
+- Regenera `thresholds.lock`.
+
+**No baja ningún umbral.** Los cuatro siguen exigiendo 0,85 / 0,90 / 0,05 / 0,10; lo que cambia
+es **cuándo** se exigen. Es la diferencia entre «esto no lo cumplimos» y «esto no lo cumplimos y
+lo tapamos», y me importa que sea la primera.
+
+Si prefieres `--metas D` (solo la primera pareja) el comando lo acepta, pero te aviso de que
+entonces `make done MILESTONE=3` seguirá en rojo por `G-ABST-FP`.
+
+Y si prefieres que la fase 3 **no** cierre hasta arreglar la calidad, no ejecutes nada: sigo con
+las palancas de fase 4 sobre la fase abierta. Es más lento y no pierde nada.
+
+**Estado: PENDIENTE DE QUE EJECUTES EL COMANDO**
+

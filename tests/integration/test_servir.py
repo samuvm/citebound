@@ -139,12 +139,20 @@ def test_los_dos_caminos_numeran_las_fuentes_exactamente_igual() -> None:
     sirviera, y `make eval` mediría un sistema que nadie ejecuta. Comparten función, y esto
     comprueba que la siguen compartiendo."""
     from citebound.agent.graph import CARACTERES_POR_FUENTE, bloques_de
+    from citebound.domain.citation import MAX_CARACTERES_TRAMO
 
     largo = Fuente(ref=parse(f"{NORMA}#art9"), texto="Artículo 9. " + "x" * 4000)
     bloques = bloques_de([ART34, largo])
-    assert bloques.startswith("[1] ")
-    assert "\n\n[2] " in bloques
-    assert len(bloques.split("\n\n[2] ")[1]) == CARACTERES_POR_FUENTE
+    assert bloques.startswith("[[REF:1]] ")
+    assert "\n\n[[REF:2]] " in bloques
+    # **Acotado y alineado a tramos, no cortado en seco.** Desde v7 el modelo señala tramos
+    # por su número, así que el bloque termina donde termina un tramo: cortar a 500 exactos
+    # partiría el último por la mitad y el código copiaría uno más largo del que el modelo vio.
+    # Lo que este test sujeta sigue siendo lo mismo —que el prompt está acotado— y además que
+    # el corte cae donde el modelo puede señalar.
+    segundo = bloques.split("\n\n[[REF:2]] ")[1]
+    assert len(segundo) <= CARACTERES_POR_FUENTE + MAX_CARACTERES_TRAMO
+    assert segundo.startswith("(1) ")
 
 
 def test_el_texto_se_trunca_en_el_prompt_pero_no_al_verificar() -> None:
@@ -166,3 +174,25 @@ def test_el_texto_se_trunca_en_el_prompt_pero_no_al_verificar() -> None:
     )[-1]
     assert isinstance(final, Resultado)
     assert final.curso.salida is Salida.RESPONDER
+
+
+def test_el_formato_por_tramo_llega_entero_por_los_dos_caminos() -> None:
+    """**El test que faltaba, y se nota que faltaba.**
+
+    `parsear_borrador` ganó un parámetro `fuentes` y los cuatro sitios que la llaman seguían
+    llamándola sin él: el `quote` salía vacío, el verificador decía `QUOTE_VACIO` y el sistema
+    se abstuvo en los 274 casos del eval. Los tests de unidad pasaban porque llaman a la
+    función directamente **con** fuentes, y los de integración pasaban porque todos usaban el
+    formato viejo entrecomillado.
+
+    Lo que sujeta esto es el formato nuevo recorriendo el camino entero, que es donde se rompió.
+    """
+    por_tramo = "CITAS\n[[REF:1]] §2\n\nRESPUESTA\nSe cuentan así [[REF:1]].\n"
+    servido = sirve(por_tramo)[-1]
+    grafo = por_el_grafo(por_tramo)
+
+    assert servido.curso.salida is Salida.RESPONDER
+    assert grafo.curso.salida is Salida.RESPONDER
+    esperado = "1. Se contará de derecha a izquierda."
+    assert servido.citas[0].quote == esperado
+    assert grafo.citas[0].quote == esperado

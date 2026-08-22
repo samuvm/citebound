@@ -59,7 +59,7 @@ RAIZ = Path(__file__).resolve().parents[1]
 GOLDEN = max((RAIZ / "evals" / "golden").glob("v*.jsonl"))
 INFORME = RAIZ / "evals" / "reports" / "eval-latest.json"
 CACHE = RAIZ / "evals" / "cache" / "respuestas.json"
-PROMPT_ID, PROMPT_VERSION = "responder", 6
+PROMPT_ID, PROMPT_VERSION = "responder", 8
 
 MAX_TOKENS = 1024
 """Suficiente para la prosa **y** el bloque de citas, que es donde se rompía.
@@ -169,6 +169,18 @@ def _es_literal(quote: str, texto: str) -> bool:
     return bool(quote) and normalizar_para_cotejo(quote) in normalizar_para_cotejo(texto)
 
 
+def _por_motivo(resultados: dict[str, Resultado]) -> dict[str, int]:
+    """Cuántas abstenciones por motivo, de mayor a menor. Ordenado para que `G-EVAL-DET`
+    —diff byte a byte del informe normalizado— no dependa del orden de un diccionario."""
+    cuenta: dict[str, int] = {}
+    for r in resultados.values():
+        if r.curso.salida is Salida.RESPONDER:
+            continue
+        clave = str(r.curso.motivo.value if r.curso.motivo else "sin_motivo_declarado")
+        cuenta[clave] = cuenta.get(clave, 0) + 1
+    return dict(sorted(cuenta.items(), key=lambda kv: (-kv[1], kv[0])))
+
+
 def main() -> int:
     import psycopg
 
@@ -275,6 +287,12 @@ def main() -> int:
             "n_cases": len(casos),
             "sha256": hashlib.sha256(semilla).hexdigest(),
         },
+        # **Por qué se abstiene, no solo cuánto.** `G-ABST-FP` dice que una de cada tres
+        # preguntas contestables se queda sin contestar; sin el reparto por motivo, eso manda a
+        # arreglar a ciegas. Con él se ve de un vistazo si el fallo es del portero, del formato
+        # o de la selección — y son tres arreglos distintos. Se descubrió faltando: la v7 subió
+        # la cobertura seis puntos y no había forma de saber qué quedaba cortando.
+        "abstenciones": _por_motivo(resultados),
         "metrics": [
             {"id": "G-HALLUC", "value": m_halluc.valor, "n": m_halluc.n},
             {"id": "G-QUOTE-LIT", "value": quote["value"], "n": quote["n"]},  # type: ignore[index]

@@ -21,6 +21,7 @@ from hypothesis import given
 from hypothesis import strategies as st
 
 from citebound.domain.citation import (
+    MAX_CARACTERES_TRAMO,
     MAX_FUENTES,
     MIN_CARACTERES_QUOTE,
     Cita,
@@ -502,3 +503,29 @@ def test_sin_fuentes_el_tramo_no_se_puede_resolver_y_no_se_inventa() -> None:
     _, citas = parsear_borrador("x [[REF:1]].\n\nCITAS\n[[REF:1]] §2\n")
     assert citas[0].segmento == 2
     assert citas[0].quote == ""
+
+
+def test_una_frase_larguisima_se_parte_en_tramos_senalables() -> None:
+    """**El tope vive aquí y no en el prompt, y este test es por qué.** `agent.graph` enseña
+    los tramos y `citation` los copia; si el tope viviera en el lado que los enseña, un tramo
+    largo se vería recortado y se copiaría entero — y saldría publicado un fragmento que el
+    modelo nunca leyó."""
+    larga = "palabra " * 200
+    tramos = segmentar(larga)
+    assert len(tramos) > 1
+    assert all(len(t) <= MAX_CARACTERES_TRAMO for t in tramos)
+    assert all(t in larga for t in tramos)
+
+
+def test_un_tramo_minusculo_se_pega_al_siguiente_en_vez_de_ser_citable() -> None:
+    """**Catorce abstenciones salieron de aquí.** El troceador producía tramos como «2.» y el
+    verificador los rechazaba por `QUOTE_DEMASIADO_CORTO` — con razón, porque un fragmento de
+    dos caracteres no cita, coincide.
+
+    El arreglo va en `segmentar` y no en el mínimo: bajar el mínimo dejaría pasar citas de dos
+    letras por la puerta del formato viejo, donde el fragmento sí lo escribe el modelo y donde
+    el mínimo es lo único que sostiene `G-QUOTE-LIT`. Lo que no puede existir es un tramo que
+    el modelo puede señalar y el verificador tiene que rechazar."""
+    tramos = segmentar("a) Sí.\nEsta frase sí tiene longitud de sobra para ser una cita.")
+    assert all(len(t) >= MIN_CARACTERES_QUOTE for t in tramos)
+    assert tramos[0].startswith("a) Sí.")

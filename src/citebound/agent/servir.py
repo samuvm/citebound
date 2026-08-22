@@ -102,7 +102,7 @@ def servir(
         if guardia.estado is Estado.RETRACTADO:
             veredictos.append(_fuera_de_rango())
         else:
-            _, citas = parsear_borrador(guardia.emitido)
+            _, citas = parsear_borrador(guardia.emitido, fuentes)
             veredictos.append(verificar(citas, fuentes))
 
         if NO_PUEDO_RESPONDER in guardia.emitido.upper():
@@ -118,7 +118,7 @@ def servir(
         yield Resultado(curso=curso, fuentes=tuple(fuentes), borradores=tuple(borradores))
         return
 
-    respuesta, citas = parsear_borrador(borradores[curso.reintentos])
+    respuesta, citas = parsear_borrador(borradores[curso.reintentos], fuentes)
     yield Resultado(
         curso=curso,
         respuesta=respuesta,

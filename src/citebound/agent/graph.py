@@ -24,7 +24,14 @@ from typing import Any, Protocol, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
-from citebound.domain.citation import Cita, Fuente, Veredicto, parsear_borrador, verificar
+from citebound.domain.citation import (
+    Cita,
+    Fuente,
+    Veredicto,
+    parsear_borrador,
+    segmentar,
+    verificar,
+)
 from citebound.domain.retry import Curso, Salida, decidir, resolver_curso
 
 __all__ = [
@@ -140,7 +147,7 @@ class _Nodos:
     def verificar(self, estado: Estado) -> dict[str, Any]:
         borrador = estado["borradores"][-1]
         fuentes = estado.get("fuentes") or []
-        _, citas = parsear_borrador(borrador)
+        _, citas = parsear_borrador(borrador, fuentes)
         veredicto = verificar(citas, fuentes)
         return {"veredictos": [*estado.get("veredictos", []), veredicto]}
 
@@ -151,10 +158,35 @@ def bloques_de(fuentes: Sequence[Fuente]) -> str:
     `agent.graph` y `agent.servir` tienen que numerar igual: si numeraran distinto, el mismo
     borrador significaría cosas distintas según por dónde se sirviera, y `make eval` mediría un
     sistema que nadie ejecuta.
+
+    **La etiqueta es `[[REF:1]]` y no `[1]`, y es una medida.** Con `[1]`, el modelo escribía el
+    número del ARTÍCULO en el marcador —`[[REF:12]]` para el artículo 12, `[[REF:90]]` para el
+    90— en 36 de 274 casos, que se retractaban por fuera de rango. Enseñarle el token exacto que
+    tiene que escribir, en el sitio donde lo tiene que leer, es más barato que explicárselo.
     """
     return "\n\n".join(
-        f"[{i}] {f.texto[:CARACTERES_POR_FUENTE]}" for i, f in enumerate(fuentes, start=1)
+        f"[[REF:{i}]] " + " ".join(f"({j}) {t}" for j, t in enumerate(_tramos(f), start=1))
+        for i, f in enumerate(fuentes, start=1)
     )
+
+
+def _tramos(fuente: Fuente) -> tuple[str, ...]:
+    """Los tramos de una fuente, **truncando por tramos enteros y no por caracteres**.
+
+    Cortar a 500 caracteres a pelo partiría el último tramo por la mitad, y el modelo podría
+    señalar un `§4` que aquí se ve completo y en el original sigue: el código copiaría el tramo
+    entero y saldría un fragmento más largo que el que el modelo leyó. Truncar por tramos
+    enteros hace que lo que ve y lo que se copia sean lo mismo.
+    """
+    enteros = segmentar(fuente.texto)
+    cabidos: list[str] = []
+    gastado = 0
+    for tramo in enteros:
+        if gastado + len(tramo) > CARACTERES_POR_FUENTE and cabidos:
+            break
+        cabidos.append(tramo)
+        gastado += len(tramo) + 1
+    return tuple(cabidos)
 
 
 def _siguiente(estado: Estado) -> str:
@@ -219,7 +251,7 @@ def responder(grafo: Any, pregunta: str) -> Resultado:
     if curso.salida is not Salida.RESPONDER:
         return Resultado(curso=curso, fuentes=fuentes, borradores=borradores)
 
-    respuesta, citas = parsear_borrador(borradores[curso.reintentos])
+    respuesta, citas = parsear_borrador(borradores[curso.reintentos], fuentes)
     return Resultado(
         curso=curso, respuesta=respuesta, citas=citas, fuentes=fuentes, borradores=borradores
     )

@@ -17,6 +17,8 @@ antes de que exista una línea de implementación.
 from __future__ import annotations
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from citebound.domain.citation import (
     MAX_FUENTES,
@@ -29,6 +31,7 @@ from citebound.domain.citation import (
     normalizar_para_cotejo,
     parsear_borrador,
     resolver,
+    segmentar,
     verificar,
 )
 from citebound.domain.legalref import parse
@@ -407,3 +410,95 @@ def test_con_las_citas_primero_una_respuesta_truncada_conserva_sus_citas() -> No
     así que la respuesta se puede verificar igual en vez de perderse entera."""
     _, citas = parsear_borrador("CITAS\n[[REF:1]] «algo»\n\nRESPUESTA\nSe cuentan de derec")
     assert citas == (Cita(n=1, quote="algo"),)
+
+
+# ======================================================================================
+# El fragmento lo copia el CÓDIGO · `[[REF:n]] §m`
+#
+# La tesis del proyecto, un nivel más abajo. Si el generador no escribe la referencia
+# porque la resuelve el código, tampoco tiene por qué escribir el fragmento: señala el
+# tramo y lo copia el código. Un quote así **no puede** no ser literal, igual que hoy una
+# referencia no puede estar inventada.
+#
+# Lo que esto deja de medir, dicho claro: la capacidad del modelo de TRANSCRIBIR, que
+# nunca fue lo que el producto promete. Lo que sigue midiéndose es su capacidad de
+# ELEGIR — el ref con `G-CITA-PRECISION` y ahora el tramo, que puede equivocarse igual.
+# ======================================================================================
+
+
+ART34_LARGO = Fuente(
+    ref=parse(f"{NORMA}#art34"),
+    texto=(
+        "Artículo 34. Cómputo de carriles.\n"
+        "1. Se contará de derecha a izquierda. 2. Los carriles reversibles no cuentan."
+    ),
+)
+
+
+def test_segmentar_parte_por_frases_y_por_lineas() -> None:
+    """El modelo tiene que poder señalar un tramo, así que el troceado del artículo es parte
+    del contrato con él: si cambia, el `§2` de una grabación deja de significar lo mismo."""
+    assert segmentar(ART34_LARGO.texto) == (
+        "Artículo 34. Cómputo de carriles.",
+        "1. Se contará de derecha a izquierda.",
+        "2. Los carriles reversibles no cuentan.",
+    )
+
+
+def test_un_texto_sin_finales_de_frase_es_un_solo_segmento() -> None:
+    assert segmentar("solo una cosa sin punto") == ("solo una cosa sin punto",)
+
+
+@given(st.text(min_size=1, max_size=400))
+def test_todo_segmento_esta_literalmente_en_su_origen(texto: str) -> None:
+    """**La propiedad que hace que esto valga la pena.** Si un segmento no fuera un trozo
+    literal del texto, copiar el segmento no garantizaría nada y todo el diseño se cae."""
+    normalizado = normalizar_para_cotejo(texto)
+    for trozo in segmentar(texto):
+        assert normalizar_para_cotejo(trozo) in normalizado
+
+
+def test_la_cita_por_tramo_produce_el_quote_desde_la_fuente() -> None:
+    """El modelo escribe `§2` y el `quote` sale del artículo, no de su teclado."""
+    borrador = "Se cuentan así [[REF:1]].\n\nCITAS\n[[REF:1]] §2\n"
+    _, citas = parsear_borrador(borrador, (ART34_LARGO,))
+    assert citas[0].segmento == 2
+    assert citas[0].quote == "1. Se contará de derecha a izquierda."
+
+
+def test_un_quote_copiado_por_codigo_no_puede_fallar_la_verificacion() -> None:
+    """`G-QUOTE-LIT` pasa de ser un número que se comprueba a un invariante estructural. El
+    verificador se queda igualmente: defensa en profundidad, no confianza."""
+    _, citas = parsear_borrador("x [[REF:1]].\n\nCITAS\n[[REF:1]] §2\n", (ART34_LARGO,))
+    assert verificar(citas, (ART34_LARGO,)).ok is True
+
+
+def test_un_tramo_que_no_existe_se_rechaza_con_su_propio_motivo() -> None:
+    """**Distinto de `FUERA_DE_RANGO`**, que es el ref, y distinto de `QUOTE_NO_LITERAL`, que
+    ya no puede pasar. Confundirlos manda a arreglar lo que no está roto."""
+    _, citas = parsear_borrador("x [[REF:1]].\n\nCITAS\n[[REF:1]] §9\n", (ART34_LARGO,))
+    assert verificar(citas, (ART34_LARGO,)).motivo is Motivo.SEGMENTO_FUERA_DE_RANGO
+
+
+def test_el_tramo_cero_se_rechaza_como_el_ref_cero() -> None:
+    """Por lo mismo que `resolver` rechaza el 0: en Python indexaría al último y citaría un
+    tramo que nadie eligió, en silencio."""
+    _, citas = parsear_borrador("x [[REF:1]].\n\nCITAS\n[[REF:1]] §0\n", (ART34_LARGO,))
+    assert verificar(citas, (ART34_LARGO,)).motivo is Motivo.SEGMENTO_FUERA_DE_RANGO
+
+
+def test_sigue_leyendo_las_citas_entrecomilladas_de_las_grabaciones() -> None:
+    """Hay 274 respuestas grabadas con el formato viejo. Si dejaran de parsearse, `make eval`
+    mediría un sistema distinto del que produjo la caché y el número no significaría nada."""
+    viejo = "x [[REF:1]].\n\nCITAS\n[[REF:1]] «1. Se contará de derecha a izquierda.»\n"
+    _, citas = parsear_borrador(viejo, (ART34_LARGO,))
+    assert citas[0].quote == "1. Se contará de derecha a izquierda."
+    assert citas[0].segmento is None
+
+
+def test_sin_fuentes_el_tramo_no_se_puede_resolver_y_no_se_inventa() -> None:
+    """`parsear_borrador` se llama en sitios donde todavía no hay fuentes. Devolver un quote
+    vacío es correcto; inventarse uno sería exactamente lo que este proyecto no hace."""
+    _, citas = parsear_borrador("x [[REF:1]].\n\nCITAS\n[[REF:1]] §2\n")
+    assert citas[0].segmento == 2
+    assert citas[0].quote == ""

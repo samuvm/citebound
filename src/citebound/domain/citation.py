@@ -45,6 +45,7 @@ __all__ = [
     "Veredicto",
     "normalizar_para_cotejo",
     "parsear_borrador",
+    "segmentar",
     "resolver",
     "verificar",
 ]
@@ -124,6 +125,7 @@ class Motivo(StrEnum):
     QUOTE_VACIO = "quote_vacio"
     QUOTE_DEMASIADO_CORTO = "quote_demasiado_corto"
     SIN_CITAS = "sin_citas"
+    SEGMENTO_FUERA_DE_RANGO = "segmento_fuera_de_rango"
     SIN_RELEVANCIA = "sin_relevancia"
     """Lo recuperado no viene a cuento. **Es distinto de `QUOTE_NO_LITERAL`** y la diferencia
     importa: este dice «el corpus no lo responde» y aquel dice «el modelo lo escribió mal».
@@ -144,6 +146,7 @@ class Cita:
 
     n: int
     quote: str
+    segmento: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +156,11 @@ class Veredicto:
     ok: bool
     refs: tuple[LegalRef, ...] = ()
     motivo: Motivo | None = None
+
+
+def segmentar(texto: str) -> tuple[str, ...]:
+    """PENDIENTE DE IMPLEMENTAR · el rojo va commiteado antes que el verde."""
+    return (texto,)
 
 
 def normalizar_para_cotejo(texto: str) -> str:
@@ -217,7 +225,7 @@ def verificar(citas: Sequence[Cita], fuentes: Sequence[Fuente]) -> Veredicto:
     return Veredicto(ok=True, refs=tuple(refs))
 
 
-def parsear_borrador(borrador: str) -> tuple[str, tuple[Cita, ...]]:
+def parsear_borrador(borrador: str, fuentes: Sequence[Fuente] = ()) -> tuple[str, tuple[Cita, ...]]:
     """`(respuesta, citas)` a partir de lo que escribió el modelo.
 
     **Es la frontera entre lo que el modelo escribe y lo que el verificador comprueba**, y por

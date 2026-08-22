@@ -2205,3 +2205,81 @@ copiar.
 Eso apunta a una palanca que **no se ha tocado y es la tesis del proyecto un nivel más abajo**:
 si el modelo no puede escribir la referencia y la resuelve el código, ¿por qué escribe el
 fragmento? Podría señalar el tramo y **copiarlo el código**. Va a Q-022 como fase 4.
+
+## 2026-08-22 · fase 3 · el fragmento lo copia el código, y el diagnóstico que faltaba
+
+Con las dos máquinas ratificadas quedaban tres metas rojas, y el diagnóstico era preciso: la
+mitad de las preguntas contestables acababan en abstención porque el modelo escribía un `quote`
+que no aparecía literalmente en su artículo. Tres versiones de prompt (v3, v4, v5) intentaron
+arreglarlo pidiéndoselo de tres maneras y las tres fallaron. **Porque el problema no era la
+instrucción: era pedirle que transcriba.**
+
+### La tesis del proyecto, un nivel más abajo
+
+Si el generador no escribe la referencia porque la resuelve el código, **tampoco tiene por qué
+escribir el fragmento**. Ahora señala el tramo —`[[REF:1]] §2`— y lo copia `domain.citation`.
+
+`G-QUOTE-LIT` pasa de número comprobado a **invariante estructural**. El verificador se queda
+puesto igual: defensa en profundidad, no confianza.
+
+**Lo que se deja de medir, dicho claro:** la capacidad del modelo de TRANSCRIBIR, que nunca fue
+lo que el producto promete. Lo que se sigue midiendo es la de ELEGIR — el artículo con
+`G-CITA-PRECISION` y ahora también el tramo, que puede equivocarse igual y tiene su propio
+motivo (`SEGMENTO_FUERA_DE_RANGO`).
+
+No toca R2 (`docs/RULES.md`, solo lectura): `[[REF:n]]` con `n∈{1..5}` sigue exactamente igual y
+el guardia lo valida en vuelo. Lo que cambia es solo cómo se expresa el fragmento.
+
+### El informe publica ahora POR QUÉ se abstiene, y no lo hacía
+
+`G-ABST-FP` decía que casi la mitad de las preguntas contestables se quedaban sin contestar. Sin
+el reparto por motivo, eso manda a arreglar a ciegas. Con él, tres arreglos distintos saltan a la
+vista. **Esto es lo que hizo posible todo lo que sigue.**
+
+### Cinco versiones medidas, mismo corpus, misma máquina, misma cuantización
+
+| prompt | `COBERTURA` | `CITA-PREC` | `ABST-FP` | `fuera_de_rango` | `sin_citas` |
+|---|---:|---:|---:|---:|---:|
+| v6 · el modelo escribe el fragmento | 0,528 | 0,602 | 0,472 | — | — |
+| v8/v9 · etiqueta `[[REF:1]]` | 0,537 | 0,608 | 0,463 | 19 | 53 |
+| **v10 · lo copia el código** | **0,588** | 0,573 | **0,412** | 36 | 23 |
+
+Etiquetar los artículos `[[REF:1]]` en vez de `[1]` **baja a la mitad** que el modelo confunda
+el hueco con el número de artículo (36 → 19) y **más que dobla** que se salte el bloque `CITAS`
+(23 → 53). En neto pierde. Verle el marcador por todas partes le desdibuja el formato, y el
+formato es lo que se parsea.
+
+### Un error mío que conviene tener escrito
+
+La v9 midió **idéntica a v8 hasta la última casilla** y estuve a punto de anotarlo como anomalía
+inexplicable. No lo era: **el borrado de una regla no llegó a aplicarse** —el `replace` no casó
+con el texto real del fichero— y el prompt quedó contradiciéndose, diciendo «cada artículo
+empieza por su marcador» con la etiqueta ya revertida a `[1]`. Era el mismo prompt.
+
+Se caza comparando el fichero, no leyendo el diff que uno cree haber aplicado. Y el desenlace es
+bueno: v10, con la regla de verdad quitada, reprodujo **exactamente** los números de v7. **El
+eval es determinista, y esto lo demuestra por accidente.**
+
+### El 9B, desenterrado: la palanca no estaba muerta, estaba tapada por la tarea
+
+| | 4B + v10 | 9B + v10 |
+|---|---:|---:|
+| `G-COBERTURA` | 0,588 | **0,718** |
+| `G-ABST-FP` | 0,412 | **0,282** |
+| `G-CITA-PRECISION` | **0,573** | 0,482 |
+| `G-ABST-FN` | **0,069** | 0,155 |
+| `G-TTFT` | **1.014 ms** | 3.074 ms |
+| `fuera_de_rango` | 36 | **2** |
+| `sin_citas` | 23 | **3** |
+
+**El 9B era malo transcribiendo y es bueno eligiendo.** Ayer lo medí con v6 y perdía en las
+cuatro métricas; anoté que la palanca «modelo más grande» quedaba cerrada. Ese diagnóstico era
+correcto **para v6** y falso para v10: al quitarle la transcripción, sus fallos de formato casi
+desaparecen (36 → 2 y 23 → 3).
+
+**No se adopta**: 3.074 ms es el doble del umbral de latencia. Y además el `G-TTFS` sube de 167
+a 1.355 ms, porque el embebedor comparte la 3070 con él y 5,5 GB de 8 dejan poco sitio — la
+misma contienda de ayer, mudada de máquina.
+
+Queda medido y escrito para cuando la máquina de referencia cambie. **Es la primera vez en la
+fase que una meta roja tiene una palanca conocida, medida y disponible.**

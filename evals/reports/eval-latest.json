@@ -1,14 +1,14 @@
 {
  "abstenciones": {
-  "fuera_de_rango": 19,
-  "quote_demasiado_corto": 13,
-  "segmento_fuera_de_rango": 1,
-  "sin_citas": 53,
+  "fuera_de_rango": 36,
+  "quote_demasiado_corto": 14,
+  "segmento_fuera_de_rango": 2,
+  "sin_citas": 23,
   "sin_motivo_declarado": 1,
   "sin_relevancia": 67
  },
  "contract_version": 1,
- "created_at": "2026-08-22T19:02:01+00:00",
+ "created_at": "2026-08-22T19:12:55+00:00",
  "dataset": {
   "n_cases": 274,
   "name": "v2.jsonl",
@@ -16,44 +16,44 @@
   "version": 2
  },
  "environment": {
-  "aciertos_cache": 274,
-  "deterministic": true,
+  "aciertos_cache": 0,
+  "deterministic": false,
   "hardware": "MacBook Pro M4 Max, 36 GB, macOS 26.5",
   "index_version": "v1-qwen3-embedding-0.6b-1024-apartado-v1",
   "modelo": "qwen3.5:4b",
   "physical_table": "chunk_v1",
   "prompt_id": "responder",
-  "prompt_version": 9,
+  "prompt_version": 10,
   "python": "3.12.4"
  },
  "lectura_publicada": "a_nivel_articulo (Q-021)",
  "metrics": [
   {
    "id": "G-HALLUC",
-   "n": 120,
+   "n": 131,
    "value": 0.0
   },
   {
    "id": "G-QUOTE-LIT",
-   "n": 128,
+   "n": 147,
    "value": 1.0
   },
   {
-   "a_nivel_articulo": 0.6083333333333333,
-   "estricto": 0.4083333333333333,
+   "a_nivel_articulo": 0.5725190839694656,
+   "estricto": 0.366412213740458,
    "id": "G-CITA-PRECISION",
-   "n": 120,
-   "value": 0.6083333333333333
+   "n": 131,
+   "value": 0.5725190839694656
   },
   {
    "id": "G-COBERTURA",
    "n": 216,
-   "value": 0.5370370370370371
+   "value": 0.5879629629629629
   },
   {
    "id": "G-ABST-FP",
    "n": 216,
-   "value": 0.46296296296296297
+   "value": 0.41203703703703703
   },
   {
    "id": "G-ABST-FN",
@@ -63,7 +63,7 @@
  ],
  "nota": "G-CITA-PRECISION se publica a nivel de ARTICULO por Q-021, que declara una divergencia con docs/CONTRACTS/retrieval-metrics.md. Motivo medido: el apartado exacto esta entre las cinco fuentes ofrecidas en el 39 % de los casos, asi que la lectura estricta esta acotada muy por debajo de su umbral por una razon ajena al generador. La estricta se publica al lado. Las parejas G-CITA-PRECISION+G-COBERTURA y G-ABST-FP+G-ABST-FN son atomicas: medidas por separado, la forma optima de aprobar cualquiera de las dos es hacer trampa. G-HALLUC y G-QUOTE-LIT son invariantes del verificador, no metricas de calidad: si bajan, es que dejo pasar algo.",
  "project": "citebound",
- "run_id": "a651f2695207f4e5",
- "segundos": 73.2,
+ "run_id": "12818902f07b05a9",
+ "segundos": 609.4,
  "suite": "fase-3"
 }

@@ -1,9 +1,14 @@
 ---
 id: responder
-version: 9
+version: 10
 modelo_destino: qwen3.5:4b
 temperatura: 0.0
 cambios: |
+  v10· lo que v9 DECIA ser. En v9 el borrado de la regla 3 no llego a aplicarse y
+       el prompt quedaba contradiciendose: decia «cada articulo empieza por su
+       marcador, escribe exactamente ese» con la etiqueta ya revertida a [1]. Por
+       eso midio identico a v8 hasta la ultima casilla -- no era coincidencia, era
+       el mismo prompt. Lo caza comparar el fichero, no leer el diff.
   v9 · se revierte la etiqueta de v8 y se conserva su troceador. Etiquetar los
        artículos [[REF:1]] baja fuera_de_rango de 36 a 19 pero sube sin_citas de 23
        a 53: en neto la cobertura cae de 0,588 a 0,537. Verle el marcador por todas
@@ -98,9 +103,7 @@ Reglas, y la primera es la que más importa:
 2. **Señala UN tramo**, el que dice lo que respondes. No escribas el texto del tramo, ni lo
    resumas, ni lo expliques ahí: solo su número. Si el tramo que señalas no existe en ese
    artículo, la respuesta se descarta.
-3. **El marcador es el que ves arriba, tal cual.** Cada artículo empieza por su marcador:
-   escribe exactamente ese. No escribas el número del artículo — no lo sabes y no te hace falta.
-4. **Solo existen los marcadores que ves arriba.** No escribas ningún otro número, ni menciones
+3. **Solo existen los números que ves arriba.** No escribas ningún otro número, ni menciones
    artículos por su número: el marcador es tu única forma de referirte a ellos.
 
 Después de las citas, escribe una línea que diga exactamente RESPUESTA y debajo tu respuesta en
